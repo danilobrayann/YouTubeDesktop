@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';" />
+  <title>YouTube Desktop</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ══════════ CUSTOM TITLEBAR ══════════ -->
+    <div id="titlebar">
+      <div id="titlebar-drag">
+        <img src="../assets/icon.svg" id="titlebar-icon" alt="icon" />
+        <span id="titlebar-title">YouTube Desktop</span>
+      </div>
+      <div id="window-controls">
+        <button class="win-btn" id="btn-min" title="Minimizar">&#8213;</button>
+        <button class="win-btn" id="btn-max" title="Maximizar">&#9633;</button>
+        <button class="win-btn close-btn" id="btn-close" title="Fechar">&#10005;</button>
+      </div>
+    </div>
+
+    <!-- ══════════ MAIN LAYOUT ══════════ -->
+    <div id="main-layout">
+
+      <!-- ── SIDEBAR ── -->
+      <nav id="sidebar">
+        <div id="sidebar-logo">
+          <img src="../assets/icon.svg" alt="logo" />
+          <span>YT Desktop</span>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-item active" data-tab="home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Início</span>
+          </div>
+          <div class="nav-item" data-tab="downloads">
+            <span class="nav-icon">⬇️</span>
+            <span class="nav-label">Downloads</span>
+            <span class="nav-badge hidden" id="dl-badge">0</span>
+          </div>
+          <div class="nav-item" data-tab="settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Configurações</span>
+          </div>
+        </div>
+
+        <div id="sidebar-footer">
+          <div id="now-playing" class="hidden">
+            <div class="np-dot"></div>
+            <span id="np-title">Reproduzindo...</span>
+          </div>
+        </div>
+      </nav>
+
+      <!-- ── CONTENT ── -->
+      <div id="content">
+
+        <!-- ════ TAB: HOME ════ -->
+        <div class="tab active" id="tab-home">
+          <div id="url-bar">
+            <div id="url-bar-nav">
+              <button id="btn-nav-back" class="nav-control-btn" title="Voltar (Alt + Esquerda)">‹</button>
+              <button id="btn-nav-forward" class="nav-control-btn" title="Avançar (Alt + Direita)">›</button>
+              <button id="btn-nav-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-nav-home" class="nav-control-btn" title="Início do YouTube">🏠</button>
+            </div>
+
+            <div id="url-bar-inner">
+              <span id="url-icon">🔗</span>
+              <input
+                id="url-input"
+                type="text"
+                placeholder="Cole o link ou pesquise no YouTube..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button id="btn-load" class="btn-primary" title="Assistir vídeo ou pesquisar">
+                <span>▶</span> Assistir
+              </button>
+              <button id="btn-download-quick" class="btn-secondary" title="Baixar este vídeo ou música">
+                <span>⬇</span> Baixar
+              </button>
+              <button id="btn-toggle-theater" class="nav-control-btn" title="Expandir vídeo (Ocultar/Exibir barra)">⛶</button>
+            </div>
+          </div>
+
+          <div id="webview-container">
+            <webview
+              id="youtube-player"
+              src="https://www.youtube.com"
+              partition="persist:youtube"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="webview-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando YouTube...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: DOWNLOADS ════ -->
+        <div class="tab" id="tab-downloads">
+          <div id="downloads-wrapper">
+            <div id="downloads-header">
+              <h2 class="tab-title">⬇️ Downloads</h2>
+            </div>
+
+            <div id="download-controls" class="glass-card">
+              <div class="dc-row">
+                <div class="dc-input-wrap">
+                  <span class="dc-icon">🔗</span>
+                  <input
+                    id="dl-url"
+                    type="text"
+                    placeholder="URL do vídeo, playlist ou música..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </div>
+                <select id="dl-format" class="glass-select">
+                  <option value="1080p">🎬 MP4 1080p</option>
+                  <option value="720p" selected>🎬 MP4 720p</option>
+                  <option value="480p">🎬 MP4 480p</option>
+                  <option value="360p">🎬 MP4 360p</option>
+                  <option value="mp3">🎵 MP3</option>
+                  <option value="m4a">🎵 M4A</option>
+                  <option value="opus">🎵 Opus</option>
+                </select>
+                <button id="btn-start-download" class="btn-primary btn-download-main">
+                  ⬇ Baixar
+                </button>
+              </div>
+            </div>
+
+            <div id="download-path-bar" class="glass-card path-bar">
+              <span class="path-icon">📁</span>
+              <span id="dl-path-display" class="path-text">Carregando...</span>
+              <button id="btn-change-path" class="btn-ghost">Alterar Pasta</button>
+              <button id="btn-open-folder" class="btn-ghost">Abrir Pasta</button>
+            </div>
+
+            <div id="download-list">
+              <div id="dl-empty-state" class="empty-state">
+                <div class="empty-icon">📥</div>
+                <p>Nenhum download ainda</p>
+                <span>Cole uma URL acima e clique em Baixar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: SETTINGS ════ -->
+        <div class="tab" id="tab-settings">
+          <div id="settings-wrapper">
+            <div id="settings-header">
+              <h2 class="tab-title">⚙️ Configurações</h2>
+            </div>
+
+            <div id="settings-content">
+
+              <!-- Theme Presets -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">🎨 Temas</h3>
+                <div id="theme-presets">
+                  <button class="preset-btn" data-preset="dark" title="Dark">
+                    <div class="preset-preview" style="background: linear-gradient(135deg,#0f0f1a,#1a1a2e)"></div>
+                    <span>Dark</span>
+                  </button>
+                  <button class="preset-btn" data-preset="amoled" title="AMOLED">
+                    <div class="preset-preview" style="background: #000000"></div>
+                    <span>AMOLED</span>
+                  </button>
+                  <button class="preset-btn" data-preset="midnight" title="Midnight">
+                    <div class="preset-preview" style="background: linear-gradient(135deg,#0d0d2b,#1a0533)"></div>
+                    <span>Midnight</span>
+                  </button>
+                  <button class="preset-btn" data-preset="ocean" title="Ocean">
+                    <div class="preset-preview" style="background: linear-gradient(135deg,#0a192f,#112240)"></div>
+                    <span>Ocean</span>
+                  </button>
+                  <button class="preset-btn" data-preset="forest" title="Forest">
+                    <div class="preset-preview" style="background: linear-gradient(135deg,#0a1628,#0d2137)"></div>
+                    <span>Forest</span>
+                  </button>
+                  <button class="preset-btn" data-preset="sunset" title="Sunset">
+                    <div class="preset-preview" style="background: linear-gradient(135deg,#1a0a0f,#2d1b1b)"></div>
+                    <span>Sunset</span>
+                  </button>
+                  <button class="preset-btn" data-preset="light" title="Light">
+                    <div class="preset-preview" style="background: linear-gradient(135deg,#f0f0f5,#e8e8f0)"></div>
+                    <span>Light</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Colors -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">🖌️ Cores</h3>
+                <div class="settings-grid">
+                  <div class="setting-row">
+                    <label>Cor de Destaque</label>
+                    <div class="color-pick-wrap">
+                      <input type="color" id="set-accent" value="#ff4444" />
+                      <span class="color-label" id="accent-label">#ff4444</span>
+                    </div>
+                  </div>
+                  <div class="setting-row">
+                    <label>Cor de Fundo</label>
+                    <div class="color-pick-wrap">
+                      <input type="color" id="set-bgcolor" value="#0f0f1a" />
+                      <span class="color-label" id="bgcolor-label">#0f0f1a</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gradient -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">🌈 Gradiente</h3>
+                <div class="settings-grid">
+                  <div class="setting-row">
+                    <label>Ativar Gradiente</label>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="set-gradient-enabled" checked />
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div class="setting-row" id="gradient-options">
+                    <label>Ângulo (°)</label>
+                    <div class="slider-wrap">
+                      <input type="range" id="set-gradient-angle" min="0" max="360" value="135" />
+                      <span class="slider-val" id="angle-val">135°</span>
+                    </div>
+                  </div>
+                  <div class="setting-row">
+                    <label>Cor 1</label>
+                    <div class="color-pick-wrap">
+                      <input type="color" id="set-grad-c1" value="#0f0f1a" />
+                      <span class="color-label" id="gradc1-label">#0f0f1a</span>
+                    </div>
+                  </div>
+                  <div class="setting-row">
+                    <label>Cor 2</label>
+                    <div class="color-pick-wrap">
+                      <input type="color" id="set-grad-c2" value="#1a1a2e" />
+                      <span class="color-label" id="gradc2-label">#1a1a2e</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Glass Effect -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">💎 Efeito Glass</h3>
+                <div class="settings-grid">
+                  <div class="setting-row">
+                    <label>Desfoque (px)</label>
+                    <div class="slider-wrap">
+                      <input type="range" id="set-blur" min="0" max="40" value="12" />
+                      <span class="slider-val" id="blur-val">12px</span>
+                    </div>
+                  </div>
+                  <div class="setting-row">
+                    <label>Opacidade Glass</label>
+                    <div class="slider-wrap">
+                      <input type="range" id="set-opacity" min="0" max="50" value="15" />
+                      <span class="slider-val" id="opacity-val">15%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Background Image -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">🖼️ Imagem de Fundo</h3>
+                <div class="bg-image-section">
+                  <div id="bg-preview-wrap">
+                    <div id="bg-preview" class="bg-preview-box">
+                      <span id="bg-preview-text">Nenhuma imagem</span>
+                      <img id="bg-preview-img" class="hidden" alt="Background preview" />
+                    </div>
+                  </div>
+                  <div class="bg-image-buttons">
+                    <button id="btn-pick-bg" class="btn-secondary">📂 Escolher Imagem</button>
+                    <button id="btn-clear-bg" class="btn-ghost">🗑️ Remover</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Transparency -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">🔮 Transparência</h3>
+                <div class="setting-row">
+                  <label>Janela Transparente</label>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="set-transparency" checked />
+                    <span class="toggle-track"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Download Settings -->
+              <div class="settings-section glass-card">
+                <h3 class="section-title">📥 Configurações de Download</h3>
+                <div class="settings-grid">
+                  <div class="setting-row">
+                    <label>Pasta de Download</label>
+                    <div class="path-setting-wrap">
+                      <span id="settings-dl-path" class="path-mini"></span>
+                      <button id="btn-settings-change-path" class="btn-ghost btn-sm">Alterar</button>
+                    </div>
+                  </div>
+                  <div class="setting-row">
+                    <label>Formato Padrão</label>
+                    <select id="set-default-format" class="glass-select glass-select-sm">
+                      <option value="1080p">MP4 1080p</option>
+                      <option value="720p" selected>MP4 720p</option>
+                      <option value="480p">MP4 480p</option>
+                      <option value="360p">MP4 360p</option>
+                      <option value="mp3">MP3</option>
+                      <option value="m4a">M4A</option>
+                      <option value="opus">Opus</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Save Button -->
+              <div class="settings-save-row">
+                <button id="btn-save-theme" class="btn-primary btn-save">
+                  💾 Salvar Configurações
+                </button>
+                <span id="save-status" class="save-status hidden">✅ Salvo!</span>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /#content -->
+    </div><!-- /#main-layout -->
+
+    <!-- ══════════ QUICK DOWNLOAD MODAL ══════════ -->
+    <div id="modal-backdrop" class="hidden"></div>
+    <div id="modal-download" class="modal hidden">
+      <div class="modal-header">
+        <h3>⬇️ Download Rápido</h3>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-url-display">
+          <span class="modal-url-label">URL:</span>
+          <span id="modal-url-text" class="modal-url-value"></span>
+        </div>
+        <div class="modal-format-row">
+          <label>Formato:</label>
+          <select id="modal-format" class="glass-select">
+            <option value="1080p">🎬 MP4 1080p</option>
+            <option value="720p" selected>🎬 MP4 720p</option>
+            <option value="480p">🎬 MP4 480p</option>
+            <option value="360p">🎬 MP4 360p</option>
+            <option value="mp3">🎵 MP3</option>
+            <option value="m4a">🎵 M4A</option>
+            <option value="opus">🎵 Opus</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel-btn" class="btn-ghost">Cancelar</button>
+        <button id="modal-download-btn" class="btn-primary">⬇ Baixar Agora</button>
+      </div>
+    </div>
+
+    <!-- ══════════ PLAYLIST CONFIRMATION MODAL ══════════ -->
+    <div id="modal-playlist" class="modal hidden">
+      <div class="modal-header">
+        <h3>📋 Playlist Detectada!</h3>
+        <button class="modal-close" id="modal-playlist-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="playlist-info-card">
+          <div class="playlist-icon">📁</div>
+          <div class="playlist-details">
+            <h4 id="playlist-title-text">Carregando playlist...</h4>
+            <div class="playlist-meta">
+              <span id="playlist-count-badge" class="playlist-badge">🔍 Verificando quantidade...</span>
+              <span class="playlist-folder-tip">📁 Uma subpasta exclusiva com o nome da playlist será criada para organizar todos os arquivos!</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-format-row" style="margin-top: 14px;">
+          <label>Formato para download:</label>
+          <select id="modal-playlist-format" class="glass-select">
+            <option value="1080p">🎬 MP4 1080p (Full HD)</option>
+            <option value="720p" selected>🎬 MP4 720p (HD)</option>
+            <option value="480p">🎬 MP4 480p</option>
+            <option value="360p">🎬 MP4 360p</option>
+            <option value="mp3">🎵 MP3 (Música)</option>
+            <option value="m4a">🎵 M4A (Música)</option>
+            <option value="opus">🎵 Opus (Música)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer" style="flex-wrap: wrap; gap: 8px;">
+        <button id="modal-playlist-cancel-btn" class="btn-ghost">Cancelar</button>
+        <button id="modal-playlist-single-btn" class="btn-secondary">🎬 Apenas Este Vídeo</button>
+        <button id="modal-playlist-all-btn" class="btn-primary">⬇️ Baixar Toda a Playlist</button>
+      </div>
+    </div>
+
+  </div><!-- /#app -->
+
+  <script src="renderer.js"></script>
+</body>
+</html>

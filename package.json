@@ -1,0 +1,68 @@
+{
+  "name": "youtube-desktop",
+  "version": "1.0.0",
+  "description": "Assistir e baixar vídeos do YouTube com visual moderno",
+  "productName": "YouTube Desktop",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build": "electron-builder"
+  },
+  "keywords": ["youtube", "electron", "desktop", "downloader"],
+  "author": "YouTube Desktop",
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.youtubedesktop.app",
+    "productName": "YouTube Desktop",
+    "copyright": "Copyright © 2024 YouTube Desktop",
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/",
+        "to": "bin/",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "YouTube Desktop",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "perMachine": false
+    },
+    "portable": {
+      "artifactName": "YouTube-Desktop-Portable.exe"
+    }
+  }
+}
