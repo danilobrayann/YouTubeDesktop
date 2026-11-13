@@ -216,14 +216,17 @@ ipcMain.handle('inspect-playlist', async (event, url) => {
 // ─── Download Media ───────────────────────────────────────────────────────────
 ipcMain.handle('download-media', async (event, { url, format, outputPath, downloadId, downloadPlaylist = true, playlistFolder = '' }) => {
   return new Promise((resolve, reject) => {
+    const fs = require('fs');
+
     // Build yt-dlp arguments
     const args = [];
 
     // Format selection
     const audioFormats = ['mp3', 'm4a', 'opus'];
     const heightMap = { '1080p': 1080, '720p': 720, '480p': 480, '360p': 360 };
+    const isAudio = audioFormats.includes(format);
 
-    if (audioFormats.includes(format)) {
+    if (isAudio) {
       args.push('--extract-audio');
       args.push('--audio-format', format);
       args.push('--audio-quality', '0');
@@ -233,16 +236,38 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
       args.push('--merge-output-format', 'mp4');
     }
 
-    // Gerenciamento Inteligente de Pastas:
-    // Se for playlist, cria pasta exclusiva com o nome da playlist e arquivos numerados!
+    // ── Gerenciamento Avançado de Pastas por Categoria ─────────────────────────
+    // 1. Playlists -> Pasta Playlists/[Nome da Playlist]/
+    // 2. Músicas avulsas -> Pasta Músicas/
+    // 3. Vídeos avulsos -> Pasta Vídeos/
+    const baseDir = outputPath || app.getPath('downloads');
+    const playlistsDir = path.join(baseDir, 'Playlists');
+    const musicasDir   = path.join(baseDir, 'Músicas');
+    const videosDir    = path.join(baseDir, 'Vídeos');
+
+    try {
+      if (!fs.existsSync(playlistsDir)) fs.mkdirSync(playlistsDir, { recursive: true });
+      if (!fs.existsSync(musicasDir))   fs.mkdirSync(musicasDir,   { recursive: true });
+      if (!fs.existsSync(videosDir))    fs.mkdirSync(videosDir,    { recursive: true });
+    } catch (e) {}
+
     const isPlaylistTarget = downloadPlaylist && (url.includes('list=') || url.includes('/playlist'));
-    let targetFolder = outputPath;
+    let defaultTargetFolder = baseDir;
 
     if (isPlaylistTarget) {
-      args.push('-o', path.join(outputPath, '%(playlist_title,playlist)s', '%(playlist_index)02d - %(title)s.%(ext)s'));
-    } else {
+      // Ex: Downloads/Playlists/As Melhores Tocadas/01 - Titulo.mp3
+      defaultTargetFolder = playlistsDir;
+      args.push('-o', path.join(playlistsDir, '%(playlist_title,playlist)s', '%(playlist_index)02d - %(title)s.%(ext)s'));
+    } else if (isAudio) {
+      // Ex: Downloads/Músicas/Titulo.mp3
+      defaultTargetFolder = musicasDir;
       args.push('--no-playlist');
-      args.push('-o', path.join(outputPath, '%(title)s.%(ext)s'));
+      args.push('-o', path.join(musicasDir, '%(title)s.%(ext)s'));
+    } else {
+      // Ex: Downloads/Vídeos/Titulo.mp4
+      defaultTargetFolder = videosDir;
+      args.push('--no-playlist');
+      args.push('-o', path.join(videosDir, '%(title)s.%(ext)s'));
     }
 
     // Output template
@@ -258,6 +283,7 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
     let currentItem = 0;
     let totalItems = 0;
     let detectedTitle = '';
+    let lastSavedFilePath = '';
 
     child.stdout.on('data', (data) => {
       const lines = data.toString().split('\n');
@@ -302,6 +328,7 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
         // Destination line / Title detection
         if (trimmed.startsWith('[download] Destination:')) {
           const filePath = trimmed.replace('[download] Destination:', '').trim();
+          lastSavedFilePath = filePath;
           detectedTitle = path.basename(filePath);
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('download-progress', {
@@ -312,6 +339,7 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
               currentItem,
               totalItems,
               title: detectedTitle,
+              filePath: lastSavedFilePath,
               status: 'downloading',
               message: `Baixando: ${detectedTitle}`
             });
@@ -328,6 +356,7 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
               currentItem,
               totalItems,
               title: detectedTitle,
+              filePath: lastSavedFilePath,
               status: 'processing',
               message: trimmed
             });
@@ -357,6 +386,14 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
       activeDownloads.delete(downloadId);
       if (mainWindow && !mainWindow.isDestroyed()) {
         if (code === 0) {
+          // Determina a pasta exata onde o arquivo (ou subpasta de playlist) foi parar
+          let exactFolder = defaultTargetFolder;
+          if (lastSavedFilePath) {
+            try {
+              exactFolder = path.dirname(lastSavedFilePath);
+            } catch (e) {}
+          }
+
           mainWindow.webContents.send('download-progress', {
             downloadId,
             percent: 100,
@@ -365,9 +402,11 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
             currentItem,
             totalItems,
             title: detectedTitle,
+            targetFolder: exactFolder,
+            filePath: lastSavedFilePath,
             status: 'complete'
           });
-          resolve({ success: true, folder: targetFolder });
+          resolve({ success: true, folder: exactFolder, file: lastSavedFilePath });
         } else if (code === null) {
           // Cancelled
           mainWindow.webContents.send('download-progress', {
@@ -411,6 +450,24 @@ ipcMain.handle('download-media', async (event, { url, format, outputPath, downlo
       reject(err);
     });
   });
+});
+
+// ─── Open Category Folder ─────────────────────────────────────────────────────
+ipcMain.handle('open-category-folder', (event, { category, basePath }) => {
+  const root = basePath || store.get('downloadPath') || app.getPath('downloads');
+  let target = root;
+  if (category === 'videos')    target = path.join(root, 'Vídeos');
+  else if (category === 'musicas')   target = path.join(root, 'Músicas');
+  else if (category === 'playlists') target = path.join(root, 'Playlists');
+
+  const fs = require('fs');
+  try {
+    if (!fs.existsSync(target)) {
+      fs.mkdirSync(target, { recursive: true });
+    }
+  } catch (e) {}
+
+  return shell.openPath(target);
 });
 
 // ─── Cancel Download ──────────────────────────────────────────────────────────

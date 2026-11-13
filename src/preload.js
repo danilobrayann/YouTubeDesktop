@@ -31,6 +31,7 @@ window.api = {
   // Open file/folder
   openFile:   (p) => ipcRenderer.invoke('open-file', p),
   openFolder: (p) => ipcRenderer.invoke('open-folder', p),
+  openCategoryFolder: (category, basePath) => ipcRenderer.invoke('open-category-folder', { category, basePath }),
 
   // Default format
   getDefaultFormat:  () => ipcRenderer.invoke('get-default-format'),

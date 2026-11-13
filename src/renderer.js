@@ -31,6 +31,9 @@ const btnStartDl     = document.getElementById('btn-start-download');
 const dlPathDisplay  = document.getElementById('dl-path-display');
 const btnChangePath  = document.getElementById('btn-change-path');
 const btnOpenFolder  = document.getElementById('btn-open-folder');
+const btnOpenVideos     = document.getElementById('btn-open-videos');
+const btnOpenMusicas    = document.getElementById('btn-open-musicas');
+const btnOpenPlaylists  = document.getElementById('btn-open-playlists');
 const downloadList   = document.getElementById('download-list');
 const dlEmptyState   = document.getElementById('dl-empty-state');
 const dlBadge        = document.getElementById('dl-badge');
@@ -826,8 +829,17 @@ function renderDownloadCard(dl) {
   card.className = 'dl-card';
   card.id = `card-${dl.id}`;
 
+  const isAudio = ['mp3', 'm4a', 'opus'].includes(dl.format);
   const icon = dl.isPlaylist ? '📁' : getFormatIcon(dl.format);
   const typeBadge = dl.isPlaylist ? 'PLAYLIST' : dl.format.toUpperCase();
+
+  // Pasta de destino prevista
+  let folderCategory = 'Vídeos';
+  if (dl.isPlaylist) {
+    folderCategory = dl.playlistTitle ? `Playlists / ${dl.playlistTitle}` : 'Playlists';
+  } else if (isAudio) {
+    folderCategory = 'Músicas';
+  }
 
   card.innerHTML = `
     <div class="dl-card-header">
@@ -836,8 +848,9 @@ function renderDownloadCard(dl) {
         <div class="dl-card-url" id="title-text-${dl.id}" title="${escHtml(dl.url)}">
           ${dl.playlistTitle ? `📁 Playlist: ${escHtml(dl.playlistTitle)}` : escHtml(dl.url)}
         </div>
-        <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap;">
           <span class="dl-card-format">${typeBadge}</span>
+          <span class="dl-folder-badge" id="folder-badge-${dl.id}">📁 ${escHtml(folderCategory)}</span>
           <span id="item-counter-${dl.id}" class="dl-item-counter hidden"></span>
         </div>
       </div>
@@ -867,22 +880,34 @@ function updateDownloadCard(id, data) {
 
   Object.assign(dl, data);
 
-  const statusEl   = document.getElementById(`status-${id}`);
-  const fillEl     = document.getElementById(`fill-${id}`);
-  const pctEl      = document.getElementById(`pct-${id}`);
-  const speedEl    = document.getElementById(`speed-${id}`);
-  const etaEl      = document.getElementById(`eta-${id}`);
-  const cardEl     = document.getElementById(`card-${id}`);
-  const actEl      = document.getElementById(`actions-${id}`);
-  const cancelEl   = document.getElementById(`cancel-${id}`);
-  const counterEl  = document.getElementById(`item-counter-${id}`);
-  const titleTxtEl = document.getElementById(`title-text-${id}`);
+  const statusEl      = document.getElementById(`status-${id}`);
+  const fillEl        = document.getElementById(`fill-${id}`);
+  const pctEl         = document.getElementById(`pct-${id}`);
+  const speedEl       = document.getElementById(`speed-${id}`);
+  const etaEl         = document.getElementById(`eta-${id}`);
+  const cardEl        = document.getElementById(`card-${id}`);
+  const actEl         = document.getElementById(`actions-${id}`);
+  const cancelEl      = document.getElementById(`cancel-${id}`);
+  const counterEl     = document.getElementById(`item-counter-${id}`);
+  const titleTxtEl    = document.getElementById(`title-text-${id}`);
+  const folderBadgeEl = document.getElementById(`folder-badge-${id}`);
 
   if (!cardEl) return;
+
+  if (data.targetFolder) dl.targetFolder = data.targetFolder;
+  if (data.filePath) dl.filePath = data.filePath;
 
   // Atualizar título se detectado
   if (data.title && titleTxtEl && !dl.playlistTitle) {
     titleTxtEl.textContent = data.title;
+  }
+
+  // Atualizar badge de pasta se a pasta real foi detectada
+  if (data.targetFolder && folderBadgeEl) {
+    const parts = data.targetFolder.replace(/\\/g, '/').split('/');
+    const lastSeg = parts.slice(-2).join('/');
+    folderBadgeEl.textContent = `📁 ${lastSeg}`;
+    folderBadgeEl.title = `Salvo em: ${data.targetFolder}`;
   }
 
   // Atualizar contador de playlist (ex: [Item 3 de 15])
@@ -954,17 +979,31 @@ function updateDownloadCard(id, data) {
     cardEl.className = `dl-card${status ? ` status-${status}` : ''}`;
   }
 
-  // Substituir botão Cancelar por Abrir Pasta / Remover na conclusão
+  // Substituir botão Cancelar por Abrir Pasta / Abrir Arquivo / Remover na conclusão
   if ((status === 'complete' || status === 'error' || status === 'cancelled') && actEl) {
     if (cancelEl) cancelEl.remove();
     if (status === 'complete') {
-      const openBtn = document.createElement('button');
-      openBtn.className = 'dl-action-btn';
-      openBtn.textContent = '📂 Abrir Pasta';
-      openBtn.addEventListener('click', () => {
-        api.openFolder(downloadPath);
+      // Botão para abrir a pasta específica onde o arquivo/playlist foi salvo!
+      const openFolderBtn = document.createElement('button');
+      openFolderBtn.className = 'dl-action-btn primary';
+      openFolderBtn.textContent = '📂 Abrir Pasta';
+      openFolderBtn.title = `Abrir: ${dl.targetFolder || downloadPath}`;
+      openFolderBtn.addEventListener('click', () => {
+        api.openFolder(dl.targetFolder || downloadPath);
       });
-      actEl.appendChild(openBtn);
+      actEl.appendChild(openFolderBtn);
+
+      // Botão para abrir o arquivo direto (se for vídeo/música individual)
+      if (dl.filePath && !dl.isPlaylist) {
+        const openFileBtn = document.createElement('button');
+        openFileBtn.className = 'dl-action-btn';
+        openFileBtn.textContent = '▶ Reproduzir';
+        openFileBtn.title = `Abrir arquivo: ${dl.filePath}`;
+        openFileBtn.addEventListener('click', () => {
+          api.openFile(dl.filePath);
+        });
+        actEl.appendChild(openFileBtn);
+      }
     }
     const rmBtn = document.createElement('button');
     rmBtn.className = 'dl-action-btn';
@@ -1040,6 +1079,24 @@ btnChangePath.addEventListener('click', async () => {
 btnOpenFolder.addEventListener('click', () => {
   if (downloadPath) api.openFolder(downloadPath);
 });
+
+if (btnOpenVideos) {
+  btnOpenVideos.addEventListener('click', () => {
+    api.openCategoryFolder('videos', downloadPath);
+  });
+}
+
+if (btnOpenMusicas) {
+  btnOpenMusicas.addEventListener('click', () => {
+    api.openCategoryFolder('musicas', downloadPath);
+  });
+}
+
+if (btnOpenPlaylists) {
+  btnOpenPlaylists.addEventListener('click', () => {
+    api.openCategoryFolder('playlists', downloadPath);
+  });
+}
 
 btnSettingsChPath.addEventListener('click', async () => {
   const newPath = await api.setDownloadPath();

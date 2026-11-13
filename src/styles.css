@@ -605,25 +605,111 @@ body.has-bg-image {
 
 .path-bar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding: 10px 16px !important;
+  padding: 12px 16px !important;
+}
+
+.path-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.path-bar-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.path-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.path-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .path-icon {
-  font-size: 16px;
+  font-size: 18px;
   flex-shrink: 0;
+  opacity: 0.8;
 }
 
 .path-text {
-  flex: 1;
   font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
+.path-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.path-categories {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+.categories-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.category-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-category:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.btn-category:active {
+  transform: translateY(0);
 }
 
 #download-list {
@@ -733,6 +819,23 @@ body.has-bg-image {
   border: 1px solid rgba(255, 68, 68, 0.2);
 }
 
+.dl-folder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 240, 255, 0.1);
+  color: #00f0ff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .dl-card-actions {
   display: flex;
   align-items: center;
@@ -756,6 +859,19 @@ body.has-bg-image {
   background: rgba(255,255,255,0.12);
   color: var(--text-primary);
   border-color: rgba(255,255,255,0.2);
+}
+
+.dl-action-btn.primary {
+  background: rgba(0, 245, 160, 0.15);
+  border-color: rgba(0, 245, 160, 0.4);
+  color: #00f5a0;
+  font-weight: 600;
+}
+
+.dl-action-btn.primary:hover {
+  background: rgba(0, 245, 160, 0.28);
+  border-color: rgba(0, 245, 160, 0.7);
+  color: #ffffff;
 }
 
 .dl-action-btn.danger:hover {

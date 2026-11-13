@@ -139,10 +139,35 @@
             </div>
 
             <div id="download-path-bar" class="glass-card path-bar">
-              <span class="path-icon">📁</span>
-              <span id="dl-path-display" class="path-text">Carregando...</span>
-              <button id="btn-change-path" class="btn-ghost">Alterar Pasta</button>
-              <button id="btn-open-folder" class="btn-ghost">Abrir Pasta</button>
+              <div class="path-bar-header">
+                <div class="path-bar-main">
+                  <span class="path-icon">📁</span>
+                  <div class="path-info">
+                    <span class="path-label">Pasta Base de Downloads:</span>
+                    <span id="dl-path-display" class="path-text">Carregando...</span>
+                  </div>
+                </div>
+                <div class="path-actions">
+                  <button id="btn-change-path" class="btn-ghost" title="Alterar pasta base">Alterar Base</button>
+                  <button id="btn-open-folder" class="btn-ghost" title="Abrir pasta raiz">Abrir Raiz</button>
+                </div>
+              </div>
+
+              <!-- Pastas categorizadas automáticas -->
+              <div class="path-categories">
+                <span class="categories-label">Pastas Separadas:</span>
+                <div class="category-buttons">
+                  <button id="btn-open-videos" class="btn-category" title="Abrir pasta de Vídeos avulsos">
+                    <span>🎬</span> Vídeos
+                  </button>
+                  <button id="btn-open-musicas" class="btn-category" title="Abrir pasta de Músicas avulsas">
+                    <span>🎵</span> Músicas
+                  </button>
+                  <button id="btn-open-playlists" class="btn-category" title="Abrir pasta de Playlists com subpastas exclusivas">
+                    <span>📋</span> Playlists
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div id="download-list">

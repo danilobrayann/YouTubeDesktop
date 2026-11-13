@@ -27,12 +27,15 @@
 
 - 📺 **Player de Vídeo Embutido**: Navegue e assista ao YouTube diretamente no app com player integrado de alta definição que preenche 100% da tela e acompanha o redimensionamento da janela.
 - ⛶ **Modo Tela Total / Cinema**: Oculte a barra de navegação com 1 clique para uma experiência imersiva e limpa.
-- ⬇️ **Downloads Inteligentes e Organizados**:
-  - **Vídeos**: MP4 em 1080p Full HD, 720p HD, 480p e 360p.
-  - **Áudio / Músicas**: Extração direta para MP3, M4A ou Opus.
-  - **Gerenciamento de Playlists**: Detecta automaticamente a quantidade total de vídeos antes de baixar, avisa com antecedência e cria uma **pasta separada exclusiva** com o nome da playlist, mantendo todos os arquivos organizados e numerados.
-  - **Barra de Progresso Dinâmica com Cores a cada %**: Barra de progresso neon viva com gradientes que se transformam dinamicamente a cada porcentagem (do rosa choque ao roxo, azul ciano, verde esmeralda e dourado) com brilho e texto colorido em tempo real.
-  - **Notificação e Alerta Sonoro**: Ao concluir qualquer download, emite uma notificação nativa do Windows e um som sutil de confirmação, além de botão direto para abrir a pasta de destino.
+- ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
+  - **📁 Separação Automática por Tipo**:
+    - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`
+    - **Músicas avulsas (MP3/M4A/Opus)**: salvas na pasta `Downloads/Músicas/`
+    - **Playlists**: salvas na pasta `Downloads/Playlists/[Nome da Playlist]/` (ex: "As melhores tocadas", "100 vídeos mais tops") com cada arquivo numerado em ordem (`01 - Faixa.mp3`, `02 - Faixa.mp3`...)
+  - **Botões de Pastas Rápidas**: Acesse qualquer uma das pastas (`🎬 Vídeos`, `🎵 Músicas`, `📋 Playlists`) com apenas 1 clique direto no topo da tela de downloads.
+  - **Aviso Prévio de Playlist**: Detecta e exibe a quantidade exata de itens antes de começar a baixar.
+  - **Barra de Progresso Dinâmica com Cores a cada %**: Barra de progresso neon viva com gradientes que se transformam dinamicamente a cada porcentagem (do rosa choque ao roxo, azul ciano, verde esmeralda e dourado).
+  - **Notificação e Acesso Imediato**: Notificação nativa do Windows + som harmônico ao concluir, com botões para **Abrir Pasta** ou **Reproduzir** o arquivo na hora.
 - 🎨 **Motor de Temas Completo**:
   - 7 Presets prontos: **Dark**, **AMOLED (Preto puro)**, **Midnight (Roxo)**, **Ocean (Azul)**, **Forest (Verde)**, **Sunset (Laranja)** e **Light (Claro)**.
   - Suporte a **Gradientes personalizados** (escolha o ângulo e as duas cores).
