@@ -83,6 +83,17 @@ const angleVal           = document.getElementById('angle-val');
 const blurVal            = document.getElementById('blur-val');
 const opacityVal         = document.getElementById('opacity-val');
 
+// Torrents DOM refs
+const torrentUrl            = document.getElementById('torrent-url');
+const btnSelectTorrentFile  = document.getElementById('btn-select-torrent-file');
+const btnStartTorrent       = document.getElementById('btn-start-torrent');
+const torrentPathDisplay    = document.getElementById('torrent-path-display');
+const btnOpenTorrentFolder  = document.getElementById('btn-open-torrent-folder');
+const btnOpenTorrentsQuick  = document.getElementById('btn-open-torrents-quick');
+const torrentList           = document.getElementById('torrent-list');
+const torrentEmptyState     = document.getElementById('torrent-empty-state');
+const torrentBadge          = document.getElementById('torrent-badge');
+
 // ── THEME PRESETS ──────────────────────────────────────────────────────────
 const PRESETS = {
   dark: {
@@ -1067,8 +1078,9 @@ async function loadDownloadPath() {
 
 function updatePathDisplay(p) {
   downloadPath = p;
-  if (dlPathDisplay)    dlPathDisplay.textContent    = p;
-  if (settingsDlPath)   settingsDlPath.textContent   = p;
+  if (dlPathDisplay)      dlPathDisplay.textContent      = p;
+  if (settingsDlPath)     settingsDlPath.textContent     = p;
+  if (torrentPathDisplay) torrentPathDisplay.textContent = `${p}\\Torrents`;
 }
 
 btnChangePath.addEventListener('click', async () => {
@@ -1095,6 +1107,12 @@ if (btnOpenMusicas) {
 if (btnOpenPlaylists) {
   btnOpenPlaylists.addEventListener('click', () => {
     api.openCategoryFolder('playlists', downloadPath);
+  });
+}
+
+if (btnOpenTorrentsQuick) {
+  btnOpenTorrentsQuick.addEventListener('click', () => {
+    api.openCategoryFolder('torrents', downloadPath);
   });
 }
 
@@ -1232,6 +1250,347 @@ btnSaveTheme.addEventListener('click', async () => {
   setTimeout(() => saveStatus.classList.add('hidden'), 2500);
 });
 
+// ── TORRENT DOWNLOAD SYSTEM ────────────────────────────────────────────────
+const torrents = new Map(); // id -> torrentData
+let activeTorrentCount = 0;
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0 || !isFinite(bytes)) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatSpeed(bytesPerSec) {
+  if (!bytesPerSec || bytesPerSec <= 0 || !isFinite(bytesPerSec)) return '0 B/s';
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
+function formatEta(ms) {
+  if (!ms || ms <= 0 || !isFinite(ms)) return '';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function updateTorrentBadge() {
+  let active = 0;
+  for (const t of torrents.values()) {
+    if (t.status === 'downloading') active++;
+  }
+  activeTorrentCount = active;
+  if (torrentBadge) {
+    if (active > 0) {
+      torrentBadge.classList.remove('hidden');
+      torrentBadge.textContent = active;
+    } else {
+      torrentBadge.classList.add('hidden');
+    }
+  }
+}
+
+function renderTorrentCard(t) {
+  if (!torrentList) return;
+  if (torrentEmptyState) torrentEmptyState.classList.add('hidden');
+
+  let card = document.getElementById(`torrent-card-${t.id}`);
+  if (card) {
+    updateTorrentCard(t);
+    return;
+  }
+
+  card = document.createElement('div');
+  card.className = 'dl-card';
+  card.id = `torrent-card-${t.id}`;
+
+  const pct = Math.min(100, Math.max(0, Math.round(t.progress || 0)));
+  const style = getProgressStyle(pct);
+
+  const isPaused = t.status === 'paused';
+  const isDone = t.status === 'complete' || pct === 100;
+  const isError = t.status === 'error';
+
+  let statusText = 'Baixando';
+  let statusClass = 'downloading';
+  if (isPaused) {
+    statusText = 'Pausado';
+    statusClass = 'pending';
+  } else if (isDone) {
+    statusText = '✅ Concluído';
+    statusClass = 'complete';
+  } else if (isError) {
+    statusText = 'Erro';
+    statusClass = 'error';
+  }
+
+  card.innerHTML = `
+    <div class="dl-card-header">
+      <span class="dl-card-icon">🧲</span>
+      <div class="dl-card-info">
+        <div class="dl-card-url" id="tor-title-${t.id}" title="${escHtml(t.name || t.source)}">
+          ${escHtml(t.name || 'Arquivo Torrent')}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:4px; flex-wrap:wrap;">
+          <span class="dl-card-format">TORRENT</span>
+          <span class="dl-folder-badge" id="tor-folder-${t.id}" title="${escHtml(t.savePath || '')}">📁 Torrents</span>
+          <span class="torrent-peers-badge" id="tor-peers-${t.id}">👥 ${t.numPeers || 0} peers</span>
+          <span class="torrent-speed-badge" id="tor-speed-badge-${t.id}">⚡ ${formatSpeed(t.downloadSpeed || 0)}</span>
+          <span class="dl-item-counter" id="tor-size-${t.id}">${formatBytes(t.downloaded || 0)} / ${formatBytes(t.total || 0)}</span>
+        </div>
+      </div>
+      <div class="dl-card-actions" id="tor-actions-${t.id}">
+        <span class="dl-status-label ${statusClass}" id="tor-status-${t.id}">${statusText}</span>
+        ${!isDone ? `
+          <button class="dl-action-btn" id="tor-btn-toggle-${t.id}" onclick="toggleTorrentPause('${t.id}')">
+            ${isPaused ? '▶ Retomar' : '⏸ Pausar'}
+          </button>
+        ` : ''}
+        <button class="dl-action-btn" id="tor-btn-folder-${t.id}" onclick="openTorrentFolder('${escHtml(t.savePath || '')}')">
+          📁 Pasta
+        </button>
+        <button class="dl-action-btn danger" id="tor-btn-remove-${t.id}" onclick="removeTorrent('${t.id}')">
+          🗑 Remover
+        </button>
+      </div>
+    </div>
+    <div class="dl-progress-wrap" id="tor-progress-wrap-${t.id}">
+      <div class="dl-progress-bar">
+        <div class="dl-progress-fill ${isDone ? 'done' : 'active'}" id="tor-fill-${t.id}" style="width:${pct}%; background:${style.gradient}; box-shadow:${style.glow};"></div>
+      </div>
+      <div class="dl-progress-stats">
+        <span class="dl-percent" id="tor-pct-${t.id}" style="color:${style.color};">${pct}%</span>
+        <span id="tor-stats-${t.id}">${formatBytes(t.downloaded || 0)} de ${formatBytes(t.total || 0)}</span>
+        <span id="tor-eta-${t.id}">${t.timeRemaining && t.timeRemaining > 0 && !isDone && !isPaused ? '⏱ ETA ' + formatEta(t.timeRemaining) : ''}</span>
+      </div>
+    </div>
+  `;
+
+  torrentList.prepend(card);
+}
+
+function updateTorrentCard(t) {
+  const existing = torrents.get(t.id);
+  if (existing) {
+    Object.assign(existing, t);
+  } else {
+    torrents.set(t.id, t);
+  }
+
+  const card = document.getElementById(`torrent-card-${t.id}`);
+  if (!card) {
+    renderTorrentCard(t);
+    return;
+  }
+
+  const titleEl   = document.getElementById(`tor-title-${t.id}`);
+  const peersEl   = document.getElementById(`tor-peers-${t.id}`);
+  const speedEl   = document.getElementById(`tor-speed-badge-${t.id}`);
+  const sizeEl    = document.getElementById(`tor-size-${t.id}`);
+  const statusEl  = document.getElementById(`tor-status-${t.id}`);
+  const fillEl    = document.getElementById(`tor-fill-${t.id}`);
+  const pctEl     = document.getElementById(`tor-pct-${t.id}`);
+  const statsEl   = document.getElementById(`tor-stats-${t.id}`);
+  const etaEl     = document.getElementById(`tor-eta-${t.id}`);
+  const toggleBtn = document.getElementById(`tor-btn-toggle-${t.id}`);
+
+  if (t.name && titleEl) titleEl.textContent = t.name;
+  if (peersEl && t.numPeers !== undefined) peersEl.textContent = `👥 ${t.numPeers} peers`;
+  if (speedEl && t.downloadSpeed !== undefined) speedEl.textContent = `⚡ ${formatSpeed(t.downloadSpeed)}`;
+  if (sizeEl && (t.downloaded !== undefined || t.total !== undefined)) {
+    sizeEl.textContent = `${formatBytes(t.downloaded || 0)} / ${formatBytes(t.total || 0)}`;
+  }
+  if (statsEl) {
+    statsEl.textContent = `${formatBytes(t.downloaded || 0)} de ${formatBytes(t.total || 0)}`;
+  }
+
+  const pct = Math.min(100, Math.max(0, Math.round(t.progress || 0)));
+  const style = getProgressStyle(pct);
+
+  if (fillEl) {
+    fillEl.style.width = `${pct}%`;
+    if (t.status !== 'complete' && pct < 100) {
+      fillEl.style.background = style.gradient;
+      fillEl.style.boxShadow = style.glow;
+    }
+  }
+  if (pctEl) {
+    pctEl.textContent = `${pct}%`;
+    pctEl.style.color = style.color;
+  }
+
+  if (etaEl) {
+    if (t.status === 'downloading' && t.timeRemaining && t.timeRemaining > 0) {
+      etaEl.textContent = `⏱ ETA ${formatEta(t.timeRemaining)}`;
+    } else {
+      etaEl.textContent = '';
+    }
+  }
+
+  if (statusEl && t.status) {
+    const isPaused = t.status === 'paused';
+    const isDone = t.status === 'complete' || pct === 100;
+    const isError = t.status === 'error';
+
+    statusEl.className = 'dl-status-label ' + (isDone ? 'complete' : isPaused ? 'pending' : isError ? 'error' : 'downloading');
+    statusEl.textContent = isDone ? '✅ Concluído' : isPaused ? 'Pausado' : isError ? 'Erro' : 'Baixando';
+
+    if (toggleBtn) {
+      if (isDone) {
+        toggleBtn.remove();
+      } else {
+        toggleBtn.textContent = isPaused ? '▶ Retomar' : '⏸ Pausar';
+      }
+    }
+  }
+
+  updateTorrentBadge();
+}
+
+window.toggleTorrentPause = async function(id) {
+  const item = torrents.get(id);
+  if (!item) return;
+  if (item.status === 'paused') {
+    await api.resumeTorrent(id);
+  } else {
+    await api.pauseTorrent(id);
+  }
+};
+
+window.openTorrentFolder = function(folder) {
+  if (folder) {
+    api.openFolder(folder);
+  } else {
+    api.openCategoryFolder('torrents', downloadPath);
+  }
+};
+
+window.removeTorrent = async function(id) {
+  const ok = confirm('Deseja remover este torrent da lista?');
+  if (!ok) return;
+  await api.removeTorrent({ id, deleteFiles: false });
+  const card = document.getElementById(`torrent-card-${id}`);
+  if (card) {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(-10px)';
+    card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    setTimeout(() => {
+      card.remove();
+      torrents.delete(id);
+      updateTorrentBadge();
+      if (torrents.size === 0 && torrentEmptyState) {
+        torrentEmptyState.classList.remove('hidden');
+      }
+    }, 300);
+  }
+};
+
+async function startTorrent(source) {
+  if (!source || !source.trim()) {
+    alert('Por favor, cole um link Magnet válido ou escolha um arquivo .torrent.');
+    return;
+  }
+  const clean = source.trim();
+  try {
+    const torrentData = await api.addTorrent({ source: clean });
+    if (torrentData) {
+      torrents.set(torrentData.id, torrentData);
+      renderTorrentCard(torrentData);
+      updateTorrentBadge();
+    }
+    if (torrentUrl) torrentUrl.value = '';
+  } catch (err) {
+    alert(`Erro ao iniciar download torrent: ${err.message}`);
+  }
+}
+
+if (btnStartTorrent) {
+  btnStartTorrent.addEventListener('click', () => {
+    startTorrent(torrentUrl.value);
+  });
+}
+
+if (torrentUrl) {
+  torrentUrl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      startTorrent(torrentUrl.value);
+    }
+  });
+}
+
+if (btnSelectTorrentFile) {
+  btnSelectTorrentFile.addEventListener('click', async () => {
+    const filePath = await api.selectTorrentFile();
+    if (filePath) {
+      if (torrentUrl) torrentUrl.value = filePath;
+      await startTorrent(filePath);
+    }
+  });
+}
+
+if (btnOpenTorrentFolder) {
+  btnOpenTorrentFolder.addEventListener('click', () => {
+    api.openCategoryFolder('torrents', downloadPath);
+  });
+}
+
+// IPC Torrent listeners
+if (api && api.on) {
+  api.on('torrent-added', (data) => {
+    if (data) {
+      torrents.set(data.id, data);
+      renderTorrentCard(data);
+      updateTorrentBadge();
+    }
+  });
+
+  api.on('torrent-progress', (data) => {
+    if (data && data.id) {
+      updateTorrentCard(data);
+    }
+  });
+
+  api.on('torrent-ready', (data) => {
+    if (data && data.id) {
+      updateTorrentCard(data);
+    }
+  });
+
+  api.on('torrent-done', (data) => {
+    if (data && data.id) {
+      updateTorrentCard(data);
+      notifyDownloadComplete(data.name || 'Download Torrent');
+      updateTorrentBadge();
+    }
+  });
+
+  api.on('torrent-updated', (data) => {
+    if (data && data.id) {
+      updateTorrentCard(data);
+    }
+  });
+
+  api.on('torrent-error', (data) => {
+    if (data && data.id) {
+      updateTorrentCard({ id: data.id, status: 'error', errorMessage: data.message });
+    }
+  });
+
+  api.on('torrent-removed', (data) => {
+    if (data && data.id) {
+      const card = document.getElementById(`torrent-card-${data.id}`);
+      if (card) card.remove();
+      torrents.delete(data.id);
+      updateTorrentBadge();
+      if (torrents.size === 0 && torrentEmptyState) {
+        torrentEmptyState.classList.remove('hidden');
+      }
+    }
+  });
+}
+
 // ── KEYBOARD SHORTCUTS ─────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey) {
@@ -1244,6 +1603,10 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       switchTab('downloads');
       dlUrl.focus();
+    } else if (e.key === 't' || e.key === 'T') {
+      e.preventDefault();
+      switchTab('torrents');
+      if (torrentUrl) torrentUrl.focus();
     } else if (e.key === ',' ) {
       e.preventDefault();
       switchTab('settings');
@@ -1264,6 +1627,22 @@ async function init() {
     dlFormat.value          = defaultFmt;
     setDefaultFormat.value  = defaultFmt;
     modalFormat.value       = defaultFmt;
+  }
+
+  // Carregar torrents salvos e restaurar estado anterior
+  try {
+    if (api && api.getTorrents) {
+      const savedTorrents = await api.getTorrents();
+      if (Array.isArray(savedTorrents) && savedTorrents.length > 0) {
+        for (const t of savedTorrents) {
+          torrents.set(t.id, t);
+          renderTorrentCard(t);
+        }
+        updateTorrentBadge();
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao carregar torrents existentes:', err);
   }
 
   // Initial tab

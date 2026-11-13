@@ -43,6 +43,11 @@
             <span class="nav-label">Downloads</span>
             <span class="nav-badge hidden" id="dl-badge">0</span>
           </div>
+          <div class="nav-item" data-tab="torrents">
+            <span class="nav-icon">🧲</span>
+            <span class="nav-label">Torrents</span>
+            <span class="nav-badge hidden" id="torrent-badge">0</span>
+          </div>
           <div class="nav-item" data-tab="settings">
             <span class="nav-icon">⚙️</span>
             <span class="nav-label">Configurações</span>
@@ -166,6 +171,9 @@
                   <button id="btn-open-playlists" class="btn-category" title="Abrir pasta de Playlists com subpastas exclusivas">
                     <span>📋</span> Playlists
                   </button>
+                  <button id="btn-open-torrents-quick" class="btn-category" title="Abrir pasta de Torrents baixados">
+                    <span>🧲</span> Torrents
+                  </button>
                 </div>
               </div>
             </div>
@@ -175,6 +183,65 @@
                 <div class="empty-icon">📥</div>
                 <p>Nenhum download ainda</p>
                 <span>Cole uma URL acima e clique em Baixar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: TORRENTS ════ -->
+        <div class="tab" id="tab-torrents">
+          <div id="torrents-wrapper">
+            <div id="torrents-header">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h2 class="tab-title">🧲 Downloads Torrent & Magnet</h2>
+                <span class="torrent-status-tag">⚡ Segundo Plano Ativo</span>
+              </div>
+              <p class="tab-subtitle">Baixe arquivos torrent ou links magnet direto no app com retomada automática e funcionamento em segundo plano!</p>
+            </div>
+
+            <div id="torrent-controls" class="glass-card">
+              <div class="tc-row">
+                <div class="tc-input-wrap">
+                  <span class="tc-icon">🧲</span>
+                  <input
+                    id="torrent-url"
+                    type="text"
+                    placeholder="Cole o link Magnet (magnet:?xt=...) ou clique em Escolher Arquivo..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </div>
+                <button id="btn-select-torrent-file" class="btn-secondary" title="Selecionar arquivo .torrent do computador">
+                  📁 Arquivo .torrent
+                </button>
+                <button id="btn-start-torrent" class="btn-primary">
+                  ⬇ Baixar Torrent
+                </button>
+              </div>
+            </div>
+
+            <div id="torrent-path-bar" class="glass-card path-bar">
+              <div class="path-bar-header">
+                <div class="path-bar-main">
+                  <span class="path-icon">📁</span>
+                  <div class="path-info">
+                    <span class="path-label">Pasta Exclusiva de Torrents:</span>
+                    <span id="torrent-path-display" class="path-text">Carregando pasta de Torrents...</span>
+                  </div>
+                </div>
+                <div class="path-actions">
+                  <button id="btn-open-torrent-folder" class="btn-ghost" title="Abrir pasta de Torrents no Windows Explorer">
+                    📂 Abrir Pasta Torrents
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div id="torrent-list">
+              <div id="torrent-empty-state" class="empty-state">
+                <div class="empty-icon">🧲</div>
+                <p>Nenhum torrent em andamento</p>
+                <span>Cole um link magnet ou selecione um arquivo .torrent acima</span>
               </div>
             </div>
           </div>

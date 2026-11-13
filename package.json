@@ -13,7 +13,8 @@
   "author": "YouTube Desktop",
   "license": "MIT",
   "dependencies": {
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "webtorrent": "^2.5.11"
   },
   "devDependencies": {
     "electron": "^28.0.0",

@@ -27,6 +27,11 @@
 
 - 📺 **Player de Vídeo Embutido**: Navegue e assista ao YouTube diretamente no app com player integrado de alta definição que preenche 100% da tela e acompanha o redimensionamento da janela.
 - ⛶ **Modo Tela Total / Cinema**: Oculte a barra de navegação com 1 clique para uma experiência imersiva e limpa.
+- 🧲 **Downloads via Torrent & Links Magnet**:
+  - Aba exclusiva para colar links `magnet:?xt=...` ou selecionar arquivos `.torrent` locais.
+  - **Segundo Plano Nativo**: Ao fechar a janela, o aplicativo continua baixando na bandeja do sistema (System Tray) sem interromper suas transferências.
+  - **Retomada Automática de Progresso**: Salva o estado dos seus downloads torrent para continuar de onde parou caso o app seja fechado ou reiniciado.
+  - Pasta exclusiva e organizada: `Downloads/Torrents/`.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
   - **📁 Separação Automática por Tipo**:
     - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`
@@ -122,6 +127,7 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
 | :--- | :--- |
 | `Ctrl + L` | Selecionar e focar na barra de endereço/pesquisa |
 | `Ctrl + D` | Abrir a aba de **Downloads** |
+| `Ctrl + T` | Abrir a aba de **Torrents** |
 | `Ctrl + ,` | Abrir a aba de **Configurações e Temas** |
 | `Enter` | Carregar vídeo ou iniciar pesquisa |
 | `Esc` | Fechar modais e janelas sobrepostas |
