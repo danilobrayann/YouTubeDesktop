@@ -2,9 +2,14 @@
 
 const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const Store = require('electron-store');
-const TorrentManager = require('./torrent-manager');
+
+// Keep existing preferences and downloads settings after the product rename.
+const userDataPath = path.join(app.getPath('appData'), 'YouTube Desktop');
+fs.mkdirSync(userDataPath, { recursive: true });
+app.setPath('userData', userDataPath);
 
 // ─── Electron Store ──────────────────────────────────────────────────────────
 const store = new Store({
@@ -23,8 +28,7 @@ const store = new Store({
       preset: 'dark'
     },
     downloadPath: null,
-    defaultFormat: '720p',
-    torrents: []
+    defaultFormat: '720p'
   }
 });
 
@@ -35,7 +39,6 @@ const activeDownloads = new Map(); // downloadId → child process
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
-let torrentManager = null;
 
 function createTray() {
   if (tray) return;
@@ -45,7 +48,7 @@ function createTray() {
 
   try {
     tray = new Tray(trayIcon);
-    tray.setToolTip('YouTube Desktop');
+    tray.setToolTip('TurboDown');
 
     updateTrayMenu();
 
@@ -63,12 +66,10 @@ function createTray() {
 function updateTrayMenu() {
   if (!tray) return;
   const activeYt = activeDownloads.size;
-  const activeTor = torrentManager ? torrentManager.getActiveCount() : 0;
-  const totalActive = activeYt + activeTor;
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '🎬 Abrir YouTube Desktop',
+      label: '⬇ Abrir TurboDown',
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -78,7 +79,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: totalActive > 0 ? `⚡ Baixando em 2º plano: ${totalActive} item(s)` : '💤 Nenhum download ativo',
+      label: activeYt > 0 ? `⚡ Baixando em 2º plano: ${activeYt} item(s)` : '💤 Nenhum download ativo',
       enabled: false
     },
     {
@@ -86,14 +87,6 @@ function updateTrayMenu() {
       click: () => {
         const root = store.get('downloadPath') || app.getPath('downloads');
         shell.openPath(root);
-      }
-    },
-    {
-      label: '🧲 Pasta de Torrents',
-      click: () => {
-        const root = store.get('downloadPath') || app.getPath('downloads');
-        const torDir = path.join(root, 'Torrents');
-        shell.openPath(torDir);
       }
     },
     { type: 'separator' },
@@ -115,6 +108,8 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
+    title: 'TurboDown',
+    icon: path.join(__dirname, '..', 'assets', 'icon.ico'),
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -156,13 +151,12 @@ function createWindow() {
       updateTrayMenu();
 
       const activeYt = activeDownloads.size;
-      const activeTor = torrentManager ? torrentManager.getActiveCount() : 0;
-      if (activeYt > 0 || activeTor > 0) {
+      if (activeYt > 0) {
         try {
           if (tray && tray.displayBalloon) {
             tray.displayBalloon({
-              title: 'YouTube Desktop',
-              content: `Continuando ${activeYt + activeTor} download(s) em segundo plano.`
+              title: 'TurboDown',
+              content: `Continuando ${activeYt} download(s) em segundo plano.`
             });
           }
         } catch (e) {}
@@ -177,13 +171,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Inicializar TorrentManager com persistência e retomada automática
-  torrentManager = new TorrentManager(
-    store,
-    () => mainWindow,
-    () => store.get('downloadPath') || app.getPath('downloads')
-  );
-
   // Allow webview to load YouTube
   app.on('web-contents-created', (event, contents) => {
     if (contents.getType() === 'webview') {
@@ -204,7 +191,6 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
-  if (torrentManager) torrentManager.destroy();
 });
 
 app.on('window-all-closed', () => {
@@ -576,7 +562,6 @@ ipcMain.handle('open-category-folder', (event, { category, basePath }) => {
   if (category === 'videos')         target = path.join(root, 'Vídeos');
   else if (category === 'musicas')   target = path.join(root, 'Músicas');
   else if (category === 'playlists') target = path.join(root, 'Playlists');
-  else if (category === 'torrents')  target = path.join(root, 'Torrents');
 
   const fs = require('fs');
   try {
@@ -586,55 +571,6 @@ ipcMain.handle('open-category-folder', (event, { category, basePath }) => {
   } catch (e) {}
 
   return shell.openPath(target);
-});
-
-// ─── Torrent Handlers ─────────────────────────────────────────────────────────
-ipcMain.handle('is-torrent-available', () => {
-  return torrentManager ? torrentManager.isAvailable() : false;
-});
-
-ipcMain.handle('get-torrents', () => {
-  return torrentManager ? torrentManager.getAllTorrents() : [];
-});
-
-ipcMain.handle('add-torrent', async (event, { source, customSavePath }) => {
-  if (!torrentManager) throw new Error('TorrentManager não inicializado');
-  const res = await torrentManager.addTorrent(source, { customSavePath });
-  updateTrayMenu();
-  return res;
-});
-
-ipcMain.handle('pause-torrent', (event, id) => {
-  const ok = torrentManager ? torrentManager.pauseTorrent(id) : false;
-  updateTrayMenu();
-  return ok;
-});
-
-ipcMain.handle('resume-torrent', (event, id) => {
-  const ok = torrentManager ? torrentManager.resumeTorrent(id) : false;
-  updateTrayMenu();
-  return ok;
-});
-
-ipcMain.handle('remove-torrent', (event, { id, deleteFiles }) => {
-  const ok = torrentManager ? torrentManager.removeTorrent(id, deleteFiles) : false;
-  updateTrayMenu();
-  return ok;
-});
-
-ipcMain.handle('select-torrent-file', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    title: 'Selecionar arquivo .torrent',
-    filters: [
-      { name: 'Arquivos Torrent (*.torrent)', extensions: ['torrent'] },
-      { name: 'Todos os arquivos', extensions: ['*'] }
-    ]
-  });
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0];
-  }
-  return null;
 });
 
 // ─── Cancel Download ──────────────────────────────────────────────────────────

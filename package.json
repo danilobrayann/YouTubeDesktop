@@ -1,20 +1,24 @@
 {
-  "name": "youtube-desktop",
+  "name": "turbodown",
   "version": "1.0.0",
   "description": "Assistir e baixar vídeos do YouTube com visual moderno",
-  "productName": "YouTube Desktop",
+  "productName": "TurboDown",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win",
     "build": "electron-builder"
   },
-  "keywords": ["youtube", "electron", "desktop", "downloader"],
-  "author": "YouTube Desktop",
+  "keywords": [
+    "youtube",
+    "electron",
+    "desktop",
+    "downloader"
+  ],
+  "author": "TurboDown",
   "license": "MIT",
   "dependencies": {
-    "electron-store": "^8.1.0",
-    "webtorrent": "^2.5.11"
+    "electron-store": "^8.1.0"
   },
   "devDependencies": {
     "electron": "^28.0.0",
@@ -22,8 +26,8 @@
   },
   "build": {
     "appId": "com.youtubedesktop.app",
-    "productName": "YouTube Desktop",
-    "copyright": "Copyright © 2024 YouTube Desktop",
+    "productName": "TurboDown",
+    "copyright": "Copyright © 2026 TurboDown",
     "files": [
       "src/**/*",
       "assets/**/*"
@@ -32,18 +36,24 @@
       {
         "from": "bin/",
         "to": "bin/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
@@ -54,7 +64,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "YouTube Desktop",
+      "shortcutName": "TurboDown",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
@@ -63,7 +73,7 @@
       "perMachine": false
     },
     "portable": {
-      "artifactName": "YouTube-Desktop-Portable.exe"
+      "artifactName": "TurboDown-Portable.exe"
     }
   }
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';" />
-  <title>YouTube Desktop</title>
+  <title>TurboDown</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -13,8 +13,8 @@
     <!-- ══════════ CUSTOM TITLEBAR ══════════ -->
     <div id="titlebar">
       <div id="titlebar-drag">
-        <img src="../assets/icon.svg" id="titlebar-icon" alt="icon" />
-        <span id="titlebar-title">YouTube Desktop</span>
+        <img src="../assets/turbodown-logo.png" id="titlebar-icon" alt="TurboDown" />
+        <span id="titlebar-title">TurboDown</span>
       </div>
       <div id="window-controls">
         <button class="win-btn" id="btn-min" title="Minimizar">&#8213;</button>
@@ -29,8 +29,8 @@
       <!-- ── SIDEBAR ── -->
       <nav id="sidebar">
         <div id="sidebar-logo">
-          <img src="../assets/icon.svg" alt="logo" />
-          <span>YT Desktop</span>
+          <img src="../assets/turbodown-logo.png" alt="TurboDown" />
+          <span>TurboDown</span>
         </div>
 
         <div class="nav-section">
@@ -42,14 +42,13 @@
             <span class="nav-icon">🌐</span>
             <span class="nav-label">Google Web</span>
           </div>
-          <div class="nav-item" data-tab="explore">
-            <span class="nav-icon">🔥</span>
-            <span class="nav-label">Recomendações</span>
+          <div class="nav-item" data-tab="wallpapers">
+            <span class="nav-icon">🖼️</span>
+            <span class="nav-label">Wallpapers HD</span>
           </div>
-          <div class="nav-item" data-tab="torrents">
-            <span class="nav-icon">🧲</span>
-            <span class="nav-label">Torrents</span>
-            <span class="nav-badge hidden" id="torrent-badge">0</span>
+          <div class="nav-item" data-tab="goalzen">
+            <span class="nav-icon">⚽</span>
+            <span class="nav-label">Goalzen</span>
           </div>
           <div class="nav-item" data-tab="downloads">
             <span class="nav-icon">⬇️</span>
@@ -139,9 +138,6 @@
               <button id="btn-google-search" class="btn-primary" title="Pesquisar no Google">
                 <span>🔍</span> Buscar
               </button>
-              <button id="btn-google-torrents" class="btn-secondary" title="Pesquisar arquivos torrent no Google">
-                <span>🧲</span> Buscar Torrents
-              </button>
             </div>
           </div>
 
@@ -153,8 +149,7 @@
             <button class="pill-btn" data-url="https://www.jamendo.com">🎵 Jamendo (Músicas)</button>
             <button class="pill-btn" data-url="https://librivox.org">📚 LibriVox (Audiobooks)</button>
             <button class="pill-btn" data-url="https://distrowatch.com">💻 DistroWatch (Linux)</button>
-            <button class="pill-btn" data-query="site:archive.org torrent">🔍 Torrents no Archive</button>
-            <button class="pill-btn" data-query="free open source movies 4k torrent">🎬 Filmes 4K Open</button>
+            <button class="pill-btn" data-url="https://www.goalzen.site">⚽ Goalzen</button>
           </div>
 
           <div id="google-webview-container" class="webview-container-full">
@@ -172,55 +167,60 @@
           </div>
         </div>
 
-        <!-- ════ TAB: RECOMENDAÇÕES / EXPLORAR TORRENTS ════ -->
-        <div class="tab" id="tab-explore">
-          <div id="explore-wrapper">
-            <div id="explore-header">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <h2 class="tab-title">🔥 Recomendações & Descobertas Torrent</h2>
-                <span class="torrent-status-tag">⚡ 100% Legal & Open Source</span>
-              </div>
-              <p class="tab-subtitle">
-                Descubra e baixe músicas em alta fidelidade, filmes clássicos, documentários premiados e distribuições Linux com 1 clique direto no app!
-              </p>
+        <!-- ════ TAB: HDQWALLS WALLPAPERS ════ -->
+        <div class="tab" id="tab-wallpapers">
+          <div class="browser-bar wallpapers-browser-bar">
+            <div class="wallpapers-browser-nav">
+              <button id="btn-wallpapers-back" class="nav-control-btn" title="Voltar">‹</button>
+              <button id="btn-wallpapers-forward" class="nav-control-btn" title="Avançar">›</button>
+              <button id="btn-wallpapers-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-wallpapers-home" class="nav-control-btn" title="Página inicial do HDQwalls">🖼️</button>
             </div>
-
-            <!-- Barra de Busca e Filtros -->
-            <div class="explore-toolbar glass-card">
-              <div class="explore-search-box">
-                <span class="explore-search-icon">🔍</span>
-                <input
-                  id="explore-search-input"
-                  type="text"
-                  placeholder="Pesquisar nas recomendações (ex: música, rock, filme, 4k, linux, ubuntu)..."
-                  autocomplete="off"
-                />
-              </div>
-              <div class="explore-filter-pills">
-                <button class="filter-pill active" data-category="all">🌟 Todos (<span id="count-all">0</span>)</button>
-                <button class="filter-pill" data-category="musica">🎵 Músicas (<span id="count-musica">0</span>)</button>
-                <button class="filter-pill" data-category="video">🎬 Vídeos & Filmes (<span id="count-video">0</span>)</button>
-                <button class="filter-pill" data-category="software">💻 Softwares & ISOs (<span id="count-software">0</span>)</button>
-                <button class="filter-pill" data-category="livro">📚 Livros & Áudio (<span id="count-livro">0</span>)</button>
-              </div>
+            <div class="wallpapers-site-label">
+              <strong>HDQwalls</strong>
+              <span>Best Source For HD, 4K, 5K, 8K Wallpapers</span>
             </div>
-
-            <!-- Banner para pesquisar além das recomendações no Google -->
-            <div class="explore-google-banner glass-card">
-              <div class="eg-icon">🌐</div>
-              <div class="eg-info">
-                <strong>Quer pesquisar qualquer torrent ou arquivo no Google?</strong>
-                <span>Use a aba Google com filtros inteligentes ou pesquise diretamente aqui:</span>
-              </div>
-              <div class="eg-action">
-                <input id="explore-google-input" type="text" placeholder="Ex: filme, artista, álbum..." />
-                <button id="btn-explore-search-google" class="btn-primary">🔍 Buscar no Google</button>
-              </div>
+          </div>
+          <div class="webview-container-full">
+            <webview
+              id="wallpapers-player"
+              src="https://hdqwalls.com/"
+              partition="persist:wallpapers"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="wallpapers-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando HDQwalls...</span>
             </div>
+          </div>
+        </div>
 
-            <!-- Grid de Cards de Recomendações -->
-            <div id="explore-grid" class="explore-grid">
-              <!-- Cards são renderizados dinamicamente via JS com dados ricos -->
+        <!-- ════ TAB: GOALZEN ════ -->
+        <div class="tab" id="tab-goalzen">
+          <div class="browser-bar wallpapers-browser-bar">
+            <div class="wallpapers-browser-nav">
+              <button id="btn-goalzen-back" class="nav-control-btn" title="Voltar">‹</button>
+              <button id="btn-goalzen-forward" class="nav-control-btn" title="Avançar">›</button>
+              <button id="btn-goalzen-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-goalzen-home" class="nav-control-btn" title="Página inicial do Goalzen">⚽</button>
+            </div>
+            <div class="wallpapers-site-label">
+              <strong>Goalzen</strong>
+              <span>Futebol e esportes</span>
+            </div>
+          </div>
+          <div class="webview-container-full">
+            <webview
+              id="goalzen-player"
+              src="https://www.goalzen.site"
+              partition="persist:goalzen"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="goalzen-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando Goalzen...</span>
             </div>
           </div>
         </div>
@@ -287,9 +287,6 @@
                   <button id="btn-open-playlists" class="btn-category" title="Abrir pasta de Playlists com subpastas exclusivas">
                     <span>📋</span> Playlists
                   </button>
-                  <button id="btn-open-torrents-quick" class="btn-category" title="Abrir pasta de Torrents baixados">
-                    <span>🧲</span> Torrents
-                  </button>
                 </div>
               </div>
             </div>
@@ -299,65 +296,6 @@
                 <div class="empty-icon">📥</div>
                 <p>Nenhum download ainda</p>
                 <span>Cole uma URL acima e clique em Baixar</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ════ TAB: TORRENTS ════ -->
-        <div class="tab" id="tab-torrents">
-          <div id="torrents-wrapper">
-            <div id="torrents-header">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <h2 class="tab-title">🧲 Downloads Torrent & Magnet</h2>
-                <span class="torrent-status-tag">⚡ Segundo Plano Ativo</span>
-              </div>
-              <p class="tab-subtitle">Baixe arquivos torrent ou links magnet direto no app com retomada automática e funcionamento em segundo plano!</p>
-            </div>
-
-            <div id="torrent-controls" class="glass-card">
-              <div class="tc-row">
-                <div class="tc-input-wrap">
-                  <span class="tc-icon">🧲</span>
-                  <input
-                    id="torrent-url"
-                    type="text"
-                    placeholder="Cole o link Magnet (magnet:?xt=...) ou clique em Escolher Arquivo..."
-                    autocomplete="off"
-                    spellcheck="false"
-                  />
-                </div>
-                <button id="btn-select-torrent-file" class="btn-secondary" title="Selecionar arquivo .torrent do computador">
-                  📁 Arquivo .torrent
-                </button>
-                <button id="btn-start-torrent" class="btn-primary">
-                  ⬇ Baixar Torrent
-                </button>
-              </div>
-            </div>
-
-            <div id="torrent-path-bar" class="glass-card path-bar">
-              <div class="path-bar-header">
-                <div class="path-bar-main">
-                  <span class="path-icon">📁</span>
-                  <div class="path-info">
-                    <span class="path-label">Pasta Exclusiva de Torrents:</span>
-                    <span id="torrent-path-display" class="path-text">Carregando pasta de Torrents...</span>
-                  </div>
-                </div>
-                <div class="path-actions">
-                  <button id="btn-open-torrent-folder" class="btn-ghost" title="Abrir pasta de Torrents no Windows Explorer">
-                    📂 Abrir Pasta Torrents
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div id="torrent-list">
-              <div id="torrent-empty-state" class="empty-state">
-                <div class="empty-icon">🧲</div>
-                <p>Nenhum torrent em andamento</p>
-                <span>Cole um link magnet ou selecione um arquivo .torrent acima</span>
               </div>
             </div>
           </div>

@@ -1,11 +1,11 @@
 @echo off
 setlocal EnableDelayedExpansion
-title YouTube Desktop - Instalador
+title TurboDown - Instalador
 color 0A
 
 echo.
 echo  =========================================================
-echo   YouTube Desktop - Instalador Oficial
+echo   TurboDown - Instalador Oficial
 echo  =========================================================
 echo.
 
@@ -62,10 +62,17 @@ if %errorlevel% equ 0 (
 echo.
 echo  [3/5] Gerando icone oficial (assets\icon.ico)...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%gerar-icone.ps1"
+if errorlevel 1 (
+    echo  ERRO: Nao foi possivel gerar o novo icone TurboDown.
+    pause
+    exit /b 1
+)
 if exist "%SCRIPT_DIR%assets\icon.ico" (
     echo  OK - Icone nativo pronto!
 ) else (
-    echo  AVISO: Icone nao gerado, continuando...
+    echo  ERRO: O arquivo assets\icon.ico nao foi criado.
+    pause
+    exit /b 1
 )
 
 :: ---------------------------------------------------------
@@ -100,7 +107,7 @@ echo  =========================================================
 echo.
 echo  O que voce deseja fazer agora?
 echo.
-echo   [1] Abrir o YouTube Desktop agora (Rapido e Direto)
+echo   [1] Abrir o TurboDown agora (Rapido e Direto)
 echo   [2] Gerar o Executavel (.exe) do Windows
 echo   [3] Sair
 echo.
@@ -108,7 +115,7 @@ set /p OPCAO="  Escolha uma opcao (1, 2 ou 3): "
 
 if "%OPCAO%"=="1" (
     echo.
-    echo  Iniciando YouTube Desktop...
+    echo  Iniciando TurboDown...
     start "" "%SCRIPT_DIR%iniciar.bat"
     exit /b 0
 )

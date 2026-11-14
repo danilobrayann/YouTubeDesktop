@@ -1,4 +1,4 @@
-# 🎬 YouTube Desktop
+# ⬇️ TurboDown
 
 <p align="center">
   <strong>Aplicativo Desktop moderno para assistir e baixar vídeos, playlists e músicas do YouTube.</strong><br>
@@ -29,18 +29,9 @@
 - ⛶ **Modo Tela Total / Cinema**: Oculte a barra de navegação com 1 clique para uma experiência imersiva e limpa.
 - 🌐 **Navegador Google Web Integrado**:
   - Navegue por qualquer site na internet com barra de endereços completa, botões de histórico (voltar/avançar) e recarregamento.
-  - **Pesquisa Inteligente de Torrents**: Botão dedicado `🧲 Buscar Torrents` para encontrar arquivos no Google rapidamente.
-  - **Captura Automática de Links Magnet**: Ao clicar em qualquer link magnet na web, o app captura o download na hora e o adiciona ao cliente de torrent nativo.
-  - Atalhos de 1 clique para Internet Archive, Jamendo, LibriVox, DistroWatch e muito mais.
-- 🔥 **Catálogo de Recomendações & Descobertas Torrent (100% Legal & Livre)**:
-  - Curadoria de mídias livres e abertas: Músicas (Nine Inch Nails, Jamendo, Jonathan Coulton), Vídeos 4K (Big Buck Bunny, Tears of Steel, Sintel, Documentários premiados), Softwares (Ubuntu, Linux Mint, Fedora) e Livros/Audiobooks.
-  - Filtros por categoria e busca em tempo real.
-  - **Botão `⚡ Baixar Torrent com 1 Clique`**: Adiciona o torrent imediatamente ao app e inicia a transferência.
-- 🧲 **Downloads via Torrent & Links Magnet**:
-  - Aba exclusiva para colar links `magnet:?xt=...` ou selecionar arquivos `.torrent` locais.
-  - **Segundo Plano Nativo**: Ao fechar a janela, o aplicativo continua baixando na bandeja do sistema (System Tray) sem interromper suas transferências.
-  - **Retomada Automática de Progresso**: Salva o estado dos seus downloads torrent para continuar de onde parou caso o app seja fechado ou reiniciado.
-  - Pasta exclusiva e organizada: `Downloads/Torrents/`.
+  - Atalhos de 1 clique para Internet Archive, Jamendo, LibriVox, DistroWatch, Goalzen e muito mais.
+- 🖼️ **Aba Wallpapers HD**: Acesse o HDQwalls dentro do app para navegar por wallpapers HD, 4K, 5K e 8K, com controles de voltar, avançar e recarregar.
+- ⚽ **Aba Goalzen**: Acesse o Goalzen diretamente no TurboDown, com navegação própria e controles para voltar, avançar e recarregar.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
   - **📁 Separação Automática por Tipo**:
     - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`
@@ -73,9 +64,9 @@ Você **não precisa** configurar nada manualmente por terminal. O projeto já v
 3. O instalador automático irá:
    - ✅ Buscar e integrar a atualização mais recente da branch Git configurada antes de instalar. Alterações locais são preservadas; se houver conflito ou falha de conexão, a instalação será interrompida.
    - ✅ Verificar e configurar o **Node.js**.
-   - ✅ Criar o arquivo de **ícone oficial (`assets\icon.ico`)** usando a API nativa do Windows.
+   - ✅ Criar o ícone oficial do **TurboDown (`assets\icon.ico`)** a partir da logo do projeto.
    - ✅ Instalar as dependências do Electron (`npm install`).
-   - ✅ Criar um **atalho com ícone na Área de Trabalho** que abre o código atualizado, sem reutilizar um executável antigo.
+   - ✅ Criar o atalho **TurboDown** na Área de Trabalho com a nova logo e abrir o código atualizado.
 
 > **Importante:** para a atualização automática, a pasta do projeto precisa ser um clone Git com uma branch remota configurada.
 > Alterações locais ainda não enviadas ao GitHub ficam disponíveis somente nesse clone; para recebê-las em outras instalações, envie os commits para a branch remota.
@@ -95,11 +86,11 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
    ```
 2. Escolha o tipo de build:
    - **Opção `1` — Executável Nativo Direto (Recomendado)**:
-     - Gera uma pasta autônoma em `dist\win-unpacked\` com o executável **`YouTube Desktop.exe`** e o ícone já embutido.
+     - Gera uma pasta autônoma em `dist\win-unpacked\` com o executável **`TurboDown.exe`** e o ícone já embutido.
      - Não requer privilégios de Administrador e não dá erros de permissão.
      - Atualiza o atalho da Área de Trabalho para abrir o executável diretamente.
    - **Opção `2` — Instalador Setup Completo (.exe)**:
-     - Gera o instalador assistido `YouTube Desktop Setup 1.0.0.exe` em `dist\`.
+     - Gera o instalador assistido `TurboDown Setup 1.0.0.exe` em `dist\`.
      - *Dica*: Caso utilize a opção 2, execute o `construir.bat` clicando com o botão direito e selecionando **"Executar como Administrador"**.
 
 ---

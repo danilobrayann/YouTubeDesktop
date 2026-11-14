@@ -1,11 +1,11 @@
 @echo off
 setlocal EnableDelayedExpansion
-title YouTube Desktop - Gerador de Executavel (.EXE)
+title TurboDown - Gerador de Executavel (.EXE)
 color 0B
 
 echo.
 echo  =========================================================
-echo   YouTube Desktop - Gerador de Executavel Windows (.exe)
+echo   TurboDown - Gerador de Executavel Windows (.exe)
 echo  =========================================================
 echo.
 
@@ -44,7 +44,7 @@ echo.
 echo  [3/3] Escolha o tipo de Executavel:
 echo.
 echo   [1] Executavel Nativo Direto (Recomendado - sem erros de permissao)
-echo       -> Gera pasta em dist\ com "YouTube Desktop.exe" e cria atalho
+echo       -> Gera pasta em dist\ com "TurboDown.exe" e cria atalho
 echo.
 echo   [2] Instalador Setup Completo (.exe)
 echo       -> Gera instalador NSIS (se der erro de permissao, execute como Admin)

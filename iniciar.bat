@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul 2>&1
-title YouTube Desktop
+title TurboDown
 cd /d "%~dp0"
 
 if not exist "%~dp0node_modules" (
@@ -12,7 +12,7 @@ if not exist "%~dp0node_modules" (
     exit /b 1
 )
 
-echo  Iniciando YouTube Desktop...
+echo  Iniciando TurboDown...
 call npm.cmd start
 
 if %errorlevel% neq 0 (

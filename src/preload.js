@@ -33,15 +33,6 @@ window.api = {
   openFolder: (p) => ipcRenderer.invoke('open-folder', p),
   openCategoryFolder: (category, basePath) => ipcRenderer.invoke('open-category-folder', { category, basePath }),
 
-  // Torrent
-  isTorrentAvailable: () => ipcRenderer.invoke('is-torrent-available'),
-  getTorrents:        () => ipcRenderer.invoke('get-torrents'),
-  addTorrent:         (opts) => ipcRenderer.invoke('add-torrent', opts),
-  pauseTorrent:       (id) => ipcRenderer.invoke('pause-torrent', id),
-  resumeTorrent:      (id) => ipcRenderer.invoke('resume-torrent', id),
-  removeTorrent:      (opts) => ipcRenderer.invoke('remove-torrent', opts),
-  selectTorrentFile:  () => ipcRenderer.invoke('select-torrent-file'),
-
   // Default format
   getDefaultFormat:  () => ipcRenderer.invoke('get-default-format'),
   saveDefaultFormat: (f) => ipcRenderer.invoke('save-default-format', f),
@@ -50,14 +41,7 @@ window.api = {
   on: (channel, callback) => {
     const allowedChannels = [
       'download-progress',
-      'window-maximized',
-      'torrent-added',
-      'torrent-progress',
-      'torrent-ready',
-      'torrent-done',
-      'torrent-error',
-      'torrent-updated',
-      'torrent-removed'
+      'window-maximized'
     ];
     if (allowedChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));
