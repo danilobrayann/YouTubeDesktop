@@ -16,9 +16,33 @@ echo  Pasta do projeto: %SCRIPT_DIR%
 echo.
 
 :: ---------------------------------------------------------
-:: PASSO 1: Verificar Node.js
+:: PASSO 1: Atualizar o projeto antes da instalacao
 :: ---------------------------------------------------------
-echo  [1/4] Verificando Node.js...
+echo  [1/5] Buscando a ultima atualizacao do projeto...
+git rev-parse --is-inside-work-tree >nul 2>&1
+if errorlevel 1 (
+    echo  ERRO: Esta pasta nao e um repositorio Git.
+    echo  Baixe ou clone o projeto pelo GitHub e execute o instalador novamente.
+    pause
+    exit /b 1
+)
+
+git pull --no-rebase --autostash
+if errorlevel 1 (
+    echo.
+    echo  ERRO: Nao foi possivel atualizar o projeto.
+    echo  Verifique sua conexao com a internet e resolva qualquer conflito Git
+    echo  antes de executar o instalador novamente.
+    pause
+    exit /b 1
+)
+echo  OK - Projeto atualizado.
+
+:: ---------------------------------------------------------
+:: PASSO 2: Verificar Node.js
+:: ---------------------------------------------------------
+echo.
+echo  [2/5] Verificando Node.js...
 node -v >nul 2>&1
 if %errorlevel% equ 0 (
     for /f "delims=" %%V in ('node -v 2^>nul') do echo  OK - Node.js %%V detectado.
@@ -33,10 +57,10 @@ if %errorlevel% equ 0 (
 )
 
 :: ---------------------------------------------------------
-:: PASSO 2: Gerar icone nativo oficial (assets\icon.ico)
+:: PASSO 3: Gerar icone nativo oficial (assets\icon.ico)
 :: ---------------------------------------------------------
 echo.
-echo  [2/4] Gerando icone oficial (assets\icon.ico)...
+echo  [3/5] Gerando icone oficial (assets\icon.ico)...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%gerar-icone.ps1"
 if exist "%SCRIPT_DIR%assets\icon.ico" (
     echo  OK - Icone nativo pronto!
@@ -45,11 +69,17 @@ if exist "%SCRIPT_DIR%assets\icon.ico" (
 )
 
 :: ---------------------------------------------------------
-:: PASSO 3: Configurar dependencias do Electron
+:: PASSO 4: Configurar dependencias do Electron
 :: ---------------------------------------------------------
 echo.
-echo  [3/4] Verificando pacotes do Electron...
+echo  [4/5] Verificando pacotes do Electron...
 call npm.cmd install
+if errorlevel 1 (
+    echo.
+    echo  ERRO: Nao foi possivel instalar as dependencias.
+    pause
+    exit /b 1
+)
 
 if exist "%SCRIPT_DIR%node_modules\electron\install.js" (
     node "%SCRIPT_DIR%node_modules\electron\install.js" >nul 2>&1
@@ -57,11 +87,11 @@ if exist "%SCRIPT_DIR%node_modules\electron\install.js" (
 echo  OK - Dependencias do Electron estao prontas!
 
 :: ---------------------------------------------------------
-:: PASSO 4: Criar atalho na Area de Trabalho
+:: PASSO 5: Criar atalho na Area de Trabalho
 :: ---------------------------------------------------------
 echo.
-echo  [4/4] Criando atalho na Area de Trabalho...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%criar-atalho.ps1"
+echo  [5/5] Criando atalho na Area de Trabalho...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%criar-atalho.ps1" -PreferSource
 
 echo.
 echo  =========================================================

@@ -71,10 +71,14 @@ Você **não precisa** configurar nada manualmente por terminal. O projeto já v
    instalar.bat
    ```
 3. O instalador automático irá:
+   - ✅ Buscar e integrar a atualização mais recente da branch Git configurada antes de instalar. Alterações locais são preservadas; se houver conflito ou falha de conexão, a instalação será interrompida.
    - ✅ Verificar e configurar o **Node.js**.
    - ✅ Criar o arquivo de **ícone oficial (`assets\icon.ico`)** usando a API nativa do Windows.
    - ✅ Instalar as dependências do Electron (`npm install`).
-   - ✅ Criar automaticamente um **atalho com ícone na sua Área de Trabalho**.
+   - ✅ Criar um **atalho com ícone na Área de Trabalho** que abre o código atualizado, sem reutilizar um executável antigo.
+
+> **Importante:** para a atualização automática, a pasta do projeto precisa ser um clone Git com uma branch remota configurada.
+> Alterações locais ainda não enviadas ao GitHub ficam disponíveis somente nesse clone; para recebê-las em outras instalações, envie os commits para a branch remota.
 4. Ao final da instalação, escolha no menu:
    - Digite `1` para **Abrir o app imediatamente**.
    - Digite `2` para **Gerar o Instalador Executável `.exe` definitivo**.

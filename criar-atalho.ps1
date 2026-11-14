@@ -1,4 +1,8 @@
 ﻿# criar-atalho.ps1
+param(
+    [switch]$PreferSource
+)
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # 1. Determinar alvo do atalho (prioridade para o executavel compilado se ja existir)
@@ -7,7 +11,10 @@ $exePack = Join-Path $scriptDir "dist\YouTube Desktop-win32-x64\YouTube Desktop.
 $batPath = Join-Path $scriptDir "iniciar.bat"
 $iconPath = Join-Path $scriptDir "assets\icon.ico"
 
-if (Test-Path $exeDir) {
+if ($PreferSource) {
+    $targetPath = $batPath
+    $workDir = $scriptDir
+} elseif (Test-Path $exeDir) {
     $targetPath = $exeDir
     $workDir = Split-Path -Parent $exeDir
 } elseif (Test-Path $exePack) {
