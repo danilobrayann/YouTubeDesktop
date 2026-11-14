@@ -38,15 +38,23 @@
             <span class="nav-icon">🏠</span>
             <span class="nav-label">Início</span>
           </div>
-          <div class="nav-item" data-tab="downloads">
-            <span class="nav-icon">⬇️</span>
-            <span class="nav-label">Downloads</span>
-            <span class="nav-badge hidden" id="dl-badge">0</span>
+          <div class="nav-item" data-tab="google">
+            <span class="nav-icon">🌐</span>
+            <span class="nav-label">Google Web</span>
+          </div>
+          <div class="nav-item" data-tab="explore">
+            <span class="nav-icon">🔥</span>
+            <span class="nav-label">Recomendações</span>
           </div>
           <div class="nav-item" data-tab="torrents">
             <span class="nav-icon">🧲</span>
             <span class="nav-label">Torrents</span>
             <span class="nav-badge hidden" id="torrent-badge">0</span>
+          </div>
+          <div class="nav-item" data-tab="downloads">
+            <span class="nav-icon">⬇️</span>
+            <span class="nav-label">Downloads</span>
+            <span class="nav-badge hidden" id="dl-badge">0</span>
           </div>
           <div class="nav-item" data-tab="settings">
             <span class="nav-icon">⚙️</span>
@@ -105,6 +113,114 @@
             <div id="webview-loading" class="hidden">
               <div class="loader-ring"></div>
               <span>Carregando YouTube...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: GOOGLE WEB ════ -->
+        <div class="tab" id="tab-google">
+          <div id="google-url-bar" class="browser-bar">
+            <div class="url-bar-nav">
+              <button id="btn-google-back" class="nav-control-btn" title="Voltar (Alt + Esquerda)">‹</button>
+              <button id="btn-google-forward" class="nav-control-btn" title="Avançar (Alt + Direita)">›</button>
+              <button id="btn-google-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-google-home" class="nav-control-btn" title="Página Inicial do Google">🌐</button>
+            </div>
+
+            <div class="url-bar-inner">
+              <span class="url-icon">🔍</span>
+              <input
+                id="google-url-input"
+                type="text"
+                placeholder="Pesquise no Google ou digite um endereço (ex: archive.org, wikipedia.org)..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button id="btn-google-search" class="btn-primary" title="Pesquisar no Google">
+                <span>🔍</span> Buscar
+              </button>
+              <button id="btn-google-torrents" class="btn-secondary" title="Pesquisar arquivos torrent no Google">
+                <span>🧲</span> Buscar Torrents
+              </button>
+            </div>
+          </div>
+
+          <!-- Atalhos rápidos de pesquisa e sites -->
+          <div class="browser-quick-pills">
+            <span class="pills-label">Atalhos:</span>
+            <button class="pill-btn" data-url="https://www.google.com">Google</button>
+            <button class="pill-btn" data-url="https://archive.org">🏛️ Internet Archive</button>
+            <button class="pill-btn" data-url="https://www.jamendo.com">🎵 Jamendo (Músicas)</button>
+            <button class="pill-btn" data-url="https://librivox.org">📚 LibriVox (Audiobooks)</button>
+            <button class="pill-btn" data-url="https://distrowatch.com">💻 DistroWatch (Linux)</button>
+            <button class="pill-btn" data-query="site:archive.org torrent">🔍 Torrents no Archive</button>
+            <button class="pill-btn" data-query="free open source movies 4k torrent">🎬 Filmes 4K Open</button>
+          </div>
+
+          <div id="google-webview-container" class="webview-container-full">
+            <webview
+              id="google-player"
+              src="https://www.google.com"
+              partition="persist:google"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="google-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando página...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: RECOMENDAÇÕES / EXPLORAR TORRENTS ════ -->
+        <div class="tab" id="tab-explore">
+          <div id="explore-wrapper">
+            <div id="explore-header">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h2 class="tab-title">🔥 Recomendações & Descobertas Torrent</h2>
+                <span class="torrent-status-tag">⚡ 100% Legal & Open Source</span>
+              </div>
+              <p class="tab-subtitle">
+                Descubra e baixe músicas em alta fidelidade, filmes clássicos, documentários premiados e distribuições Linux com 1 clique direto no app!
+              </p>
+            </div>
+
+            <!-- Barra de Busca e Filtros -->
+            <div class="explore-toolbar glass-card">
+              <div class="explore-search-box">
+                <span class="explore-search-icon">🔍</span>
+                <input
+                  id="explore-search-input"
+                  type="text"
+                  placeholder="Pesquisar nas recomendações (ex: música, rock, filme, 4k, linux, ubuntu)..."
+                  autocomplete="off"
+                />
+              </div>
+              <div class="explore-filter-pills">
+                <button class="filter-pill active" data-category="all">🌟 Todos (<span id="count-all">0</span>)</button>
+                <button class="filter-pill" data-category="musica">🎵 Músicas (<span id="count-musica">0</span>)</button>
+                <button class="filter-pill" data-category="video">🎬 Vídeos & Filmes (<span id="count-video">0</span>)</button>
+                <button class="filter-pill" data-category="software">💻 Softwares & ISOs (<span id="count-software">0</span>)</button>
+                <button class="filter-pill" data-category="livro">📚 Livros & Áudio (<span id="count-livro">0</span>)</button>
+              </div>
+            </div>
+
+            <!-- Banner para pesquisar além das recomendações no Google -->
+            <div class="explore-google-banner glass-card">
+              <div class="eg-icon">🌐</div>
+              <div class="eg-info">
+                <strong>Quer pesquisar qualquer torrent ou arquivo no Google?</strong>
+                <span>Use a aba Google com filtros inteligentes ou pesquise diretamente aqui:</span>
+              </div>
+              <div class="eg-action">
+                <input id="explore-google-input" type="text" placeholder="Ex: filme, artista, álbum..." />
+                <button id="btn-explore-search-google" class="btn-primary">🔍 Buscar no Google</button>
+              </div>
+            </div>
+
+            <!-- Grid de Cards de Recomendações -->
+            <div id="explore-grid" class="explore-grid">
+              <!-- Cards são renderizados dinamicamente via JS com dados ricos -->
             </div>
           </div>
         </div>

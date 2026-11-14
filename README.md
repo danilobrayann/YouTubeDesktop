@@ -27,6 +27,15 @@
 
 - 📺 **Player de Vídeo Embutido**: Navegue e assista ao YouTube diretamente no app com player integrado de alta definição que preenche 100% da tela e acompanha o redimensionamento da janela.
 - ⛶ **Modo Tela Total / Cinema**: Oculte a barra de navegação com 1 clique para uma experiência imersiva e limpa.
+- 🌐 **Navegador Google Web Integrado**:
+  - Navegue por qualquer site na internet com barra de endereços completa, botões de histórico (voltar/avançar) e recarregamento.
+  - **Pesquisa Inteligente de Torrents**: Botão dedicado `🧲 Buscar Torrents` para encontrar arquivos no Google rapidamente.
+  - **Captura Automática de Links Magnet**: Ao clicar em qualquer link magnet na web, o app captura o download na hora e o adiciona ao cliente de torrent nativo.
+  - Atalhos de 1 clique para Internet Archive, Jamendo, LibriVox, DistroWatch e muito mais.
+- 🔥 **Catálogo de Recomendações & Descobertas Torrent (100% Legal & Livre)**:
+  - Curadoria de mídias livres e abertas: Músicas (Nine Inch Nails, Jamendo, Jonathan Coulton), Vídeos 4K (Big Buck Bunny, Tears of Steel, Sintel, Documentários premiados), Softwares (Ubuntu, Linux Mint, Fedora) e Livros/Audiobooks.
+  - Filtros por categoria e busca em tempo real.
+  - **Botão `⚡ Baixar Torrent com 1 Clique`**: Adiciona o torrent imediatamente ao app e inicia a transferência.
 - 🧲 **Downloads via Torrent & Links Magnet**:
   - Aba exclusiva para colar links `magnet:?xt=...` ou selecionar arquivos `.torrent` locais.
   - **Segundo Plano Nativo**: Ao fechar a janela, o aplicativo continua baixando na bandeja do sistema (System Tray) sem interromper suas transferências.
@@ -125,9 +134,11 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
 
 | Atalho | Ação |
 | :--- | :--- |
-| `Ctrl + L` | Selecionar e focar na barra de endereço/pesquisa |
-| `Ctrl + D` | Abrir a aba de **Downloads** |
+| `Ctrl + L` | Selecionar e focar na barra de endereço/pesquisa (YouTube) |
+| `Ctrl + G` | Abrir a aba do **Google Web Browser** |
+| `Ctrl + E` | Abrir a aba de **Recomendações e Descobertas** |
 | `Ctrl + T` | Abrir a aba de **Torrents** |
+| `Ctrl + D` | Abrir a aba de **Downloads** |
 | `Ctrl + ,` | Abrir a aba de **Configurações e Temas** |
 | `Enter` | Carregar vídeo ou iniciar pesquisa |
 | `Esc` | Fechar modais e janelas sobrepostas |

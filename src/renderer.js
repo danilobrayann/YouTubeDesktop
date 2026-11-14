@@ -94,6 +94,23 @@ const torrentList           = document.getElementById('torrent-list');
 const torrentEmptyState     = document.getElementById('torrent-empty-state');
 const torrentBadge          = document.getElementById('torrent-badge');
 
+// Google Web DOM refs
+const googleWebview         = document.getElementById('google-player');
+const googleUrlInput        = document.getElementById('google-url-input');
+const btnGoogleSearch       = document.getElementById('btn-google-search');
+const btnGoogleTorrents     = document.getElementById('btn-google-torrents');
+const btnGoogleBack         = document.getElementById('btn-google-back');
+const btnGoogleForward      = document.getElementById('btn-google-forward');
+const btnGoogleReload       = document.getElementById('btn-google-reload');
+const btnGoogleHome         = document.getElementById('btn-google-home');
+const googleLoading         = document.getElementById('google-loading');
+
+// Explore DOM refs
+const exploreSearchInput      = document.getElementById('explore-search-input');
+const exploreGoogleInput      = document.getElementById('explore-google-input');
+const btnExploreSearchGoogle  = document.getElementById('btn-explore-search-google');
+const exploreGrid             = document.getElementById('explore-grid');
+
 // ── THEME PRESETS ──────────────────────────────────────────────────────────
 const PRESETS = {
   dark: {
@@ -1591,6 +1608,451 @@ if (api && api.on) {
   });
 }
 
+// ── GOOGLE WEB BROWSER SYSTEM ──────────────────────────────────────────────
+function loadGoogleUrl(input, isTorrentSearch = false) {
+  if (!googleWebview) return;
+  const trimmed = (input || '').trim();
+  if (!trimmed) {
+    googleWebview.src = 'https://www.google.com';
+    if (googleUrlInput) googleUrlInput.value = 'https://www.google.com';
+    return;
+  }
+
+  let targetUrl = '';
+  if (isTorrentSearch) {
+    const q = encodeURIComponent(`${trimmed} torrent`);
+    targetUrl = `https://www.google.com/search?q=${q}`;
+  } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    targetUrl = trimmed;
+  } else if (trimmed.includes('.') && !trimmed.includes(' ') && trimmed.length > 3) {
+    targetUrl = `https://${trimmed}`;
+  } else {
+    targetUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+  }
+
+  googleWebview.src = targetUrl;
+  if (googleUrlInput) googleUrlInput.value = targetUrl;
+}
+
+if (btnGoogleSearch) {
+  btnGoogleSearch.addEventListener('click', () => {
+    loadGoogleUrl(googleUrlInput ? googleUrlInput.value : '');
+  });
+}
+
+if (btnGoogleTorrents) {
+  btnGoogleTorrents.addEventListener('click', () => {
+    loadGoogleUrl(googleUrlInput ? googleUrlInput.value : '', true);
+  });
+}
+
+if (googleUrlInput) {
+  googleUrlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      loadGoogleUrl(googleUrlInput.value);
+    }
+  });
+}
+
+if (btnGoogleBack) {
+  btnGoogleBack.addEventListener('click', () => {
+    try {
+      if (googleWebview && googleWebview.canGoBack && googleWebview.canGoBack()) {
+        googleWebview.goBack();
+      }
+    } catch (e) {}
+  });
+}
+
+if (btnGoogleForward) {
+  btnGoogleForward.addEventListener('click', () => {
+    try {
+      if (googleWebview && googleWebview.canGoForward && googleWebview.canGoForward()) {
+        googleWebview.goForward();
+      }
+    } catch (e) {}
+  });
+}
+
+if (btnGoogleReload) {
+  btnGoogleReload.addEventListener('click', () => {
+    try {
+      if (googleWebview) googleWebview.reload();
+    } catch (e) {}
+  });
+}
+
+if (btnGoogleHome) {
+  btnGoogleHome.addEventListener('click', () => {
+    loadGoogleUrl('https://www.google.com');
+  });
+}
+
+// Quick pills in Google browser
+document.querySelectorAll('.pill-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.url) {
+      loadGoogleUrl(btn.dataset.url);
+    } else if (btn.dataset.query) {
+      loadGoogleUrl(btn.dataset.query);
+    }
+  });
+});
+
+// Google Webview events (loading, navigation, and magnet interception)
+if (googleWebview) {
+  googleWebview.addEventListener('did-start-loading', () => {
+    if (googleLoading) googleLoading.classList.remove('hidden');
+  });
+
+  googleWebview.addEventListener('did-stop-loading', () => {
+    if (googleLoading) googleLoading.classList.add('hidden');
+    try {
+      const wvUrl = googleWebview.getURL();
+      if (wvUrl && googleUrlInput && wvUrl !== googleUrlInput.value) {
+        googleUrlInput.value = wvUrl;
+      }
+    } catch (e) {}
+  });
+
+  googleWebview.addEventListener('did-navigate', (e) => {
+    if (e.url && googleUrlInput && e.url !== googleUrlInput.value) {
+      googleUrlInput.value = e.url;
+    }
+  });
+
+  // Interceptar cliques em links magnet para baixar direto no app!
+  googleWebview.addEventListener('will-navigate', (e) => {
+    if (e.url && e.url.startsWith('magnet:')) {
+      e.preventDefault();
+      switchTab('torrents');
+      startTorrent(e.url);
+      if (window.Notification && Notification.permission === 'granted') {
+        new Notification('🧲 Link Magnet Detectado!', {
+          body: 'O link foi capturado da web e adicionado aos seus Torrents!',
+          icon: '../assets/icon.svg'
+        });
+      }
+    }
+  });
+
+  googleWebview.addEventListener('new-window', (e) => {
+    if (e.url && e.url.startsWith('magnet:')) {
+      e.preventDefault();
+      switchTab('torrents');
+      startTorrent(e.url);
+    }
+  });
+}
+
+// ── RECOMENDAÇÕES / EXPLORAR TORRENTS ──────────────────────────────────────
+const RECOMMENDATIONS = [
+  // ── MÚSICAS ──
+  {
+    id: 'rec-nin-slip',
+    title: 'Nine Inch Nails — The Slip',
+    category: 'musica',
+    categoryLabel: '🎵 MÚSICA / ROCK INDUSTRIAL',
+    badge: 'Álbum Completo FLAC / MP3',
+    description: 'Álbum oficial lançado pela banda sob licença Creative Commons. Inclui arquivos de estúdio de alta fidelidade sem perdas.',
+    size: '420 MB',
+    peers: 'Alta (120+ peers)',
+    icon: '🎸',
+    magnet: 'magnet:?xt=urn:btih:31ba7633e6fa16b14d24ee4e3bfa99b40f2f3575&dn=Nine+Inch+Nails+-+The+Slip+%5B2008%5D&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-nin-ghosts',
+    title: 'Nine Inch Nails — Ghosts I–IV',
+    category: 'musica',
+    categoryLabel: '🎵 MÚSICA / INSTRUMENTAL',
+    badge: '36 Faixas Master',
+    description: 'Coletânea instrumental épica de 36 faixas que rendeu indicações ao Grammy, disponibilizada em Creative Commons.',
+    size: '1.2 GB',
+    peers: 'Alta (110+ peers)',
+    icon: '🎹',
+    magnet: 'magnet:?xt=urn:btih:b66807f45c9ca62507f154bf154fe268291f41be&dn=Nine+Inch+Nails+-+Ghosts+I-IV&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-jc-greatest',
+    title: 'Jonathan Coulton — Greatest Hit (1.0)',
+    category: 'musica',
+    categoryLabel: '🎵 MÚSICA / FOLK ROCK',
+    badge: 'Creative Commons',
+    description: 'Os maiores sucessos da lenda do geek-rock ("Code Monkey", "Still Alive" e "Re: Your Brains") com áudio master.',
+    size: '310 MB',
+    peers: 'Média (55+ peers)',
+    icon: '🎼',
+    magnet: 'magnet:?xt=urn:btih:f1a0e3863a34a87c1d763878b30e42d7da6a9089&dn=Jonathan+Coulton+-+Greatest+Hit+1.0&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-jamendo-best',
+    title: 'Jamendo Top Hits Collection (Creative Commons)',
+    category: 'musica',
+    categoryLabel: '🎵 MÚSICA / INDIE & POP',
+    badge: 'Coletânea 50 Músicas',
+    description: 'Compilação das 50 músicas mais tocadas de artistas independentes mundiais com licença livre para ouvir e remixar.',
+    size: '480 MB',
+    peers: 'Alta (90+ peers)',
+    icon: '🎧',
+    magnet: 'magnet:?xt=urn:btih:8c9038d1d8ef311cfca3582496a798835e5d1659&dn=Jamendo+Best+Collection&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+
+  // ── VÍDEOS & FILMES ──
+  {
+    id: 'rec-big-buck-bunny',
+    title: 'Big Buck Bunny (4K Ultra HD - 60fps)',
+    category: 'video',
+    categoryLabel: '🎬 VÍDEO / ANIMAÇÃO 4K',
+    badge: 'Blender Open Movie',
+    description: 'A famosa animação do coelho gigante em resolução 4K a 60 quadros por segundo com áudio surround multicanal.',
+    size: '680 MB',
+    peers: 'Muito Alta (200+ peers)',
+    icon: '🐰',
+    magnet: 'magnet:?xt=urn:btih:08a80290482279d447a5153fc868b31b43e4b2f0&dn=Big+Buck+Bunny+4K&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-tears-of-steel',
+    title: 'Tears of Steel (Sci-Fi VFX 4K)',
+    category: 'video',
+    categoryLabel: '🎬 VÍDEO / FICÇÃO CIENTÍFICA',
+    badge: 'Visual Effects 4K',
+    description: 'Curta-metragem futurista ambientado em uma Amsterdã pós-apocalíptica com efeitos especiais cinematográficos avançados.',
+    size: '570 MB',
+    peers: 'Alta (140+ peers)',
+    icon: '🤖',
+    magnet: 'magnet:?xt=urn:btih:2b87e23398634e939297a3b0481b499e8d33c460&dn=Tears+of+Steel+4K&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-sintel',
+    title: 'Sintel — The Durian Open Movie',
+    category: 'video',
+    categoryLabel: '🎬 VÍDEO / ANIMAÇÃO FANTASIA',
+    badge: 'HD 1080p',
+    description: 'Emocionante jornada de fantasia sobre a busca de uma jovem guerreira por seu dragão de estimação.',
+    size: '650 MB',
+    peers: 'Alta (110+ peers)',
+    icon: '🐉',
+    magnet: 'magnet:?xt=urn:btih:0c82dd35b9cfdaec274642c4dcb817d80112e016&dn=Sintel+1080p&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-swartz-doc',
+    title: "The Internet's Own Boy (Aaron Swartz)",
+    category: 'video',
+    categoryLabel: '🎬 VÍDEO / DOCUMENTÁRIO',
+    badge: 'Premiado Sundance',
+    description: 'Aclamado documentário sobre o prodígio da programação e ativista da internet livre Aaron Swartz.',
+    size: '1.4 GB',
+    peers: 'Alta (95+ peers)',
+    icon: '🎥',
+    magnet: 'magnet:?xt=urn:btih:8f000b0d3bf49aa2bfdd09919b5c2a17f7bfa639&dn=The+Internets+Own+Boy&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+  {
+    id: 'rec-night-living-dead',
+    title: 'A Noite dos Mortos-Vivos (1968)',
+    category: 'video',
+    categoryLabel: '🎬 VÍDEO / CLÁSSICO TERROR',
+    badge: 'Domínio Público HD',
+    description: 'O divisor de águas de George A. Romero que redefiniu o gênero do terror. Remasterizado em alta definição.',
+    size: '1.8 GB',
+    peers: 'Média (70+ peers)',
+    icon: '🧟',
+    magnet: 'magnet:?xt=urn:btih:5a57a0bf9b75294e77ddc9931b79f82d02c813be&dn=Night+of+the+Living+Dead+1968&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=wss%3A%2F%2Ftracker.webtorrent.dev'
+  },
+
+  // ── SOFTWARES & ISOS ──
+  {
+    id: 'rec-ubuntu',
+    title: 'Ubuntu 24.04 LTS Desktop (64-bit)',
+    category: 'software',
+    categoryLabel: '💻 SOFTWARE / SISTEMA LINUX',
+    badge: 'Suporte Estendido LTS',
+    description: 'A versão de suporte a longo prazo do Ubuntu Desktop. Seguro, moderno e pronto para produtividade.',
+    size: '5.7 GB',
+    peers: 'Altíssima (400+ peers)',
+    icon: '🐧',
+    magnet: 'magnet:?xt=urn:btih:08b688d6c8e31a8ca9489279313fa171c7e997f7&dn=ubuntu-24.04-desktop-amd64.iso&tr=https%3A%2F%2Ftorrent.ubuntu.com%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce'
+  },
+  {
+    id: 'rec-linux-mint',
+    title: 'Linux Mint 22 (Cinnamon Edition)',
+    category: 'software',
+    categoryLabel: '💻 SOFTWARE / SISTEMA LINUX',
+    badge: 'Interface Elegante',
+    description: 'Distribuição famosa pela facilidade de uso, visual familiar e excelente desempenho em qualquer computador.',
+    size: '2.9 GB',
+    peers: 'Alta (250+ peers)',
+    icon: '🍃',
+    magnet: 'magnet:?xt=urn:btih:3fa81308a09f87251dc3d7e77a28e3a0937a074c&dn=linuxmint-22-cinnamon-64bit.iso&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce'
+  },
+  {
+    id: 'rec-fedora',
+    title: 'Fedora Workstation 40 (64-bit)',
+    category: 'software',
+    categoryLabel: '💻 SOFTWARE / SISTEMA LINUX',
+    badge: 'GNOME 46 Puro',
+    description: 'Sistema inovador e de ponta da comunidade Fedora com as tecnologias mais recentes do mundo de código aberto.',
+    size: '2.4 GB',
+    peers: 'Alta (180+ peers)',
+    icon: '🎩',
+    magnet: 'magnet:?xt=urn:btih:8e16548d88e894564c7cf08a155c0a3e87748834&dn=Fedora-Workstation-Live-x86_64-40&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce'
+  },
+
+  // ── LIVROS & AUDIOBOOKS ──
+  {
+    id: 'rec-sherlock',
+    title: 'Coleção Sherlock Holmes (Audiobook Completo)',
+    category: 'livro',
+    categoryLabel: '📚 LIVRO & ÁUDIO / MISTÉRIO',
+    badge: 'LibriVox Domínio Público',
+    description: 'Histórias clássicas de Arthur Conan Doyle com narração em áudio MP3 de alta clareza para ouvir onde quiser.',
+    size: '480 MB',
+    peers: 'Média (45+ peers)',
+    icon: '🕵️',
+    magnet: 'magnet:?xt=urn:btih:75b084e5b3827ec3cf283d5a42211985160fa4be&dn=Sherlock+Holmes+Audiobook+Collection&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce'
+  },
+  {
+    id: 'rec-dracula',
+    title: 'Drácula — Bram Stoker (Audiobook)',
+    category: 'livro',
+    categoryLabel: '📚 LIVRO & ÁUDIO / CLÁSSICO GÓTICO',
+    badge: 'Obra Completa',
+    description: 'O romance epistolar que definiu o mito do vampiro, narrado em formato dramático com múltiplos personagens.',
+    size: '520 MB',
+    peers: 'Média (50+ peers)',
+    icon: '🧛',
+    magnet: 'magnet:?xt=urn:btih:4d93963286bf54f5905d5c192bb3b0c48e89c661&dn=Dracula+Bram+Stoker+Audiobook&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce'
+  }
+];
+
+let currentExploreCategory = 'all';
+
+function renderExploreCards(itemsToRender) {
+  if (!exploreGrid) return;
+  exploreGrid.innerHTML = '';
+
+  if (itemsToRender.length === 0) {
+    exploreGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--text-muted);">
+        <div style="font-size: 32px; margin-bottom: 10px;">🔍</div>
+        <p style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Nenhuma recomendação encontrada</p>
+        <span>Tente buscar por outro termo ou pesquise no Google pelo banner acima.</span>
+      </div>
+    `;
+    return;
+  }
+
+  itemsToRender.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'explore-card';
+    card.innerHTML = `
+      <div class="explore-card-top">
+        <div class="explore-card-icon">${item.icon}</div>
+        <div class="explore-card-meta">
+          <div class="explore-card-category">${escHtml(item.categoryLabel)}</div>
+          <div class="explore-card-title">${escHtml(item.title)}</div>
+          <span class="explore-card-badge">${escHtml(item.badge)}</span>
+        </div>
+      </div>
+      <p class="explore-card-desc">${escHtml(item.description)}</p>
+      <div class="explore-card-footer">
+        <div class="explore-card-stats">
+          <span class="explore-card-size">📦 ${item.size}</span>
+          <span class="explore-card-peers">👥 ${item.peers}</span>
+        </div>
+        <button class="btn-explore-download" onclick="downloadRecommendedTorrent('${item.id}')">
+          ⚡ Baixar Torrent
+        </button>
+      </div>
+    `;
+    exploreGrid.appendChild(card);
+  });
+}
+
+function updateExploreCategoryCounts() {
+  const countAll = document.getElementById('count-all');
+  const countMusica = document.getElementById('count-musica');
+  const countVideo = document.getElementById('count-video');
+  const countSoftware = document.getElementById('count-software');
+  const countLivro = document.getElementById('count-livro');
+
+  if (countAll) countAll.textContent = RECOMMENDATIONS.length;
+  if (countMusica) countMusica.textContent = RECOMMENDATIONS.filter(r => r.category === 'musica').length;
+  if (countVideo) countVideo.textContent = RECOMMENDATIONS.filter(r => r.category === 'video').length;
+  if (countSoftware) countSoftware.textContent = RECOMMENDATIONS.filter(r => r.category === 'software').length;
+  if (countLivro) countLivro.textContent = RECOMMENDATIONS.filter(r => r.category === 'livro').length;
+}
+
+function filterExploreItems() {
+  const query = (exploreSearchInput ? exploreSearchInput.value : '').toLowerCase().trim();
+
+  let filtered = RECOMMENDATIONS;
+  if (currentExploreCategory !== 'all') {
+    filtered = filtered.filter(r => r.category === currentExploreCategory);
+  }
+
+  if (query) {
+    filtered = filtered.filter(r =>
+      r.title.toLowerCase().includes(query) ||
+      r.description.toLowerCase().includes(query) ||
+      r.categoryLabel.toLowerCase().includes(query) ||
+      r.badge.toLowerCase().includes(query)
+    );
+  }
+
+  renderExploreCards(filtered);
+}
+
+// Category filter pills click
+document.querySelectorAll('.filter-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    currentExploreCategory = pill.dataset.category || 'all';
+    filterExploreItems();
+  });
+});
+
+if (exploreSearchInput) {
+  exploreSearchInput.addEventListener('input', () => {
+    filterExploreItems();
+  });
+}
+
+// Banner Google Search
+if (btnExploreSearchGoogle) {
+  btnExploreSearchGoogle.addEventListener('click', () => {
+    const q = exploreGoogleInput ? exploreGoogleInput.value.trim() : '';
+    switchTab('google');
+    loadGoogleUrl(q, true);
+  });
+}
+
+if (exploreGoogleInput) {
+  exploreGoogleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      if (btnExploreSearchGoogle) btnExploreSearchGoogle.click();
+    }
+  });
+}
+
+window.downloadRecommendedTorrent = async function(id) {
+  const item = RECOMMENDATIONS.find(r => r.id === id);
+  if (!item) return;
+
+  try {
+    switchTab('torrents');
+    await startTorrent(item.magnet);
+    if (window.Notification && Notification.permission === 'granted') {
+      new Notification('🧲 Download Recomendado Iniciado!', {
+        body: `Iniciando download de "${item.title}" na sua pasta de Torrents!`,
+        icon: '../assets/icon.svg'
+      });
+    }
+  } catch (err) {
+    alert(`Erro ao iniciar download: ${err.message}`);
+  }
+};
+
 // ── KEYBOARD SHORTCUTS ─────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey) {
@@ -1607,6 +2069,20 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       switchTab('torrents');
       if (torrentUrl) torrentUrl.focus();
+    } else if (e.key === 'g' || e.key === 'G') {
+      e.preventDefault();
+      switchTab('google');
+      if (googleUrlInput) {
+        googleUrlInput.focus();
+        googleUrlInput.select();
+      }
+    } else if (e.key === 'e' || e.key === 'E') {
+      e.preventDefault();
+      switchTab('explore');
+      if (exploreSearchInput) {
+        exploreSearchInput.focus();
+        exploreSearchInput.select();
+      }
     } else if (e.key === ',' ) {
       e.preventDefault();
       switchTab('settings');
@@ -1644,6 +2120,10 @@ async function init() {
   } catch (err) {
     console.warn('Erro ao carregar torrents existentes:', err);
   }
+
+  // Inicializar catalogo de recomendacoes
+  updateExploreCategoryCounts();
+  renderExploreCards(RECOMMENDATIONS);
 
   // Initial tab
   switchTab('home');
