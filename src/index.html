@@ -50,6 +50,18 @@
             <span class="nav-icon">⚽</span>
             <span class="nav-label">Goalzen</span>
           </div>
+          <div class="nav-item" data-tab="pluto">
+            <span class="nav-icon">📺</span>
+            <span class="nav-label">Pluto TV</span>
+          </div>
+          <div class="nav-item" data-tab="gemini">
+            <span class="nav-icon">✨</span>
+            <span class="nav-label">Gemini</span>
+          </div>
+          <div class="nav-item" data-tab="twitch">
+            <span class="nav-icon">🟣</span>
+            <span class="nav-label">Twitch</span>
+          </div>
           <div class="nav-item" data-tab="downloads">
             <span class="nav-icon">⬇️</span>
             <span class="nav-label">Downloads</span>
@@ -62,6 +74,10 @@
         </div>
 
         <div id="sidebar-footer">
+          <div class="nav-item" data-tab="social">
+            <span class="nav-icon">💬</span>
+            <span class="nav-label">Redes Sociais</span>
+          </div>
           <div id="now-playing" class="hidden">
             <div class="np-dot"></div>
             <span id="np-title">Reproduzindo...</span>
@@ -71,6 +87,59 @@
 
       <!-- ── CONTENT ── -->
       <div id="content">
+
+        <!-- ════ TAB: SOCIAL NETWORKS ════ -->
+        <div class="tab" id="tab-social">
+          <div id="social-wrapper">
+            <div id="social-header">
+              <span class="social-kicker">SEUS ESPAÇOS DIGITAIS</span>
+              <h2 class="tab-title">Redes Sociais</h2>
+              <p>Escolha uma rede para abrir no navegador integrado.</p>
+            </div>
+            <div class="social-grid">
+              <button class="social-card" data-social-url="https://web.whatsapp.com/" aria-label="Abrir WhatsApp Web">
+                <span class="social-icon social-whatsapp" aria-hidden="true">☎</span>
+                <span class="social-copy"><strong>WhatsApp Web</strong><small>Mensagens e chamadas</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://web.telegram.org/" aria-label="Abrir Telegram Web">
+                <span class="social-icon social-telegram" aria-hidden="true">➤</span>
+                <span class="social-copy"><strong>Telegram</strong><small>Conversas e canais</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://www.instagram.com/" aria-label="Abrir Instagram">
+                <span class="social-icon social-instagram" aria-hidden="true">◎</span>
+                <span class="social-copy"><strong>Instagram</strong><small>Fotos, reels e mensagens</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://www.facebook.com/" aria-label="Abrir Facebook">
+                <span class="social-icon social-facebook" aria-hidden="true">f</span>
+                <span class="social-copy"><strong>Facebook</strong><small>Amigos e comunidades</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://x.com/" aria-label="Abrir X">
+                <span class="social-icon social-x" aria-hidden="true">X</span>
+                <span class="social-copy"><strong>X</strong><small>Assuntos em tempo real</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://www.tiktok.com/" aria-label="Abrir TikTok">
+                <span class="social-icon social-tiktok" aria-hidden="true">♪</span>
+                <span class="social-copy"><strong>TikTok</strong><small>Vídeos curtos e lives</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://www.youtube.com/" aria-label="Abrir YouTube">
+                <span class="social-icon social-youtube" aria-hidden="true">▶</span>
+                <span class="social-copy"><strong>YouTube</strong><small>Vídeos e transmissões</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+              <button class="social-card" data-social-url="https://discord.com/app" aria-label="Abrir Discord">
+                <span class="social-icon social-discord" aria-hidden="true">◉</span>
+                <span class="social-copy"><strong>Discord</strong><small>Comunidades e chamadas</small></span>
+                <span class="social-open" aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- ════ TAB: HOME ════ -->
         <div class="tab active" id="tab-home">
@@ -150,6 +219,9 @@
             <button class="pill-btn" data-url="https://librivox.org">📚 LibriVox (Audiobooks)</button>
             <button class="pill-btn" data-url="https://distrowatch.com">💻 DistroWatch (Linux)</button>
             <button class="pill-btn" data-url="https://www.goalzen.site">⚽ Goalzen</button>
+            <button class="pill-btn" data-url="https://pluto.tv/br/">📺 Pluto TV</button>
+            <button class="pill-btn" data-url="https://gemini.google.com/app">✨ Gemini</button>
+            <button class="pill-btn" data-url="https://www.twitch.tv">🟣 Twitch</button>
           </div>
 
           <div id="google-webview-container" class="webview-container-full">
@@ -221,6 +293,93 @@
             <div id="goalzen-loading" class="hidden">
               <div class="loader-ring"></div>
               <span>Carregando Goalzen...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: PLUTO TV ════ -->
+        <div class="tab" id="tab-pluto">
+          <div class="browser-bar wallpapers-browser-bar">
+            <div class="wallpapers-browser-nav">
+              <button id="btn-pluto-back" class="nav-control-btn" title="Voltar">‹</button>
+              <button id="btn-pluto-forward" class="nav-control-btn" title="Avançar">›</button>
+              <button id="btn-pluto-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-pluto-home" class="nav-control-btn" title="Página inicial da Pluto TV">📺</button>
+            </div>
+            <div class="wallpapers-site-label">
+              <strong>Pluto TV</strong>
+              <span>TV e filmes grátis</span>
+            </div>
+          </div>
+          <div class="webview-container-full">
+            <webview
+              id="pluto-player"
+              src="https://pluto.tv/br/"
+              partition="persist:pluto-tv"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="pluto-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando Pluto TV...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: GEMINI ════ -->
+        <div class="tab" id="tab-gemini">
+          <div class="browser-bar wallpapers-browser-bar">
+            <div class="wallpapers-browser-nav">
+              <button id="btn-gemini-back" class="nav-control-btn" title="Voltar">‹</button>
+              <button id="btn-gemini-forward" class="nav-control-btn" title="Avançar">›</button>
+              <button id="btn-gemini-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-gemini-home" class="nav-control-btn" title="Página inicial do Gemini">✨</button>
+            </div>
+            <div class="wallpapers-site-label">
+              <strong>Gemini</strong>
+              <span>Assistente de IA do Google</span>
+            </div>
+          </div>
+          <div class="webview-container-full">
+            <webview
+              id="gemini-player"
+              src="https://gemini.google.com/app"
+              partition="persist:gemini"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="gemini-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando Gemini...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ TAB: TWITCH ════ -->
+        <div class="tab" id="tab-twitch">
+          <div class="browser-bar wallpapers-browser-bar">
+            <div class="wallpapers-browser-nav">
+              <button id="btn-twitch-back" class="nav-control-btn" title="Voltar">‹</button>
+              <button id="btn-twitch-forward" class="nav-control-btn" title="Avançar">›</button>
+              <button id="btn-twitch-reload" class="nav-control-btn" title="Recarregar">↻</button>
+              <button id="btn-twitch-home" class="nav-control-btn" title="Página inicial da Twitch">🟣</button>
+            </div>
+            <div class="wallpapers-site-label">
+              <strong>Twitch</strong>
+              <span>Lives e jogos</span>
+            </div>
+          </div>
+          <div class="webview-container-full">
+            <webview
+              id="twitch-player"
+              src="https://www.twitch.tv"
+              partition="persist:twitch"
+              allowpopups
+              webpreferences="contextIsolation=false"
+            ></webview>
+            <div id="twitch-loading" class="hidden">
+              <div class="loader-ring"></div>
+              <span>Carregando Twitch...</span>
             </div>
           </div>
         </div>

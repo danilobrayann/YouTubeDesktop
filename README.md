@@ -32,6 +32,10 @@
   - Atalhos de 1 clique para Internet Archive, Jamendo, LibriVox, DistroWatch, Goalzen e muito mais.
 - 🖼️ **Aba Wallpapers HD**: Acesse o HDQwalls dentro do app para navegar por wallpapers HD, 4K, 5K e 8K, com controles de voltar, avançar e recarregar.
 - ⚽ **Aba Goalzen**: Acesse o Goalzen diretamente no TurboDown, com navegação própria e controles para voltar, avançar e recarregar.
+- 📺 **Aba Pluto TV**: Abra a Pluto TV Brasil dentro do app, com controles de navegação, recarga e página inicial.
+- ✨ **Aba Gemini**: Abra o Gemini em uma aba própria, com sessão persistente e controles de navegação.
+- 🟣 **Aba Twitch**: Acesse transmissões e jogos da Twitch em uma aba própria, com sessão persistente e controles de navegação.
+- 💬 **Redes Sociais**: Acesso rápido ao WhatsApp Web, Telegram, Instagram, Facebook, X, TikTok, YouTube e Discord pelo navegador integrado.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
   - **📁 Separação Automática por Tipo**:
     - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`

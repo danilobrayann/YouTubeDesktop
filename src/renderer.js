@@ -109,6 +109,30 @@ const btnGoalzenForward      = document.getElementById('btn-goalzen-forward');
 const btnGoalzenReload       = document.getElementById('btn-goalzen-reload');
 const btnGoalzenHome         = document.getElementById('btn-goalzen-home');
 
+// Pluto TV browser
+const plutoWebview           = document.getElementById('pluto-player');
+const plutoLoading           = document.getElementById('pluto-loading');
+const btnPlutoBack           = document.getElementById('btn-pluto-back');
+const btnPlutoForward        = document.getElementById('btn-pluto-forward');
+const btnPlutoReload         = document.getElementById('btn-pluto-reload');
+const btnPlutoHome           = document.getElementById('btn-pluto-home');
+
+// Gemini browser
+const geminiWebview           = document.getElementById('gemini-player');
+const geminiLoading           = document.getElementById('gemini-loading');
+const btnGeminiBack           = document.getElementById('btn-gemini-back');
+const btnGeminiForward        = document.getElementById('btn-gemini-forward');
+const btnGeminiReload         = document.getElementById('btn-gemini-reload');
+const btnGeminiHome           = document.getElementById('btn-gemini-home');
+
+// Twitch browser
+const twitchWebview           = document.getElementById('twitch-player');
+const twitchLoading           = document.getElementById('twitch-loading');
+const btnTwitchBack           = document.getElementById('btn-twitch-back');
+const btnTwitchForward        = document.getElementById('btn-twitch-forward');
+const btnTwitchReload         = document.getElementById('btn-twitch-reload');
+const btnTwitchHome           = document.getElementById('btn-twitch-home');
+
 // ── THEME PRESETS ──────────────────────────────────────────────────────────
 const PRESETS = {
   dark: {
@@ -1339,6 +1363,15 @@ document.querySelectorAll('.pill-btn').forEach(btn => {
   });
 });
 
+document.querySelectorAll('.social-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const url = card.dataset.socialUrl;
+    if (!url) return;
+    switchTab('google');
+    loadGoogleUrl(url);
+  });
+});
+
 // Google Webview events (loading and navigation)
 if (googleWebview) {
   googleWebview.addEventListener('did-start-loading', () => {
@@ -1424,6 +1457,102 @@ if (goalzenWebview) {
 
   goalzenWebview.addEventListener('did-stop-loading', () => {
     if (goalzenLoading) goalzenLoading.classList.add('hidden');
+  });
+}
+
+if (plutoWebview) {
+  if (btnPlutoBack) {
+    btnPlutoBack.addEventListener('click', () => {
+      if (plutoWebview.canGoBack()) plutoWebview.goBack();
+    });
+  }
+
+  if (btnPlutoForward) {
+    btnPlutoForward.addEventListener('click', () => {
+      if (plutoWebview.canGoForward()) plutoWebview.goForward();
+    });
+  }
+
+  if (btnPlutoReload) {
+    btnPlutoReload.addEventListener('click', () => plutoWebview.reload());
+  }
+
+  if (btnPlutoHome) {
+    btnPlutoHome.addEventListener('click', () => {
+      plutoWebview.loadURL('https://pluto.tv/br/');
+    });
+  }
+
+  plutoWebview.addEventListener('did-start-loading', () => {
+    if (plutoLoading) plutoLoading.classList.remove('hidden');
+  });
+
+  plutoWebview.addEventListener('did-stop-loading', () => {
+    if (plutoLoading) plutoLoading.classList.add('hidden');
+  });
+}
+
+if (geminiWebview) {
+  if (btnGeminiBack) {
+    btnGeminiBack.addEventListener('click', () => {
+      if (geminiWebview.canGoBack()) geminiWebview.goBack();
+    });
+  }
+
+  if (btnGeminiForward) {
+    btnGeminiForward.addEventListener('click', () => {
+      if (geminiWebview.canGoForward()) geminiWebview.goForward();
+    });
+  }
+
+  if (btnGeminiReload) {
+    btnGeminiReload.addEventListener('click', () => geminiWebview.reload());
+  }
+
+  if (btnGeminiHome) {
+    btnGeminiHome.addEventListener('click', () => {
+      geminiWebview.loadURL('https://gemini.google.com/app');
+    });
+  }
+
+  geminiWebview.addEventListener('did-start-loading', () => {
+    if (geminiLoading) geminiLoading.classList.remove('hidden');
+  });
+
+  geminiWebview.addEventListener('did-stop-loading', () => {
+    if (geminiLoading) geminiLoading.classList.add('hidden');
+  });
+}
+
+if (twitchWebview) {
+  if (btnTwitchBack) {
+    btnTwitchBack.addEventListener('click', () => {
+      if (twitchWebview.canGoBack()) twitchWebview.goBack();
+    });
+  }
+
+  if (btnTwitchForward) {
+    btnTwitchForward.addEventListener('click', () => {
+      if (twitchWebview.canGoForward()) twitchWebview.goForward();
+    });
+  }
+
+  if (btnTwitchReload) {
+    btnTwitchReload.addEventListener('click', () => twitchWebview.reload());
+  }
+
+  if (btnTwitchHome) {
+    btnTwitchHome.addEventListener('click', () => {
+      twitchWebview.loadURL('https://www.twitch.tv');
+    });
+  }
+
+  twitchWebview.addEventListener('did-start-loading', () => {
+    if (twitchLoading) twitchLoading.classList.remove('hidden');
+  });
+
+  twitchWebview.addEventListener('did-stop-loading', () => {
+    if (twitchLoading) twitchLoading.classList.add('hidden');
   });
 }
 

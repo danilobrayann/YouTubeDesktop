@@ -240,10 +240,12 @@ body.has-bg-image {
 
 .nav-section {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 0 8px;
+  overflow-y: auto;
 }
 
 .nav-item {
@@ -510,7 +512,10 @@ body.has-bg-image {
 
 #webview-loading,
 #wallpapers-loading,
-#goalzen-loading {
+#goalzen-loading,
+#pluto-loading,
+#gemini-loading,
+#twitch-loading {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1811,10 +1816,136 @@ input:focus-visible {
 
 #google-player,
 #wallpapers-player,
-#goalzen-player {
+#goalzen-player,
+#pluto-player,
+#gemini-player,
+#twitch-player {
   flex: 1;
   width: 100%;
   height: 100%;
   border: none;
   background: #ffffff;
+}
+
+/* ── Social networks tab ─────────────────────────────────────────────────── */
+#tab-social {
+  overflow-y: auto;
+}
+
+#social-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px;
+}
+
+#social-header {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.social-kicker {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+#social-header p {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.social-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.social-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025));
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.social-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+}
+
+.social-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.social-whatsapp { background: #25d366; color: #08351b; }
+.social-telegram { background: #229ed9; }
+.social-instagram { background: linear-gradient(135deg, #833ab4, #fd1d1d 55%, #fcb045); }
+.social-facebook { background: #0866ff; }
+.social-x { background: #111111; }
+.social-tiktok { background: #121212; text-shadow: -2px 0 #25f4ee, 2px 0 #fe2c55; }
+.social-youtube { background: #ff0033; }
+.social-discord { background: #5865f2; }
+
+.social-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.social-copy strong {
+  font-size: 14px;
+}
+
+.social-copy small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.social-open {
+  color: var(--text-muted);
+  font-size: 18px;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.social-card:hover .social-open {
+  transform: translate(2px, -2px);
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  #social-wrapper {
+    padding: 16px;
+  }
+
+  .social-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
 }
