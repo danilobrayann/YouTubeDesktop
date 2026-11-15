@@ -35,7 +35,7 @@
 - 📺 **Aba Pluto TV**: Abra a Pluto TV Brasil dentro do app, com controles de navegação, recarga e página inicial.
 - ✨ **Aba Gemini**: Abra o Gemini em uma aba própria, com sessão persistente e controles de navegação.
 - 🟣 **Aba Twitch**: Acesse transmissões e jogos da Twitch em uma aba própria, com sessão persistente e controles de navegação.
-- 💬 **Redes Sociais e Futebol**: Atalhos em uma barra lateral para WhatsApp Web, Telegram, Instagram, Facebook, X, TikTok, YouTube, Discord e os canais ge tv, CazéTV, TNT Sports e ESPN Brasil; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
+- 💬 **Redes Sociais, Futebol, Filmes, Animes e Música**: Atalhos em uma barra lateral para redes sociais, canais de futebol como SportyNet Brasil, serviços de vídeo como Netflix e Crunchyroll e plataformas de música como Spotify, YouTube Music, Deezer, Apple Music, SoundCloud, Amazon Music, Tidal e Jamendo; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
   - **📁 Separação Automática por Tipo**:
     - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`

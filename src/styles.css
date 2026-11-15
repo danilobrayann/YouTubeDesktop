@@ -1982,6 +1982,7 @@ input:focus-visible {
 
 .social-rail-group {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 6px;
 }
@@ -2082,6 +2083,78 @@ input:focus-visible {
 .social-espn {
   background: linear-gradient(145deg, #ed1c24, #a90d18);
   font-style: italic;
+}
+
+.social-sportynet {
+  background: linear-gradient(145deg, #ff6a00, #d51f32);
+}
+
+.social-netflix {
+  background: #e50914;
+}
+
+.social-prime {
+  background: linear-gradient(145deg, #00a8e1, #063d75);
+}
+
+.social-disney {
+  background: linear-gradient(145deg, #081a4a, #1d5bc6);
+  font-size: 23px;
+}
+
+.social-max {
+  background: #111111;
+  font-style: italic;
+}
+
+.social-globoplay {
+  background: linear-gradient(145deg, #f8b500, #f03a17 55%, #5f16a8);
+}
+
+.social-pluto {
+  background: #5b2b90;
+}
+
+.social-crunchyroll {
+  background: #f47521;
+}
+
+.social-spotify {
+  background: #1ed760;
+  color: #101010;
+}
+
+.social-youtube-music {
+  background: #ff0033;
+}
+
+.social-deezer {
+  background: linear-gradient(145deg, #a238ff, #ff3b4e);
+}
+
+.social-apple-music {
+  background: linear-gradient(145deg, #fc5c7d, #6a82fb);
+  font-size: 22px;
+}
+
+.social-soundcloud {
+  background: #ff5500;
+  font-size: 23px;
+}
+
+.social-amazon-music {
+  background: linear-gradient(145deg, #08a9e2, #074d83);
+  font-style: italic;
+}
+
+.social-tidal {
+  background: #111111;
+  font-size: 15px;
+}
+
+.social-jamendo {
+  background: #f4a900;
+  color: #15252c;
 }
 
 .social-link-label {
