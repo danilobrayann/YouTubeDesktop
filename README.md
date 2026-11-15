@@ -70,13 +70,14 @@ Você **não precisa** configurar nada manualmente por terminal. O projeto já v
    - ✅ Verificar e configurar o **Node.js**.
    - ✅ Criar o ícone oficial do **TurboDown (`assets\icon.ico`)** a partir da logo do projeto.
    - ✅ Instalar as dependências do Electron (`npm install`).
-   - ✅ Criar o atalho **TurboDown** na Área de Trabalho com a nova logo e abrir o código atualizado.
+   - ✅ Gerar e abrir o instalador nativo do Windows.
+   - ✅ Instalar o aplicativo, criar atalhos no Desktop e menu Iniciar e iniciar o TurboDown instalado.
 
 > **Importante:** para a atualização automática, a pasta do projeto precisa ser um clone Git com uma branch remota configurada.
 > Alterações locais ainda não enviadas ao GitHub ficam disponíveis somente nesse clone; para recebê-las em outras instalações, envie os commits para a branch remota.
-4. Ao final da instalação, escolha no menu:
-   - Digite `1` para **Abrir o app imediatamente**.
-   - Digite `2` para **Gerar o Instalador Executável `.exe` definitivo**.
+4. Siga as etapas do instalador do Windows. Ao concluir, o TurboDown será iniciado e poderá ser aberto pelo atalho no Desktop ou no menu Iniciar.
+
+Depois de instalado, o app roda pelo executável do Windows e não precisa de `npm start` para abrir.
 
 ---
 
@@ -148,7 +149,7 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
 
 | Arquivo | Função |
 | :--- | :--- |
-| **`instalar.bat`** | ⭐ **Instalador principal** — verifica tudo, instala dependências e cria atalho. |
+| **`instalar.bat`** | ⭐ **Instalador principal** — prepara dependências, gera e abre o Setup nativo do Windows. |
 | **`iniciar.bat`** | Inicia o aplicativo diretamente de forma rápida. |
 | **`construir.bat`** | Compila o aplicativo e gera o executável `.exe` na pasta `dist\`. |
 | **`gerar-icone.bat`** | Gera o arquivo `assets\icon.ico` oficial do Windows via script .NET. |
@@ -174,7 +175,7 @@ O script `instalar.bat` já instala tudo de forma automática. Caso prefira inst
 ## ❓ Resolução de Problemas
 
 #### O atalho na Área de Trabalho não apareceu
-Execute novamente o arquivo `instalar.bat` ou abra o app diretamente através de `iniciar.bat`. Um atalho de segurança também é mantido na própria pasta do projeto.
+Verifique se o instalador do Windows concluiu a instalação; depois, procure TurboDown no menu Iniciar ou execute novamente `instalar.bat`.
 
 #### O build do executável travou com erro de symlink / permissão
 Abra o arquivo `construir.bat` e escolha a **Opção 1 (Executável Nativo Direto)**. Ela compila o aplicativo em pasta sem depender do utilitário de links simbólicos do macOS.

@@ -94,40 +94,58 @@ if exist "%SCRIPT_DIR%node_modules\electron\install.js" (
 echo  OK - Dependencias do Electron estao prontas!
 
 :: ---------------------------------------------------------
-:: PASSO 5: Criar atalho na Area de Trabalho
+:: PASSO 5: Gerar o instalador nativo do Windows
 :: ---------------------------------------------------------
 echo.
-echo  [5/5] Criando atalho na Area de Trabalho...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%criar-atalho.ps1" -PreferSource
-
-echo.
-echo  =========================================================
-echo   INSTALACAO BASE CONCLUIDA COM SUCESSO!
-echo  =========================================================
-echo.
-echo  O que voce deseja fazer agora?
-echo.
-echo   [1] Abrir o TurboDown agora (Rapido e Direto)
-echo   [2] Gerar o Executavel (.exe) do Windows
-echo   [3] Sair
-echo.
-set /p OPCAO="  Escolha uma opcao (1, 2 ou 3): "
-
-if "%OPCAO%"=="1" (
+echo  [5/5] Gerando o instalador nativo do Windows...
+call npm.cmd run build:win
+if errorlevel 1 (
     echo.
-    echo  Iniciando TurboDown...
-    start "" "%SCRIPT_DIR%iniciar.bat"
-    exit /b 0
+    echo  Preparando novamente as ferramentas do build e tentando outra vez...
+    call :prepare_wincodesign
+    if errorlevel 1 goto build_failed
+    call npm.cmd run build:win
+    if errorlevel 1 goto build_failed
 )
 
-if "%OPCAO%"=="2" (
+set "INSTALLER_PATH="
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$installer = Get-ChildItem -LiteralPath '%SCRIPT_DIR%dist' -Filter '*Setup*.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($installer) { $installer.FullName }"`) do set "INSTALLER_PATH=%%I"
+
+if not defined INSTALLER_PATH (
     echo.
-    call "%SCRIPT_DIR%construir.bat"
-    exit /b 0
+    echo  ERRO: O instalador Setup nao foi encontrado na pasta dist.
+    pause
+    exit /b 1
 )
 
 echo.
-echo  Pronto! Voce pode abrir o app a qualquer momento pelo atalho
-echo  na Area de Trabalho ou pelo arquivo iniciar.bat.
+echo  Abrindo o instalador do TurboDown...
+start /wait "" "%INSTALLER_PATH%"
 echo.
+echo  Instalador finalizado. O TurboDown pode ser aberto pelo atalho criado
+echo  na Area de Trabalho ou no menu Iniciar.
+exit /b 0
+
+:prepare_wincodesign
+set "SEVENZIP=%SCRIPT_DIR%node_modules\7zip-bin\win\x64\7za.exe"
+set "WCS_CACHE=%LOCALAPPDATA%\electron-builder\Cache\winCodeSign"
+
+if not exist "%SEVENZIP%" exit /b 1
+if not exist "%WCS_CACHE%" exit /b 1
+if exist "%WCS_CACHE%\winCodeSign-2.6.0" exit /b 0
+
+for %%F in ("%WCS_CACHE%\*.7z") do (
+    if exist "%%~fF" (
+        "%SEVENZIP%" x -y -xr!*darwin* "%%~fF" -o"%WCS_CACHE%\winCodeSign-2.6.0" >nul 2>&1
+        if not errorlevel 1 exit /b 0
+    )
+)
+
+exit /b 1
+
+:build_failed
+echo.
+echo  ERRO: Nao foi possivel gerar o instalador do TurboDown.
+echo  Verifique as permissoes e tente executar instalar.bat novamente.
 pause
+exit /b 1
