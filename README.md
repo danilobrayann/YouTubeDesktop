@@ -28,14 +28,16 @@
 - 📺 **Player de Vídeo Embutido**: Navegue e assista ao YouTube diretamente no app com player integrado de alta definição que preenche 100% da tela e acompanha o redimensionamento da janela.
 - ⛶ **Modo Tela Total / Cinema**: Oculte a barra de navegação com 1 clique para uma experiência imersiva e limpa.
 - 🌐 **Navegador Google Web Integrado**:
-  - Navegue por qualquer site na internet com barra de endereços completa, botões de histórico (voltar/avançar) e recarregamento.
+  - Abas independentes, barra de endereço com busca web, favoritos e histórico salvos localmente.
+  - Abas privadas usam uma sessão temporária, não entram no histórico e têm os dados limpos ao fechar a última aba privada.
+  - **Shields básico** bloqueia domínios conhecidos de anúncios e rastreamento e pode ser ligado/desligado. Não substitui listas completas de bloqueio do Brave.
   - Atalhos de 1 clique para Internet Archive, Jamendo, LibriVox, DistroWatch, Goalzen e muito mais.
 - 🖼️ **Aba Wallpapers HD**: Acesse o HDQwalls dentro do app para navegar por wallpapers HD, 4K, 5K e 8K, com controles de voltar, avançar e recarregar.
 - ⚽ **Aba Goalzen**: Acesse o Goalzen diretamente no TurboDown, com navegação própria e controles para voltar, avançar e recarregar.
 - 📺 **Aba Pluto TV**: Abra a Pluto TV Brasil dentro do app, com controles de navegação, recarga e página inicial.
 - ✨ **Aba Gemini**: Abra o Gemini em uma aba própria, com sessão persistente e controles de navegação.
 - 🟣 **Aba Twitch**: Acesse transmissões e jogos da Twitch em uma aba própria, com sessão persistente e controles de navegação.
-- 💬 **Redes + 1.000**: Atalhos para redes sociais, canais de futebol, streaming, música e compras. Inclui Mercado Livre, KaBuM!, TerabyteShop, Pichau, Amazon, Shopee, AliExpress e Magalu; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
+- 💬 **Redes + 1.000**: Atalhos para redes sociais, canais de futebol, streaming, música, quadros colaborativos e compras. Inclui Goalzen, Sofascore, FigJam, Whimsical, Excalidraw, Mural, Lucidspark, Canva Whiteboards, Microsoft Whiteboard, Draw.io, AFFiNE e Stormboard, além de Mercado Livre, KaBuM!, TerabyteShop, Pichau, Amazon, Shopee, AliExpress e Magalu; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
   - **Fila sequencial**: um download por vez, com ações para pausar, retomar downloads parciais, cancelar e tentar novamente em caso de falha.
   - **Erros explicados**: mensagens orientam como agir em problemas de conexão, qualidade indisponível, permissão e ausência do FFmpeg.
@@ -140,7 +142,10 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
 
 | Atalho | Ação |
 | :--- | :--- |
-| `Ctrl + L` | Selecionar e focar na barra de endereço/pesquisa (YouTube) |
+| `Ctrl + L` | Focar na barra de endereço do navegador atual (Google Web ou YouTube) |
+| `Ctrl + T` | Abrir nova aba no Google Web |
+| `Ctrl + Shift + N` | Abrir nova aba privada |
+| `Ctrl + W` | Fechar a aba atual do Google Web |
 | `Ctrl + G` | Abrir a aba do **Google Web Browser** |
 | `Ctrl + E` | Abrir a aba de **Recomendações e Descobertas** |
 | `Ctrl + T` | Abrir a aba de **Torrents** |

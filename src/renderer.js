@@ -100,14 +100,35 @@ const blurVal            = document.getElementById('blur-val');
 const opacityVal         = document.getElementById('opacity-val');
 
 // Google Web DOM refs
-const googleWebview         = document.getElementById('google-player');
+const googleWebviews        = document.getElementById('google-webviews');
+const googleTabsContainer   = document.getElementById('google-tabs');
 const googleUrlInput        = document.getElementById('google-url-input');
 const btnGoogleSearch       = document.getElementById('btn-google-search');
 const btnGoogleBack         = document.getElementById('btn-google-back');
 const btnGoogleForward      = document.getElementById('btn-google-forward');
 const btnGoogleReload       = document.getElementById('btn-google-reload');
 const btnGoogleHome         = document.getElementById('btn-google-home');
+const btnGoogleNewTab       = document.getElementById('btn-google-new-tab');
+const btnGoogleNewPrivateTab = document.getElementById('btn-google-new-private-tab');
+const btnGoogleBookmark     = document.getElementById('btn-google-bookmark');
+const btnGoogleBookmarks    = document.getElementById('btn-google-bookmarks');
+const btnGoogleHistory      = document.getElementById('btn-google-history');
+const btnGoogleShields      = document.getElementById('btn-google-shields');
+const googleShieldsCount    = document.getElementById('google-shields-count');
+const googleLibraryPanel    = document.getElementById('google-library-panel');
+const googleLibraryTitle    = document.getElementById('google-library-title');
+const googleLibraryList     = document.getElementById('google-library-list');
+const btnGoogleClearHistory = document.getElementById('btn-google-clear-history');
+const btnGoogleCloseLibrary = document.getElementById('btn-google-close-library');
 const googleLoading         = document.getElementById('google-loading');
+let activeGoogleWebview     = null;
+let activeGoogleTabId       = null;
+let googleShieldsEnabled    = true;
+let googleHistory           = loadBrowserList('turbodown-google-history');
+let googleBookmarks         = loadBrowserList('turbodown-google-bookmarks');
+const googleTabs            = new Map();
+let googleTabOrder          = [];
+let googleLibraryMode       = '';
 
 // Social sidebar browser
 const socialWebview          = document.getElementById('social-player');
@@ -1521,84 +1542,379 @@ btnSaveTheme.addEventListener('click', async () => {
   setTimeout(() => saveStatus.classList.add('hidden'), 2500);
 });
 
+const GOOGLE_HOME_URL = 'https://www.google.com/';
+const GOOGLE_HISTORY_KEY = 'turbodown-google-history';
+const GOOGLE_BOOKMARKS_KEY = 'turbodown-google-bookmarks';
+
+function loadBrowserList(key) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(stored)
+      ? stored.filter(entry => entry && typeof entry.url === 'string')
+      : [];
+  } catch (error) {
+    console.warn(`Não foi possível ler ${key}:`, error);
+    return [];
+  }
+}
+
+function saveBrowserList(key, entries) {
+  try {
+    localStorage.setItem(key, JSON.stringify(entries));
+  } catch (error) {
+    console.error(`Não foi possível salvar ${key}:`, error);
+  }
+}
+
+function getGoogleTabUrl(tab) {
+  try {
+    return tab.webview.getURL() || tab.url || GOOGLE_HOME_URL;
+  } catch {
+    return tab.url || GOOGLE_HOME_URL;
+  }
+}
+
+function recordGoogleHistory(tab, url, title) {
+  if (tab.isPrivate) return;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return;
+
+  const entry = {
+    url: parsed.href,
+    title: title || parsed.hostname,
+    visitedAt: Date.now()
+  };
+  if (googleHistory[0] && googleHistory[0].url === entry.url) {
+    googleHistory[0] = entry;
+  } else {
+    googleHistory = [entry, ...googleHistory.filter(item => item.url !== entry.url)].slice(0, 300);
+  }
+  saveBrowserList(GOOGLE_HISTORY_KEY, googleHistory);
+  if (googleLibraryMode === 'history') renderGoogleLibrary();
+}
+
+function renderGoogleTabs() {
+  googleTabsContainer.replaceChildren();
+  googleTabOrder.forEach((id) => {
+    const tab = googleTabs.get(id);
+    if (!tab) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `google-tab${id === activeGoogleTabId ? ' active' : ''}${tab.isPrivate ? ' private' : ''}`;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', String(id === activeGoogleTabId));
+    button.title = tab.title;
+
+    const label = document.createElement('span');
+    label.className = 'google-tab-title';
+    label.textContent = `${tab.isPrivate ? '🕶 ' : ''}${tab.title || 'Nova guia'}`;
+    button.appendChild(label);
+
+    const close = document.createElement('span');
+    close.className = 'google-tab-close';
+    close.setAttribute('role', 'button');
+    close.setAttribute('aria-label', `Fechar ${tab.title || 'aba'}`);
+    close.textContent = '×';
+    close.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeGoogleTab(id);
+    });
+    button.appendChild(close);
+    button.addEventListener('click', () => selectGoogleTab(id));
+    googleTabsContainer.appendChild(button);
+  });
+}
+
+function setGoogleTabUrl(tab, url, title) {
+  if (!tab) return;
+  tab.url = url;
+  if (title) tab.title = title;
+  if (activeGoogleTabId === tab.id) {
+    googleUrlInput.value = url;
+    googleLoading.querySelector('span').textContent = `Carregando ${tab.title || 'página'}...`;
+    updateGoogleBookmarkButton();
+  }
+  renderGoogleTabs();
+}
+
+function selectGoogleTab(id) {
+  const tab = googleTabs.get(id);
+  if (!tab) return;
+  activeGoogleTabId = id;
+  activeGoogleWebview = tab.webview;
+  googleTabs.forEach((item, tabId) => {
+    item.webview.classList.toggle('active', tabId === id);
+  });
+  document.getElementById('tab-google').classList.toggle('private-mode', tab.isPrivate);
+  googleUrlInput.value = getGoogleTabUrl(tab);
+  googleLoading.classList.add('hidden');
+  renderGoogleTabs();
+  updateGoogleBookmarkButton();
+}
+
+function attachGoogleTabEvents(tab) {
+  const webview = tab.webview;
+  webview.addEventListener('did-start-loading', () => {
+    if (activeGoogleTabId === tab.id) {
+      googleLoading.querySelector('span').textContent = `Carregando ${tab.title || 'página'}...`;
+      googleLoading.classList.remove('hidden');
+    }
+  });
+  webview.addEventListener('did-stop-loading', () => {
+    const url = getGoogleTabUrl(tab);
+    if (activeGoogleTabId === tab.id) {
+      googleLoading.classList.add('hidden');
+      googleUrlInput.value = url;
+    }
+  });
+  webview.addEventListener('did-navigate', (event) => {
+    if (!event.isMainFrame && event.isMainFrame !== undefined) return;
+    setGoogleTabUrl(tab, event.url, tab.title);
+    recordGoogleHistory(tab, event.url, tab.title);
+  });
+  webview.addEventListener('did-navigate-in-page', (event) => {
+    if (!event.isMainFrame) return;
+    setGoogleTabUrl(tab, event.url, tab.title);
+    recordGoogleHistory(tab, event.url, tab.title);
+  });
+  webview.addEventListener('page-title-updated', (event) => {
+    let fallbackTitle = 'Página';
+    try {
+      fallbackTitle = new URL(tab.url || GOOGLE_HOME_URL).hostname;
+    } catch (error) {
+      console.warn('URL da aba Google inválida:', error);
+    }
+    tab.title = event.title || fallbackTitle;
+    renderGoogleTabs();
+    recordGoogleHistory(tab, getGoogleTabUrl(tab), tab.title);
+  });
+  webview.addEventListener('did-fail-load', (event) => {
+    if (event.isMainFrame && event.errorCode !== -3 && activeGoogleTabId === tab.id) {
+      googleLoading.classList.add('hidden');
+    }
+  });
+}
+
+function createGoogleTab(isPrivate = false, initialUrl = GOOGLE_HOME_URL) {
+  const id = `google-tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const webview = document.createElement('webview');
+  webview.className = 'google-webview';
+  webview.setAttribute('partition', isPrivate ? 'google-private' : 'persist:google');
+  webview.setAttribute('allowpopups', '');
+  webview.setAttribute('webpreferences', 'contextIsolation=false');
+
+  const tab = {
+    id,
+    title: isPrivate ? 'Aba privada' : 'Nova guia',
+    url: initialUrl,
+    isPrivate,
+    webview
+  };
+  googleTabs.set(id, tab);
+  googleTabOrder.push(id);
+  attachGoogleTabEvents(tab);
+  googleWebviews.appendChild(webview);
+  renderGoogleTabs();
+  selectGoogleTab(id);
+  webview.src = initialUrl;
+  return tab;
+}
+
+function closeGoogleTab(id) {
+  const tab = googleTabs.get(id);
+  if (!tab) return;
+  const wasActive = activeGoogleTabId === id;
+  const hadPrivateTab = tab.isPrivate;
+  const closedIndex = googleTabOrder.indexOf(id);
+  tab.webview.remove();
+  googleTabs.delete(id);
+  googleTabOrder = googleTabOrder.filter(tabId => tabId !== id);
+
+  const hasPrivateTabs = [...googleTabs.values()].some(item => item.isPrivate);
+  if (hadPrivateTab && !hasPrivateTabs) {
+    api.clearGooglePrivateData().catch(error => {
+      console.error('Não foi possível limpar os dados da sessão privada:', error);
+    });
+  }
+
+  if (googleTabs.size === 0) {
+    createGoogleTab(false);
+  } else if (wasActive) {
+    selectGoogleTab(googleTabOrder[Math.min(closedIndex, googleTabOrder.length - 1)]);
+  } else {
+    renderGoogleTabs();
+  }
+}
+
 function loadGoogleUrl(input) {
-  if (!googleWebview) return;
-  const trimmed = (input || '').trim();
-  if (!trimmed) {
-    googleWebview.src = 'https://www.google.com';
-    if (googleUrlInput) googleUrlInput.value = 'https://www.google.com';
+  let targetUrl;
+  try {
+    targetUrl = api.resolveNavigationTarget(input);
+  } catch (error) {
+    googleUrlInput.setCustomValidity(error.message);
+    googleUrlInput.reportValidity();
+    googleUrlInput.addEventListener('input', () => googleUrlInput.setCustomValidity(''), { once: true });
+    return;
+  }
+  let tab = googleTabs.get(activeGoogleTabId);
+  if (!tab) tab = createGoogleTab(false, targetUrl);
+  tab.url = targetUrl;
+  tab.webview.src = targetUrl;
+  googleUrlInput.value = targetUrl;
+}
+
+function renderGoogleLibrary() {
+  const entries = googleLibraryMode === 'history' ? googleHistory : googleBookmarks;
+  googleLibraryTitle.textContent = googleLibraryMode === 'history' ? 'Histórico' : 'Favoritos';
+  btnGoogleClearHistory.classList.toggle('hidden', googleLibraryMode !== 'history');
+  googleLibraryList.replaceChildren();
+
+  if (!entries.length) {
+    const empty = document.createElement('p');
+    empty.className = 'google-library-empty';
+    empty.textContent = googleLibraryMode === 'history' ? 'O histórico está vazio.' : 'Nenhum favorito salvo ainda.';
+    googleLibraryList.appendChild(empty);
     return;
   }
 
-  let targetUrl = '';
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    targetUrl = trimmed;
-  } else if (trimmed.includes('.') && !trimmed.includes(' ') && trimmed.length > 3) {
-    targetUrl = `https://${trimmed}`;
-  } else {
-    targetUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
-  }
+  entries.forEach((entry) => {
+    const row = document.createElement('div');
+    row.className = 'google-library-item';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'google-library-open';
+    const title = document.createElement('strong');
+    title.textContent = entry.title || entry.url;
+    const url = document.createElement('span');
+    url.textContent = entry.url;
+    open.append(title, url);
+    open.addEventListener('click', () => {
+      googleLibraryPanel.classList.add('hidden');
+      loadGoogleUrl(entry.url);
+    });
+    row.appendChild(open);
 
-  googleWebview.src = targetUrl;
-  if (googleUrlInput) googleUrlInput.value = targetUrl;
-}
-
-if (btnGoogleSearch) {
-  btnGoogleSearch.addEventListener('click', () => {
-    loadGoogleUrl(googleUrlInput ? googleUrlInput.value : '');
-  });
-}
-
-if (googleUrlInput) {
-  googleUrlInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      loadGoogleUrl(googleUrlInput.value);
+    if (googleLibraryMode === 'bookmarks') {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'google-library-remove';
+      remove.title = 'Remover favorito';
+      remove.setAttribute('aria-label', `Remover ${entry.title || entry.url} dos favoritos`);
+      remove.textContent = '×';
+      remove.addEventListener('click', () => {
+        googleBookmarks = googleBookmarks.filter(item => item.url !== entry.url);
+        saveBrowserList(GOOGLE_BOOKMARKS_KEY, googleBookmarks);
+        renderGoogleLibrary();
+        updateGoogleBookmarkButton();
+      });
+      row.appendChild(remove);
     }
+    googleLibraryList.appendChild(row);
   });
 }
 
-if (btnGoogleBack) {
-  btnGoogleBack.addEventListener('click', () => {
-    try {
-      if (googleWebview && googleWebview.canGoBack && googleWebview.canGoBack()) {
-        googleWebview.goBack();
-      }
-    } catch (e) {}
-  });
+function toggleGoogleLibrary(mode) {
+  if (googleLibraryMode === mode && !googleLibraryPanel.classList.contains('hidden')) {
+    googleLibraryPanel.classList.add('hidden');
+    return;
+  }
+  googleLibraryMode = mode;
+  renderGoogleLibrary();
+  googleLibraryPanel.classList.remove('hidden');
 }
 
-if (btnGoogleForward) {
-  btnGoogleForward.addEventListener('click', () => {
-    try {
-      if (googleWebview && googleWebview.canGoForward && googleWebview.canGoForward()) {
-        googleWebview.goForward();
-      }
-    } catch (e) {}
-  });
+function updateGoogleBookmarkButton() {
+  const tab = googleTabs.get(activeGoogleTabId);
+  const url = tab ? getGoogleTabUrl(tab) : '';
+  const saved = googleBookmarks.some(entry => entry.url === url);
+  btnGoogleBookmark.textContent = saved ? '★' : '☆';
+  btnGoogleBookmark.title = saved ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+  btnGoogleBookmark.setAttribute('aria-label', btnGoogleBookmark.title);
 }
 
-if (btnGoogleReload) {
-  btnGoogleReload.addEventListener('click', () => {
-    try {
-      if (googleWebview) googleWebview.reload();
-    } catch (e) {}
-  });
+function toggleGoogleBookmark() {
+  const tab = googleTabs.get(activeGoogleTabId);
+  if (!tab) return;
+  const url = getGoogleTabUrl(tab);
+  if (!/^https?:/i.test(url)) return;
+  const existing = googleBookmarks.find(entry => entry.url === url);
+  if (existing) {
+    googleBookmarks = googleBookmarks.filter(entry => entry.url !== url);
+  } else {
+    googleBookmarks.unshift({ url, title: tab.title || new URL(url).hostname, savedAt: Date.now() });
+  }
+  saveBrowserList(GOOGLE_BOOKMARKS_KEY, googleBookmarks);
+  updateGoogleBookmarkButton();
+  if (googleLibraryMode === 'bookmarks' && !googleLibraryPanel.classList.contains('hidden')) {
+    renderGoogleLibrary();
+  }
 }
 
-if (btnGoogleHome) {
-  btnGoogleHome.addEventListener('click', () => {
-    loadGoogleUrl('https://www.google.com');
-  });
+function applyGoogleShieldStatus(status) {
+  if (!status) return;
+  googleShieldsEnabled = status.enabled;
+  googleShieldsCount.textContent = String(status.blockedCount || 0);
+  btnGoogleShields.classList.toggle('shields-enabled', googleShieldsEnabled);
+  btnGoogleShields.classList.toggle('shields-disabled', !googleShieldsEnabled);
+  btnGoogleShields.setAttribute('aria-pressed', String(googleShieldsEnabled));
+  btnGoogleShields.querySelector('span').textContent = googleShieldsEnabled ? 'Ativo' : 'Desativado';
 }
 
-// Quick pills in Google browser
+btnGoogleSearch.addEventListener('click', () => loadGoogleUrl(googleUrlInput.value));
+googleUrlInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') loadGoogleUrl(googleUrlInput.value);
+});
+btnGoogleBack.addEventListener('click', () => {
+  if (activeGoogleWebview && activeGoogleWebview.canGoBack()) activeGoogleWebview.goBack();
+});
+btnGoogleForward.addEventListener('click', () => {
+  if (activeGoogleWebview && activeGoogleWebview.canGoForward()) activeGoogleWebview.goForward();
+});
+btnGoogleReload.addEventListener('click', () => {
+  if (activeGoogleWebview) activeGoogleWebview.reload();
+});
+btnGoogleHome.addEventListener('click', () => loadGoogleUrl(GOOGLE_HOME_URL));
+btnGoogleNewTab.addEventListener('click', () => {
+  createGoogleTab(false);
+  googleUrlInput.focus();
+  googleUrlInput.select();
+});
+btnGoogleNewPrivateTab.addEventListener('click', () => {
+  createGoogleTab(true);
+  googleUrlInput.focus();
+  googleUrlInput.select();
+});
+btnGoogleBookmark.addEventListener('click', toggleGoogleBookmark);
+btnGoogleBookmarks.addEventListener('click', () => toggleGoogleLibrary('bookmarks'));
+btnGoogleHistory.addEventListener('click', () => toggleGoogleLibrary('history'));
+btnGoogleCloseLibrary.addEventListener('click', () => googleLibraryPanel.classList.add('hidden'));
+btnGoogleClearHistory.addEventListener('click', () => {
+  googleHistory = [];
+  saveBrowserList(GOOGLE_HISTORY_KEY, googleHistory);
+  renderGoogleLibrary();
+});
+btnGoogleShields.addEventListener('click', async () => {
+  btnGoogleShields.disabled = true;
+  try {
+    applyGoogleShieldStatus(await api.setGoogleShields(!googleShieldsEnabled));
+  } catch (error) {
+    console.error('Não foi possível alterar a proteção de navegação:', error);
+  } finally {
+    btnGoogleShields.disabled = false;
+  }
+});
+api.on('google-shield-status', applyGoogleShieldStatus);
+
 document.querySelectorAll('.pill-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (btn.dataset.url) {
-      loadGoogleUrl(btn.dataset.url);
-    } else if (btn.dataset.query) {
-      loadGoogleUrl(btn.dataset.query);
-    }
+    if (btn.dataset.url) loadGoogleUrl(btn.dataset.url);
+    else if (btn.dataset.query) loadGoogleUrl(btn.dataset.query);
   });
 });
 
@@ -1680,28 +1996,9 @@ if (socialWebview) {
   });
 }
 
-// Google Webview events (loading and navigation)
-if (googleWebview) {
-  googleWebview.addEventListener('did-start-loading', () => {
-    if (googleLoading) googleLoading.classList.remove('hidden');
-  });
-
-  googleWebview.addEventListener('did-stop-loading', () => {
-    if (googleLoading) googleLoading.classList.add('hidden');
-    try {
-      const wvUrl = googleWebview.getURL();
-      if (wvUrl && googleUrlInput && wvUrl !== googleUrlInput.value) {
-        googleUrlInput.value = wvUrl;
-      }
-    } catch (e) {}
-  });
-
-  googleWebview.addEventListener('did-navigate', (e) => {
-    if (e.url && googleUrlInput && e.url !== googleUrlInput.value) {
-      googleUrlInput.value = e.url;
-    }
-  });
-
+async function initializeGoogleBrowser() {
+  applyGoogleShieldStatus(await api.getGoogleShieldStatus());
+  createGoogleTab(false);
 }
 
 if (wallpapersWebview) {
@@ -1772,9 +2069,29 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey) {
     if (e.key === 'l' || e.key === 'L') {
       e.preventDefault();
-      switchTab('home');
-      urlInput.focus();
-      urlInput.select();
+      if (currentTab === 'google') {
+        googleUrlInput.focus();
+        googleUrlInput.select();
+      } else {
+        switchTab('home');
+        urlInput.focus();
+        urlInput.select();
+      }
+    } else if ((e.key === 'n' || e.key === 'N') && e.shiftKey) {
+      e.preventDefault();
+      switchTab('google');
+      createGoogleTab(true);
+      googleUrlInput.focus();
+      googleUrlInput.select();
+    } else if (e.key === 't' || e.key === 'T') {
+      e.preventDefault();
+      switchTab('google');
+      createGoogleTab(false);
+      googleUrlInput.focus();
+      googleUrlInput.select();
+    } else if ((e.key === 'w' || e.key === 'W') && currentTab === 'google') {
+      e.preventDefault();
+      closeGoogleTab(activeGoogleTabId);
     } else if (e.key === 'd' || e.key === 'D') {
       e.preventDefault();
       switchTab('downloads');
@@ -1793,6 +2110,9 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     if (!modalDownload.classList.contains('hidden')) closeModal();
+    if (googleLibraryPanel && !googleLibraryPanel.classList.contains('hidden')) {
+      googleLibraryPanel.classList.add('hidden');
+    }
   }
 });
 
@@ -1815,6 +2135,7 @@ async function init() {
   appVersionStatus.textContent = `Versão instalada: ${version}. ${updateStatus.message}`;
   applyAppUpdateStatus(updateStatus);
   checkDownloadTools();
+  await initializeGoogleBrowser();
 
   // Initial tab
   switchTab('home');

@@ -6,6 +6,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
+const { isTrackerRequest } = require('./browser-utils');
 const {
   AUDIO_FORMATS,
   VIDEO_FORMATS,
@@ -43,9 +44,14 @@ const store = new Store({
       preset: 'dark'
     },
     downloadPath: null,
-    defaultFormat: '720p'
+    defaultFormat: '720p',
+    googleShieldsEnabled: true
   }
 });
+
+let googleShieldsEnabled = store.get('googleShieldsEnabled', true);
+let googleBlockedRequestCount = 0;
+const configuredGoogleSessions = new WeakSet();
 
 // ─── Active downloads registry ───────────────────────────────────────────────
 const activeDownloads = new Map(); // downloadId → child process
@@ -55,6 +61,42 @@ const downloadJobs = new Map();
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let googleShieldUpdateTimer = null;
+
+function sendGoogleShieldStatus() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('google-shield-status', {
+    enabled: googleShieldsEnabled,
+    blockedCount: googleBlockedRequestCount
+  });
+}
+
+function queueGoogleShieldStatus() {
+  if (googleShieldUpdateTimer) return;
+  googleShieldUpdateTimer = setTimeout(() => {
+    googleShieldUpdateTimer = null;
+    sendGoogleShieldStatus();
+  }, 300);
+}
+
+function configureGoogleBrowserSession(partition) {
+  const browserSession = session.fromPartition(partition);
+  if (configuredGoogleSessions.has(browserSession)) return;
+  configuredGoogleSessions.add(browserSession);
+
+  browserSession.webRequest.onBeforeRequest(
+    { urls: ['http://*/*', 'https://*/*'] },
+    (details, callback) => {
+      if (googleShieldsEnabled && isTrackerRequest(details.url)) {
+        googleBlockedRequestCount++;
+        queueGoogleShieldStatus();
+        callback({ cancel: true });
+        return;
+      }
+      callback({ cancel: false });
+    }
+  );
+}
 
 function createTray() {
   if (tray) return;
@@ -188,6 +230,8 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initializeAutoUpdater();
+  configureGoogleBrowserSession('persist:google');
+  configureGoogleBrowserSession('google-private');
 
   // Allow webview to load YouTube
   app.on('web-contents-created', (event, contents) => {
@@ -233,6 +277,28 @@ ipcMain.on('maximize-window', () => {
 
 ipcMain.on('close-window', () => {
   if (mainWindow) mainWindow.close();
+});
+
+// ─── Google Web privacy controls ────────────────────────────────────────────
+ipcMain.handle('get-google-shield-status', () => ({
+  enabled: googleShieldsEnabled,
+  blockedCount: googleBlockedRequestCount
+}));
+
+ipcMain.handle('set-google-shields', (_event, enabled) => {
+  if (typeof enabled !== 'boolean') {
+    throw new Error('Estado da proteção de navegação inválido.');
+  }
+  googleShieldsEnabled = enabled;
+  store.set('googleShieldsEnabled', enabled);
+  sendGoogleShieldStatus();
+  return { enabled: googleShieldsEnabled, blockedCount: googleBlockedRequestCount };
+});
+
+ipcMain.handle('clear-google-private-data', async () => {
+  const privateSession = session.fromPartition('google-private');
+  await Promise.all([privateSession.clearStorageData(), privateSession.clearCache()]);
+  return true;
 });
 
 // ─── Theme ───────────────────────────────────────────────────────────────────

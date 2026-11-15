@@ -1,6 +1,7 @@
 'use strict';
 
 const { ipcRenderer } = require('electron');
+const { resolveNavigationTarget } = require('./browser-utils');
 
 // ─── Expose API to renderer ───────────────────────────────────────────────────
 // Since contextIsolation is false, we attach to window directly for simplicity
@@ -47,11 +48,18 @@ window.api = {
   checkAppUpdate: () => ipcRenderer.invoke('check-app-update'),
   installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
 
+  // Google Web privacy controls
+  getGoogleShieldStatus: () => ipcRenderer.invoke('get-google-shield-status'),
+  setGoogleShields: (enabled) => ipcRenderer.invoke('set-google-shields', enabled),
+  clearGooglePrivateData: () => ipcRenderer.invoke('clear-google-private-data'),
+  resolveNavigationTarget,
+
   // IPC event listeners
   on: (channel, callback) => {
     const allowedChannels = [
       'download-progress',
       'app-update-status',
+      'google-shield-status',
       'window-maximized'
     ];
     if (allowedChannels.includes(channel)) {
