@@ -2,7 +2,13 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { getFormatArgs, validateDownloadRequest, validateHttpUrl } = require('../src/download-utils');
+const {
+  formatDownloadError,
+  getFormatArgs,
+  isAudioFormat,
+  validateDownloadRequest,
+  validateHttpUrl
+} = require('../src/download-utils');
 
 test('accepts HTTP and HTTPS download URLs', () => {
   assert.equal(validateHttpUrl(' https://example.com/video?id=1 '), 'https://example.com/video?id=1');
@@ -41,4 +47,21 @@ test('builds format arguments only for supported formats', () => {
   assert.deepEqual(getFormatArgs('1080p'), ['-f', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]', '--merge-output-format', 'mp4']);
   assert.throws(() => getFormatArgs('invalid'), /Formato/);
   assert.throws(() => getFormatArgs('__proto__'), /Formato/);
+});
+
+test('identifies audio formats and provides actionable download errors', () => {
+  assert.equal(isAudioFormat('mp3'), true);
+  assert.equal(isAudioFormat('720p'), false);
+  assert.match(formatDownloadError('ERROR: Requested format is not available', 1), /Tente outra qualidade/);
+  assert.match(formatDownloadError('ERROR: ffmpeg not found', 1), /FFmpeg não foi encontrado/);
+  assert.match(formatDownloadError('', 1), /código 1/);
+});
+
+test('rejects invalid destination paths in download requests', () => {
+  assert.throws(() => validateDownloadRequest({
+    url: 'https://example.com/video',
+    format: '720p',
+    downloadId: 'dl-123456-abc123',
+    outputPath: ''
+  }), /Pasta de destino/);
 });

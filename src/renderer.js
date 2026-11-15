@@ -11,8 +11,10 @@ const api = window.api;
 let currentTab = 'home';
 let downloadPath = '';
 let currentTheme = {};
-let activeDownloadCount = 0;
 const downloads = new Map(); // downloadId → { url, format, status, percent, ... }
+const downloadQueue = [];
+let queueProcessing = false;
+let downloadPreferences = { videoFormat: '720p', audioFormat: 'mp3' };
 const appShell = document.getElementById('app');
 const btnMenuToggle = document.getElementById('btn-menu-toggle');
 
@@ -68,7 +70,8 @@ const setGradC2          = document.getElementById('set-grad-c2');
 const setBlur            = document.getElementById('set-blur');
 const setOpacity         = document.getElementById('set-opacity');
 const setTransparency    = document.getElementById('set-transparency');
-const setDefaultFormat   = document.getElementById('set-default-format');
+const setDefaultVideoFormat = document.getElementById('set-default-video-format');
+const setDefaultAudioFormat = document.getElementById('set-default-audio-format');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -77,6 +80,17 @@ const btnSaveTheme       = document.getElementById('btn-save-theme');
 const saveStatus         = document.getElementById('save-status');
 const settingsDlPath     = document.getElementById('settings-dl-path');
 const btnSettingsChPath  = document.getElementById('btn-settings-change-path');
+const dlSpaceDisplay     = document.getElementById('dl-space-display');
+const btnRefreshSpace    = document.getElementById('btn-refresh-space');
+const toolYtDlpStatus    = document.getElementById('tool-ytdlp-status');
+const toolFfmpegStatus   = document.getElementById('tool-ffmpeg-status');
+const appVersionStatus   = document.getElementById('app-version-status');
+const maintenanceMessage = document.getElementById('maintenance-message');
+const appUpdateBadge     = document.getElementById('app-update-badge');
+const btnCheckTools      = document.getElementById('btn-check-tools');
+const btnUpdateYtDlp     = document.getElementById('btn-update-ytdlp');
+const btnCheckAppUpdate  = document.getElementById('btn-check-app-update');
+const btnInstallAppUpdate = document.getElementById('btn-install-app-update');
 const accentLabel        = document.getElementById('accent-label');
 const bgcolorLabel       = document.getElementById('bgcolor-label');
 const gradc1Label        = document.getElementById('gradc1-label');
@@ -580,6 +594,7 @@ btnDownloadQ.addEventListener('click', openQuickDownloadModal);
 
 function openQuickDownloadModal() {
   const url = urlInput.value.trim() || webview.src || '';
+  modalFormat.value = dlFormat.value;
   modalUrl.textContent = url || 'Nenhuma URL carregada';
   modalDownload.classList.remove('hidden');
   modalBackdrop.classList.remove('hidden');
@@ -601,9 +616,15 @@ if (modalPlaylistCancelBtn) modalPlaylistCancelBtn.addEventListener('click', clo
 // ── PLAYLIST MODAL HANDLING ────────────────────────────────────────────────
 let pendingPlaylistUrl = '';
 
+function resolveDownloadFormat(format) {
+  if (format === 'default-audio') return downloadPreferences.audioFormat;
+  if (format === 'default-video') return downloadPreferences.videoFormat;
+  return format;
+}
+
 function openPlaylistModal(url, format, title = 'Playlist do YouTube', count = null) {
   pendingPlaylistUrl = url;
-  if (modalPlaylistFormat) modalPlaylistFormat.value = format || '720p';
+  if (modalPlaylistFormat) modalPlaylistFormat.value = resolveDownloadFormat(format || 'default-video');
   if (playlistTitleText) playlistTitleText.textContent = title;
   if (playlistCountBadge) {
     if (count) {
@@ -811,6 +832,7 @@ async function startDownload(url, format, downloadPlaylist = true, playlistTitle
     return;
   }
 
+  format = resolveDownloadFormat(format || 'default-video');
   const id = generateId();
   const isPlaylist = downloadPlaylist && (url.includes('list=') || url.includes('/playlist'));
 
@@ -829,24 +851,44 @@ async function startDownload(url, format, downloadPlaylist = true, playlistTitle
 
   downloads.set(id, download);
   renderDownloadCard(download);
+  downloadQueue.push(id);
+  updateDownloadCard(id, { status: 'pending', message: 'Aguardando na fila...' });
   updateBadge();
+  processDownloadQueue();
+}
 
+async function processDownloadQueue() {
+  if (queueProcessing) return;
+  queueProcessing = true;
   try {
-    activeDownloadCount++;
-    updateBadge();
-    updateDownloadCard(id, { status: 'downloading' });
+    while (downloadQueue.length) {
+      const id = downloadQueue.shift();
+      const download = downloads.get(id);
+      if (!download || download.status !== 'pending') continue;
 
-    await api.downloadMedia({
-      url:              download.url,
-      format:           download.format,
-      outputPath:       downloadPath,
-      downloadId:       id,
-      downloadPlaylist: downloadPlaylist,
-      playlistFolder:   playlistTitle
-    });
-  } catch (err) {
-    updateDownloadCard(id, { status: 'error', message: err.message });
-    activeDownloadCount = Math.max(0, activeDownloadCount - 1);
+      updateDownloadCard(id, { status: 'downloading', message: 'Iniciando download...' });
+      try {
+        const result = await api.downloadMedia({
+          url: download.url,
+          format: download.format,
+          outputPath: downloadPath,
+          downloadId: id,
+          downloadPlaylist: download.isPlaylist
+        });
+        if (result && result.paused) {
+          updateDownloadCard(id, { status: 'paused', message: 'Download pausado. O progresso parcial foi mantido.' });
+        } else if (result && result.cancelled) {
+          updateDownloadCard(id, { status: 'cancelled' });
+        } else if (result && result.success) {
+          updateDownloadCard(id, { status: 'complete', targetFolder: result.folder, filePath: result.file });
+        }
+      } catch (error) {
+        updateDownloadCard(id, { status: 'error', message: error.message });
+      }
+      updateBadge();
+    }
+  } finally {
+    queueProcessing = false;
     updateBadge();
   }
 }
@@ -871,18 +913,28 @@ dlUrl.addEventListener('keydown', async (e) => {
 // ── DOWNLOAD PROGRESS EVENTS ───────────────────────────────────────────────
 api.on('download-progress', (data) => {
   const { downloadId, percent, speed, eta, size, status, message, currentItem, totalItems, title } = data;
-  updateDownloadCard(downloadId, { percent, speed, eta, size, status, message, currentItem, totalItems, title });
+  updateDownloadCard(downloadId, {
+    ...data,
+    percent,
+    speed,
+    eta,
+    size,
+    status,
+    message,
+    currentItem,
+    totalItems,
+    title
+  });
 
-  if (status === 'complete' || status === 'error' || status === 'cancelled') {
-    activeDownloadCount = Math.max(0, activeDownloadCount - 1);
-    updateBadge();
-
-    if (status === 'complete') {
-      const dl = downloads.get(downloadId);
+  if (status === 'complete') {
+    const dl = downloads.get(downloadId);
+    if (!dl || !dl.notifiedComplete) {
       const displayTitle = (dl && dl.playlistTitle) || title || 'Seu download';
       notifyDownloadComplete(displayTitle, dl ? dl.isPlaylist : false);
+      if (dl) dl.notifiedComplete = true;
     }
   }
+  updateBadge();
 });
 
 // ── RENDER DOWNLOAD CARD ───────────────────────────────────────────────────
@@ -920,7 +972,6 @@ function renderDownloadCard(dl) {
       </div>
       <div class="dl-card-actions" id="actions-${dl.id}">
         <span class="dl-status-label pending" id="status-${dl.id}">Aguardando</span>
-        <button class="dl-action-btn danger" id="cancel-${dl.id}" onclick="cancelDownload('${dl.id}')">✕ Cancelar</button>
       </div>
     </div>
     <div class="dl-progress-wrap" id="progress-wrap-${dl.id}">
@@ -933,6 +984,7 @@ function renderDownloadCard(dl) {
         <span id="eta-${dl.id}"></span>
       </div>
     </div>
+    <div class="dl-error-message hidden" id="error-${dl.id}" role="alert"></div>
   `;
 
   downloadList.prepend(card);
@@ -951,15 +1003,17 @@ function updateDownloadCard(id, data) {
   const etaEl         = document.getElementById(`eta-${id}`);
   const cardEl        = document.getElementById(`card-${id}`);
   const actEl         = document.getElementById(`actions-${id}`);
-  const cancelEl      = document.getElementById(`cancel-${id}`);
   const counterEl     = document.getElementById(`item-counter-${id}`);
   const titleTxtEl    = document.getElementById(`title-text-${id}`);
   const folderBadgeEl = document.getElementById(`folder-badge-${id}`);
+  const errorEl       = document.getElementById(`error-${id}`);
 
   if (!cardEl) return;
 
   if (data.targetFolder) dl.targetFolder = data.targetFolder;
   if (data.filePath) dl.filePath = data.filePath;
+  if (data.message) dl.message = data.message;
+  if (data.details) dl.errorDetails = data.details;
 
   // Atualizar título se detectado
   if (data.title && titleTxtEl && !dl.playlistTitle) {
@@ -1011,6 +1065,8 @@ function updateDownloadCard(id, data) {
       pending:     'Aguardando',
       downloading: 'Baixando',
       processing:  'Processando',
+      pausing:     'Pausando...',
+      paused:      'Pausado',
       complete:    '✅ Concluído',
       error:       '❌ Erro',
       cancelled:   '⚠️ Cancelado'
@@ -1020,7 +1076,7 @@ function updateDownloadCard(id, data) {
   }
 
   if (fillEl) {
-    fillEl.classList.remove('active', 'complete', 'error', 'cancelled');
+    fillEl.classList.remove('active', 'complete', 'error', 'cancelled', 'paused');
     if (status === 'downloading' || status === 'processing') {
       fillEl.classList.add('active');
     } else if (status === 'complete') {
@@ -1036,47 +1092,58 @@ function updateDownloadCard(id, data) {
       fillEl.classList.add('error');
     } else if (status === 'cancelled') {
       fillEl.classList.add('cancelled');
+    } else if (status === 'paused') {
+      fillEl.classList.add('paused');
     }
   }
 
-  if (cardEl) {
-    cardEl.className = `dl-card${status ? ` status-${status}` : ''}`;
+  cardEl.className = `dl-card${status ? ` status-${status}` : ''}`;
+  if (errorEl) {
+    const showError = status === 'error' && !!dl.message;
+    errorEl.classList.toggle('hidden', !showError);
+    errorEl.textContent = showError ? dl.message : '';
+    errorEl.title = dl.errorDetails || '';
   }
 
-  // Substituir botão Cancelar por Abrir Pasta / Abrir Arquivo / Remover na conclusão
-  if ((status === 'complete' || status === 'error' || status === 'cancelled') && actEl) {
-    if (cancelEl) cancelEl.remove();
-    if (status === 'complete') {
-      // Botão para abrir a pasta específica onde o arquivo/playlist foi salvo!
-      const openFolderBtn = document.createElement('button');
-      openFolderBtn.className = 'dl-action-btn primary';
-      openFolderBtn.textContent = '📂 Abrir Pasta';
-      openFolderBtn.title = `Abrir: ${dl.targetFolder || downloadPath}`;
-      openFolderBtn.addEventListener('click', () => {
+  if (actEl && statusEl) {
+    actEl.replaceChildren(statusEl);
+    const addAction = (label, className, handler, disabled = false) => {
+      const button = document.createElement('button');
+      button.className = `dl-action-btn${className ? ` ${className}` : ''}`;
+      button.textContent = label;
+      button.disabled = disabled;
+      button.addEventListener('click', handler);
+      actEl.appendChild(button);
+    };
+
+    if (status === 'pending') {
+      addAction('✕ Remover da fila', 'danger', () => cancelDownload(id));
+    } else if (status === 'downloading' || status === 'processing') {
+      addAction('⏸ Pausar', '', () => pauseDownload(id));
+      addAction('✕ Cancelar', 'danger', () => cancelDownload(id));
+    } else if (status === 'pausing') {
+      addAction('⏳ Pausando...', '', () => {}, true);
+      addAction('✕ Cancelar', 'danger', () => cancelDownload(id));
+    } else if (status === 'paused') {
+      addAction('▶ Retomar', 'primary', () => resumeDownload(id));
+      addAction('✕ Cancelar', 'danger', () => cancelDownload(id));
+    } else if (status === 'error') {
+      addAction('↻ Tentar novamente', 'primary', () => retryDownload(id));
+      addAction('🗑 Remover', '', () => removeDownloadCard(id));
+    } else if (status === 'complete') {
+      addAction('📂 Abrir Pasta', 'primary', () => {
         api.openFolder(dl.targetFolder || downloadPath);
       });
-      actEl.appendChild(openFolderBtn);
-
-      // Botão para abrir o arquivo direto (se for vídeo/música individual)
       if (dl.filePath && !dl.isPlaylist) {
-        const openFileBtn = document.createElement('button');
-        openFileBtn.className = 'dl-action-btn';
-        openFileBtn.textContent = '▶ Reproduzir';
-        openFileBtn.title = `Abrir arquivo: ${dl.filePath}`;
-        openFileBtn.addEventListener('click', () => {
-          api.openFile(dl.filePath);
-        });
-        actEl.appendChild(openFileBtn);
+        addAction('▶ Reproduzir', '', () => api.openFile(dl.filePath));
       }
+      addAction('🗑 Remover', '', () => removeDownloadCard(id));
+    } else if (status === 'cancelled') {
+      addAction('🗑 Remover', '', () => removeDownloadCard(id));
     }
-    const rmBtn = document.createElement('button');
-    rmBtn.className = 'dl-action-btn';
-    rmBtn.textContent = '🗑 Remover';
-    rmBtn.addEventListener('click', () => removeDownloadCard(id));
-    actEl.appendChild(rmBtn);
   }
 
-  if (speedEl && etaEl && (status === 'complete' || status === 'error' || status === 'cancelled')) {
+  if (speedEl && etaEl && ['complete', 'error', 'cancelled', 'paused'].includes(status)) {
     speedEl.textContent = '';
     etaEl.textContent   = '';
   }
@@ -1096,20 +1163,69 @@ function removeDownloadCard(id) {
   }
 }
 
-function cancelDownload(id) {
-  api.cancelDownload(id).then(() => {
-    updateDownloadCard(id, { status: 'cancelled' });
-  });
-}
-window.cancelDownload = cancelDownload;
-
 function updateBadge() {
-  if (activeDownloadCount > 0) {
+  const outstanding = Array.from(downloads.values())
+    .filter(download => ['pending', 'downloading', 'processing', 'pausing', 'paused'].includes(download.status))
+    .length;
+  if (outstanding > 0) {
     dlBadge.classList.remove('hidden');
-    dlBadge.textContent = activeDownloadCount;
+    dlBadge.textContent = outstanding;
   } else {
     dlBadge.classList.add('hidden');
   }
+}
+
+function pauseDownload(id) {
+  const download = downloads.get(id);
+  if (!download) return;
+  if (download.status === 'pending') {
+    const index = downloadQueue.indexOf(id);
+    if (index >= 0) downloadQueue.splice(index, 1);
+    updateDownloadCard(id, { status: 'paused', message: 'Aguardando retomada.' });
+    updateBadge();
+    return;
+  }
+  if (download.status !== 'downloading' && download.status !== 'processing') return;
+  updateDownloadCard(id, { status: 'pausing', message: 'Salvando progresso para retomar...' });
+  api.pauseDownload(id).then((accepted) => {
+    if (!accepted && download.status === 'pausing') {
+      updateDownloadCard(id, { status: 'downloading', message: 'Não foi possível pausar este download.' });
+    }
+  }).catch(error => {
+    updateDownloadCard(id, { status: 'downloading', message: error.message });
+  });
+}
+
+function resumeDownload(id) {
+  const download = downloads.get(id);
+  if (!download || download.status !== 'paused') return;
+  download.message = '';
+  downloadQueue.unshift(id);
+  updateDownloadCard(id, { status: 'pending', message: 'Aguardando retomada...' });
+  updateBadge();
+  processDownloadQueue();
+}
+
+function retryDownload(id) {
+  const download = downloads.get(id);
+  if (!download || download.status !== 'error') return;
+  download.message = '';
+  download.errorDetails = '';
+  download.percent = 0;
+  downloadQueue.unshift(id);
+  updateDownloadCard(id, { status: 'pending', percent: 0, message: 'Aguardando nova tentativa...' });
+  updateBadge();
+  processDownloadQueue();
+}
+
+function cancelDownload(id) {
+  const download = downloads.get(id);
+  if (!download) return;
+  const index = downloadQueue.indexOf(id);
+  if (index >= 0) downloadQueue.splice(index, 1);
+  api.cancelDownload(id).catch(error => console.error('Falha ao cancelar download:', error));
+  updateDownloadCard(id, { status: 'cancelled' });
+  updateBadge();
 }
 
 function getFormatIcon(format) {
@@ -1127,6 +1243,7 @@ function escHtml(str) {
 async function loadDownloadPath() {
   downloadPath = await api.getDownloadPath();
   updatePathDisplay(downloadPath);
+  await updateDownloadSpace();
 }
 
 function updatePathDisplay(p) {
@@ -1135,10 +1252,40 @@ function updatePathDisplay(p) {
   if (settingsDlPath)     settingsDlPath.textContent     = p;
 }
 
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return 'Indisponível';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(unitIndex > 1 ? 1 : 0)} ${units[unitIndex]}`;
+}
+
+async function updateDownloadSpace() {
+  if (!dlSpaceDisplay) return;
+  dlSpaceDisplay.textContent = 'Consultando espaço livre...';
+  try {
+    const space = await api.getDownloadSpace();
+    dlSpaceDisplay.textContent = `Espaço livre: ${formatBytes(space.freeBytes)}`;
+    dlSpaceDisplay.title = `Disponível em ${space.path} (${formatBytes(space.totalBytes)} no volume)`;
+  } catch (error) {
+    dlSpaceDisplay.textContent = 'Espaço livre indisponível';
+    dlSpaceDisplay.title = error.message;
+  }
+}
+
 btnChangePath.addEventListener('click', async () => {
   const newPath = await api.setDownloadPath();
-  if (newPath) updatePathDisplay(newPath);
+  if (newPath) {
+    updatePathDisplay(newPath);
+    await updateDownloadSpace();
+  }
 });
+
+btnRefreshSpace.addEventListener('click', updateDownloadSpace);
 
 btnOpenFolder.addEventListener('click', () => {
   if (downloadPath) api.openFolder(downloadPath);
@@ -1164,7 +1311,88 @@ if (btnOpenPlaylists) {
 
 btnSettingsChPath.addEventListener('click', async () => {
   const newPath = await api.setDownloadPath();
-  if (newPath) updatePathDisplay(newPath);
+  if (newPath) {
+    updatePathDisplay(newPath);
+    await updateDownloadSpace();
+  }
+});
+
+async function checkDownloadTools() {
+  toolYtDlpStatus.textContent = 'Verificando...';
+  toolFfmpegStatus.textContent = 'Verificando...';
+  try {
+    const tools = await api.checkDownloadTools();
+    toolYtDlpStatus.textContent = tools.ytDlp.installed
+      ? `Instalado — ${tools.ytDlp.version}`
+      : `Não encontrado — ${tools.ytDlp.error || 'verifique a instalação'}`;
+    toolFfmpegStatus.textContent = tools.ffmpeg.installed
+      ? `Instalado — ${tools.ffmpeg.version}`
+      : `Não encontrado — ${tools.ffmpeg.error || 'instale FFmpeg'}`;
+  } catch (error) {
+    toolYtDlpStatus.textContent = `Falha ao verificar: ${error.message}`;
+    toolFfmpegStatus.textContent = 'Verificação não concluída';
+  }
+}
+
+btnCheckTools.addEventListener('click', checkDownloadTools);
+
+btnUpdateYtDlp.addEventListener('click', async () => {
+  btnUpdateYtDlp.disabled = true;
+  toolYtDlpStatus.textContent = 'Atualizando yt-dlp...';
+  try {
+    const result = await api.updateYtDlp();
+    if (!result.installed) throw new Error(result.error || 'yt-dlp não encontrado.');
+    toolYtDlpStatus.textContent = `Atualizado — ${result.version}`;
+  } catch (error) {
+    toolYtDlpStatus.textContent = `Falha ao atualizar: ${error.message}`;
+  } finally {
+    btnUpdateYtDlp.disabled = false;
+  }
+});
+
+function applyAppUpdateStatus(update) {
+  if (!update) return;
+  const versionPrefix = update.version ? `v${update.version} — ` : '';
+  appVersionStatus.textContent = `${versionPrefix}${update.message || update.status}`;
+  appVersionStatus.title = update.error || '';
+  const hasUpdate = ['available', 'downloading', 'downloaded'].includes(update.status);
+  appUpdateBadge.classList.toggle('hidden', !hasUpdate);
+  btnInstallAppUpdate.classList.toggle('hidden', update.status !== 'downloaded');
+  if (update.status === 'error') {
+    maintenanceMessage.textContent = update.error
+      ? `${update.message} Detalhes: ${update.error}`
+      : update.message;
+  } else if (update.status === 'downloaded') {
+    maintenanceMessage.textContent = 'A atualização foi baixada. Salve seu trabalho e reinicie para instalar.';
+  }
+}
+
+api.on('app-update-status', applyAppUpdateStatus);
+
+btnCheckAppUpdate.addEventListener('click', async () => {
+  btnCheckAppUpdate.disabled = true;
+  applyAppUpdateStatus({ status: 'checking', message: 'Verificando atualizações...' });
+  try {
+    applyAppUpdateStatus(await api.checkAppUpdate());
+  } catch (error) {
+    applyAppUpdateStatus({
+      status: 'error',
+      message: 'Não foi possível verificar atualizações.',
+      error: error.message
+    });
+  } finally {
+    btnCheckAppUpdate.disabled = false;
+  }
+});
+
+btnInstallAppUpdate.addEventListener('click', async () => {
+  btnInstallAppUpdate.disabled = true;
+  try {
+    await api.installAppUpdate();
+  } catch (error) {
+    maintenanceMessage.textContent = `Falha ao instalar atualização: ${error.message}`;
+    btnInstallAppUpdate.disabled = false;
+  }
 });
 
 // ── SETTINGS ───────────────────────────────────────────────────────────────
@@ -1279,18 +1507,15 @@ function showBgPreview(imgPath) {
   bgPreviewText.classList.add('hidden');
 }
 
-// Default format
-setDefaultFormat.addEventListener('change', async () => {
-  await api.saveDefaultFormat(setDefaultFormat.value);
-  dlFormat.value = setDefaultFormat.value;
-});
-
 // Save theme
 btnSaveTheme.addEventListener('click', async () => {
   await saveTheme();
-  const fmt = setDefaultFormat.value;
-  await api.saveDefaultFormat(fmt);
-  dlFormat.value = fmt;
+  downloadPreferences = await api.saveDownloadPreferences({
+    videoFormat: setDefaultVideoFormat.value,
+    audioFormat: setDefaultAudioFormat.value
+  });
+  dlFormat.value = 'default-video';
+  modalFormat.value = 'default-video';
 
   saveStatus.classList.remove('hidden');
   setTimeout(() => saveStatus.classList.add('hidden'), 2500);
@@ -1576,12 +1801,20 @@ async function init() {
   await loadTheme();
   await loadDownloadPath();
 
-  const defaultFmt = await api.getDefaultFormat();
-  if (defaultFmt) {
-    dlFormat.value          = defaultFmt;
-    setDefaultFormat.value  = defaultFmt;
-    modalFormat.value       = defaultFmt;
-  }
+  downloadPreferences = await api.getDownloadPreferences();
+  setDefaultVideoFormat.value = downloadPreferences.videoFormat;
+  setDefaultAudioFormat.value = downloadPreferences.audioFormat;
+  dlFormat.value = 'default-video';
+  modalFormat.value = 'default-video';
+  modalPlaylistFormat.value = downloadPreferences.videoFormat;
+
+  const [version, updateStatus] = await Promise.all([
+    api.getAppVersion(),
+    api.getAppUpdateStatus()
+  ]);
+  appVersionStatus.textContent = `Versão instalada: ${version}. ${updateStatus.message}`;
+  applyAppUpdateStatus(updateStatus);
+  checkDownloadTools();
 
   // Initial tab
   switchTab('home');

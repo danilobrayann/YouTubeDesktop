@@ -35,8 +35,10 @@
 - 📺 **Aba Pluto TV**: Abra a Pluto TV Brasil dentro do app, com controles de navegação, recarga e página inicial.
 - ✨ **Aba Gemini**: Abra o Gemini em uma aba própria, com sessão persistente e controles de navegação.
 - 🟣 **Aba Twitch**: Acesse transmissões e jogos da Twitch em uma aba própria, com sessão persistente e controles de navegação.
-- 💬 **Redes Sociais, Futebol, Filmes, Animes e Música**: Atalhos em uma barra lateral para redes sociais, canais de futebol como SportyNet Brasil, serviços de vídeo como Netflix e Crunchyroll e plataformas de música como Spotify, YouTube Music, Deezer, Apple Music, SoundCloud, Amazon Music, Tidal e Jamendo; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
+- 💬 **Redes + 1.000**: Atalhos para redes sociais, canais de futebol, streaming, música e compras. Inclui Mercado Livre, KaBuM!, TerabyteShop, Pichau, Amazon, Shopee, AliExpress e Magalu; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
+  - **Fila sequencial**: um download por vez, com ações para pausar, retomar downloads parciais, cancelar e tentar novamente em caso de falha.
+  - **Erros explicados**: mensagens orientam como agir em problemas de conexão, qualidade indisponível, permissão e ausência do FFmpeg.
   - **📁 Separação Automática por Tipo**:
     - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`
     - **Músicas avulsas (MP3/M4A/Opus)**: salvas na pasta `Downloads/Músicas/`
@@ -45,6 +47,7 @@
   - **Aviso Prévio de Playlist**: Detecta e exibe a quantidade exata de itens antes de começar a baixar.
   - **Barra de Progresso Dinâmica com Cores a cada %**: Barra de progresso neon viva com gradientes que se transformam dinamicamente a cada porcentagem (do rosa choque ao roxo, azul ciano, verde esmeralda e dourado).
   - **Notificação e Acesso Imediato**: Notificação nativa do Windows + som harmônico ao concluir, com botões para **Abrir Pasta** ou **Reproduzir** o arquivo na hora.
+- 🛠️ **Diagnóstico e atualizações**: confira as versões e a disponibilidade do yt-dlp e do FFmpeg, atualize o yt-dlp pelo app, veja o espaço livre na pasta de downloads e receba avisos para atualizar o TurboDown.
 - 🎨 **Motor de Temas Completo**:
   - 7 Presets prontos: **Dark**, **AMOLED (Preto puro)**, **Midnight (Roxo)**, **Ocean (Azul)**, **Forest (Verde)**, **Sunset (Laranja)** e **Light (Claro)**.
   - Suporte a **Gradientes personalizados** (escolha o ângulo e as duas cores).
@@ -95,7 +98,7 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
      - Não requer privilégios de Administrador e não dá erros de permissão.
      - Atualiza o atalho da Área de Trabalho para abrir o executável diretamente.
    - **Opção `2` — Instalador Setup Completo (.exe)**:
-     - Gera o instalador assistido `TurboDown Setup 1.0.0.exe` em `dist\`.
+     - Gera o instalador assistido `TurboDown Setup 1.1.0.exe` em `dist\`.
      - *Dica*: Caso utilize a opção 2, execute o `construir.bat` clicando com o botão direito e selecionando **"Executar como Administrador"**.
 
 ---
@@ -119,6 +122,7 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
   - Escolha o formato desejado no menu suspenso.
   - Clique em **Baixar**.
   - Você pode alterar a pasta onde os arquivos são salvos clicando em **📁 Alterar Pasta**.
+- **Fila e retomada**: os itens são processados um por vez. Use **Pausar** e **Retomar** para manter e continuar o progresso parcial; downloads com erro exibem uma explicação e a opção **Tentar novamente**.
 
 ### 3. Personalizar Temas e Fundo
 - Clique em **⚙️ Configurações** na barra lateral.
@@ -127,6 +131,8 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
 - **Efeito Vidro / Glass**: Ajuste os controles deslizantes de desfoque (blur) e opacidade.
 - **Imagem de Fundo**: Clique em **Escolher Imagem** para colocar qualquer foto ou wallpaper do seu computador como plano de fundo do aplicativo.
 - Clique em **Salvar Tema** para manter suas preferências salvas mesmo após fechar o programa.
+- Em **Configurações de Download**, escolha padrões de vídeo e áudio separadamente.
+- Em **Diagnóstico e atualizações**, verifique yt-dlp/FFmpeg, atualize o yt-dlp e confira atualizações do TurboDown. O espaço disponível também aparece na aba Downloads.
 
 ---
 
@@ -170,6 +176,21 @@ O script `instalar.bat` já instala tudo de forma automática. Caso prefira inst
 3. **FFmpeg** (necessário para extração de MP3 e mesclagem de vídeo 1080p):
    - Via terminal: `winget install Gyan.FFmpeg`
 
+### Atualização automática do TurboDown
+
+A atualização automática funciona nas versões instaladas pelo Setup do Windows; a versão portátil e a execução com `npm start` não se atualizam automaticamente. Para receber uma atualização, o projeto precisa ter uma nova versão publicada em **GitHub Releases**. O TurboDown verifica atualizações ao iniciar, baixa a nova versão e oferece o botão **Reiniciar e instalar**.
+
+Quem estiver usando uma versão antiga, sem o atualizador, precisará instalar manualmente uma vez a versão 1.1.0; as versões seguintes poderão ser atualizadas pelo próprio app.
+
+Para publicar uma versão, atualize `version` em `package.json`, gere o Setup e publique os artefatos do electron-builder em uma Release do GitHub. A publicação automatizada usa `GH_TOKEN` no ambiente e o comando:
+
+```powershell
+$env:GH_TOKEN = "<seu-token-do-GitHub>"
+npm run build:win -- --publish always
+```
+
+Não salve o token no repositório. A primeira Release precisa ser publicada antes que o app possa encontrar atualizações.
+
 ---
 
 ## ❓ Resolução de Problemas
@@ -182,3 +203,9 @@ Abra o arquivo `construir.bat` e escolha a **Opção 1 (Executável Nativo Diret
 
 #### Os downloads não iniciam ou dão erro
 Certifique-se de que o **yt-dlp** e o **FFmpeg** estão instalados. Você pode rodar `atualizar-ytdlp.bat` para garantir que o mecanismo esteja na versão mais recente que suporta as últimas atualizações do YouTube.
+
+#### Não aparece atualização do TurboDown
+Confirme que o app foi instalado pelo Setup, que existe uma Release mais recente no GitHub e que ela contém os arquivos de atualização gerados pelo electron-builder.
+
+#### Erros de cache ou “Acesso negado”
+Feche e abra novamente o TurboDown atualizado. O cache do Chromium fica em `%LOCALAPPDATA%\TurboDown\Cache`, separado das preferências e sessões salvas. Se o erro continuar, confira se o Windows ou o antivírus está bloqueando essa pasta.

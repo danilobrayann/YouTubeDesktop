@@ -818,6 +818,12 @@ body.has-bg-image {
   flex-shrink: 0;
 }
 
+.path-space {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .path-categories {
   display: flex;
   align-items: center;
@@ -934,6 +940,10 @@ body.has-bg-image {
   opacity: 0.7;
 }
 
+.dl-card.status-paused {
+  border-color: rgba(0, 180, 216, 0.25);
+}
+
 .dl-card-header {
   display: flex;
   align-items: flex-start;
@@ -1015,6 +1025,13 @@ body.has-bg-image {
   border-color: rgba(255,255,255,0.2);
 }
 
+.btn-ghost:disabled,
+.btn-primary:disabled,
+.dl-action-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .dl-action-btn.primary {
   background: rgba(0, 245, 160, 0.15);
   border-color: rgba(0, 245, 160, 0.4);
@@ -1080,6 +1097,21 @@ body.has-bg-image {
 
 .dl-progress-fill.cancelled {
   background: rgba(255, 170, 0, 0.5) !important;
+}
+
+.dl-progress-fill.paused {
+  background: rgba(0, 180, 216, 0.65) !important;
+}
+
+.dl-error-message {
+  color: #ffb4b4;
+  background: rgba(255, 68, 68, 0.09);
+  border: 1px solid rgba(255, 68, 68, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .dl-progress-stats {
@@ -1194,6 +1226,12 @@ body.has-bg-image {
   background: rgba(255, 170, 0, 0.1);
 }
 
+.dl-status-label.paused,
+.dl-status-label.pausing {
+  color: #00b4d8;
+  background: rgba(0, 180, 216, 0.12);
+}
+
 .dl-status-label.pending {
   color: var(--text-muted);
   background: rgba(255,255,255,0.05);
@@ -1243,6 +1281,53 @@ body.has-bg-image {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.maintenance-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.maintenance-row,
+.maintenance-row > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.maintenance-row {
+  justify-content: space-between;
+}
+
+.maintenance-row > div:first-child {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.maintenance-row strong {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.maintenance-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.maintenance-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.maintenance-message {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .setting-row {
@@ -2158,6 +2243,44 @@ input:focus-visible {
 .social-jamendo {
   background: #f4a900;
   color: #15252c;
+}
+
+.social-mercadolivre {
+  background: linear-gradient(145deg, #ffe600, #ffd000);
+  color: #173a6a;
+  font-size: 13px;
+}
+
+.social-kabum {
+  background: linear-gradient(145deg, #ff6800, #e84200);
+}
+
+.social-terabyte {
+  background: linear-gradient(145deg, #262626, #111111);
+  color: #a7e100;
+  font-size: 13px;
+}
+
+.social-pichau {
+  background: linear-gradient(145deg, #ff7100, #d64700);
+}
+
+.social-amazon-shop {
+  background: linear-gradient(145deg, #182a3a, #101820);
+  color: #ffb84d;
+  font-style: italic;
+}
+
+.social-shopee {
+  background: #ee4d2d;
+}
+
+.social-aliexpress {
+  background: linear-gradient(145deg, #ff4747, #c8102e);
+}
+
+.social-magalu {
+  background: linear-gradient(145deg, #0086ff, #0055c8);
 }
 
 .social-link-label {

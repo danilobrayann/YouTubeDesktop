@@ -19,12 +19,14 @@ window.api = {
   // Download path
   getDownloadPath: () => ipcRenderer.invoke('get-download-path'),
   setDownloadPath: () => ipcRenderer.invoke('set-download-path'),
+  getDownloadSpace: () => ipcRenderer.invoke('get-download-space'),
 
   // Background image
   selectBackgroundImage: () => ipcRenderer.invoke('select-background-image'),
 
   // Download media
   downloadMedia: (opts) => ipcRenderer.invoke('download-media', opts),
+  pauseDownload: (id) => ipcRenderer.invoke('pause-download', id),
   cancelDownload: (id) => ipcRenderer.invoke('cancel-download', id),
   inspectPlaylist: (url) => ipcRenderer.invoke('inspect-playlist', url),
 
@@ -33,14 +35,23 @@ window.api = {
   openFolder: (p) => ipcRenderer.invoke('open-folder', p),
   openCategoryFolder: (category, basePath) => ipcRenderer.invoke('open-category-folder', { category, basePath }),
 
-  // Default format
-  getDefaultFormat:  () => ipcRenderer.invoke('get-default-format'),
-  saveDefaultFormat: (f) => ipcRenderer.invoke('save-default-format', f),
+  // Download preferences and maintenance
+  getDownloadPreferences: () => ipcRenderer.invoke('get-download-preferences'),
+  saveDownloadPreferences: (preferences) => ipcRenderer.invoke('save-download-preferences', preferences),
+  checkDownloadTools: () => ipcRenderer.invoke('check-download-tools'),
+  updateYtDlp: () => ipcRenderer.invoke('update-ytdlp'),
+
+  // Application updates
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getAppUpdateStatus: () => ipcRenderer.invoke('get-app-update-status'),
+  checkAppUpdate: () => ipcRenderer.invoke('check-app-update'),
+  installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
 
   // IPC event listeners
   on: (channel, callback) => {
     const allowedChannels = [
       'download-progress',
+      'app-update-status',
       'window-maximized'
     ];
     if (allowedChannels.includes(channel)) {

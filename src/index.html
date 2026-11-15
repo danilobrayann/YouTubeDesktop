@@ -122,6 +122,7 @@
               >
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Configurações</span>
+                <span class="nav-badge hidden" id="app-update-badge">!</span>
               </button>
             </div>
           </div>
@@ -131,10 +132,10 @@
               type="button"
               class="nav-item"
               data-tab="social"
-              title="Redes Sociais"
+              title="Redes + 1.000"
             >
               <span class="nav-icon">💬</span>
-              <span class="nav-label">Redes Sociais</span>
+              <span class="nav-label">Redes + 1.000</span>
             </button>
             <div id="now-playing" class="hidden">
               <div class="np-dot"></div>
@@ -150,7 +151,7 @@
             <div id="social-layout">
               <aside
                 id="social-rail"
-                aria-label="Redes sociais, futebol, filmes, animes e música"
+                aria-label="Redes + 1.000: redes sociais, futebol, filmes, animes, música e compras"
               >
                 <div class="social-rail-group">
                   <span class="social-rail-label">SOCIAIS</span>
@@ -572,6 +573,98 @@
                     <span class="social-link-label">Jamendo</span>
                   </button>
                 </div>
+                <div class="social-rail-divider" role="separator"></div>
+                <div class="social-rail-group">
+                  <span class="social-rail-label">COMPRAS</span>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.mercadolivre.com.br/"
+                    data-social-name="Mercado Livre"
+                    title="Mercado Livre"
+                    aria-label="Abrir Mercado Livre"
+                  >
+                    <span class="social-icon social-mercadolivre" aria-hidden="true">ML</span>
+                    <span class="social-link-label">Mercado Livre</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.kabum.com.br/"
+                    data-social-name="KaBuM!"
+                    title="KaBuM!"
+                    aria-label="Abrir KaBuM!"
+                  >
+                    <span class="social-icon social-kabum" aria-hidden="true">K</span>
+                    <span class="social-link-label">KaBuM!</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.terabyteshop.com.br/"
+                    data-social-name="TerabyteShop"
+                    title="TerabyteShop"
+                    aria-label="Abrir TerabyteShop"
+                  >
+                    <span class="social-icon social-terabyte" aria-hidden="true">TB</span>
+                    <span class="social-link-label">Terabyte</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.pichau.com.br/"
+                    data-social-name="Pichau"
+                    title="Pichau"
+                    aria-label="Abrir Pichau"
+                  >
+                    <span class="social-icon social-pichau" aria-hidden="true">P</span>
+                    <span class="social-link-label">Pichau</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.amazon.com.br/"
+                    data-social-name="Amazon Brasil"
+                    title="Amazon Brasil"
+                    aria-label="Abrir Amazon Brasil"
+                  >
+                    <span class="social-icon social-amazon-shop" aria-hidden="true">a</span>
+                    <span class="social-link-label">Amazon</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://shopee.com.br/"
+                    data-social-name="Shopee"
+                    title="Shopee"
+                    aria-label="Abrir Shopee"
+                  >
+                    <span class="social-icon social-shopee" aria-hidden="true">S</span>
+                    <span class="social-link-label">Shopee</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://pt.aliexpress.com/"
+                    data-social-name="AliExpress"
+                    title="AliExpress"
+                    aria-label="Abrir AliExpress"
+                  >
+                    <span class="social-icon social-aliexpress" aria-hidden="true">A</span>
+                    <span class="social-link-label">AliExpress</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.magazineluiza.com.br/"
+                    data-social-name="Magalu"
+                    title="Magalu"
+                    aria-label="Abrir Magalu"
+                  >
+                    <span class="social-icon social-magalu" aria-hidden="true">M</span>
+                    <span class="social-link-label">Magalu</span>
+                  </button>
+                </div>
               </aside>
 
               <section id="social-browser" aria-label="Página selecionada">
@@ -934,13 +1027,21 @@
                     />
                   </div>
                   <select id="dl-format" class="glass-select">
+                    <optgroup label="Padrões salvos">
+                      <option value="default-video" selected>🎬 Vídeo (padrão)</option>
+                      <option value="default-audio">🎵 Áudio (padrão)</option>
+                    </optgroup>
+                    <optgroup label="Vídeo">
                     <option value="1080p">🎬 MP4 1080p</option>
-                    <option value="720p" selected>🎬 MP4 720p</option>
+                    <option value="720p">🎬 MP4 720p</option>
                     <option value="480p">🎬 MP4 480p</option>
                     <option value="360p">🎬 MP4 360p</option>
+                    </optgroup>
+                    <optgroup label="Áudio">
                     <option value="mp3">🎵 MP3</option>
                     <option value="m4a">🎵 M4A</option>
                     <option value="opus">🎵 Opus</option>
+                    </optgroup>
                   </select>
                   <button
                     id="btn-start-download"
@@ -963,6 +1064,16 @@
                     </div>
                   </div>
                   <div class="path-actions">
+                    <span id="dl-space-display" class="path-space"
+                      >Espaço livre: verificando...</span
+                    >
+                    <button
+                      id="btn-refresh-space"
+                      class="btn-ghost"
+                      title="Atualizar espaço disponível"
+                    >
+                      ↻
+                    </button>
                     <button
                       id="btn-change-path"
                       class="btn-ghost"
@@ -1280,21 +1391,81 @@
                       </div>
                     </div>
                     <div class="setting-row">
-                      <label>Formato Padrão</label>
+                      <label>Qualidade padrão de vídeo</label>
                       <select
-                        id="set-default-format"
+                        id="set-default-video-format"
                         class="glass-select glass-select-sm"
                       >
                         <option value="1080p">MP4 1080p</option>
                         <option value="720p" selected>MP4 720p</option>
                         <option value="480p">MP4 480p</option>
                         <option value="360p">MP4 360p</option>
+                      </select>
+                    </div>
+                    <div class="setting-row">
+                      <label>Formato padrão de áudio</label>
+                      <select
+                        id="set-default-audio-format"
+                        class="glass-select glass-select-sm"
+                      >
                         <option value="mp3">MP3</option>
                         <option value="m4a">M4A</option>
                         <option value="opus">Opus</option>
                       </select>
                     </div>
                   </div>
+                </div>
+
+                <!-- Tool status and application updates -->
+                <div class="settings-section glass-card">
+                  <h3 class="section-title">🛠️ Diagnóstico e atualizações</h3>
+                  <div class="maintenance-grid">
+                    <div class="maintenance-row">
+                      <div>
+                        <strong>TurboDown</strong>
+                        <span id="app-version-status" class="maintenance-status"
+                          >Verificando versão...</span
+                        >
+                      </div>
+                      <div class="maintenance-actions">
+                        <button id="btn-check-app-update" class="btn-ghost">
+                          Verificar atualização
+                        </button>
+                        <button
+                          id="btn-install-app-update"
+                          class="btn-primary hidden"
+                        >
+                          Reiniciar e instalar
+                        </button>
+                      </div>
+                    </div>
+                    <div class="maintenance-row">
+                      <div>
+                        <strong>yt-dlp</strong>
+                        <span id="tool-ytdlp-status" class="maintenance-status"
+                          >Não verificado</span
+                        >
+                      </div>
+                      <button id="btn-update-ytdlp" class="btn-ghost">
+                        Atualizar yt-dlp
+                      </button>
+                    </div>
+                    <div class="maintenance-row">
+                      <div>
+                        <strong>FFmpeg</strong>
+                        <span id="tool-ffmpeg-status" class="maintenance-status"
+                          >Não verificado</span
+                        >
+                      </div>
+                      <button id="btn-check-tools" class="btn-ghost">
+                        Verificar ferramentas
+                      </button>
+                    </div>
+                  </div>
+                  <p id="maintenance-message" class="maintenance-message">
+                    O TurboDown verifica atualizações ao iniciar. Para receber
+                    novas versões, elas precisam ser publicadas no GitHub.
+                  </p>
                 </div>
 
                 <!-- Save Button -->
@@ -1329,13 +1500,21 @@
           <div class="modal-format-row">
             <label>Formato:</label>
             <select id="modal-format" class="glass-select">
+              <optgroup label="Padrões salvos">
+                <option value="default-video" selected>🎬 Vídeo (padrão)</option>
+                <option value="default-audio">🎵 Áudio (padrão)</option>
+              </optgroup>
+              <optgroup label="Vídeo">
               <option value="1080p">🎬 MP4 1080p</option>
-              <option value="720p" selected>🎬 MP4 720p</option>
+              <option value="720p">🎬 MP4 720p</option>
               <option value="480p">🎬 MP4 480p</option>
               <option value="360p">🎬 MP4 360p</option>
+              </optgroup>
+              <optgroup label="Áudio">
               <option value="mp3">🎵 MP3</option>
               <option value="m4a">🎵 M4A</option>
               <option value="opus">🎵 Opus</option>
+              </optgroup>
             </select>
           </div>
         </div>

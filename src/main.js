@@ -1,15 +1,30 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const Store = require('electron-store');
+const { autoUpdater } = require('electron-updater');
+const {
+  AUDIO_FORMATS,
+  VIDEO_FORMATS,
+  formatDownloadError,
+  getFormatArgs,
+  validateDownloadRequest
+} = require('./download-utils');
 
 // Keep existing preferences and downloads settings after the product rename.
 const userDataPath = path.join(app.getPath('appData'), 'YouTube Desktop');
 fs.mkdirSync(userDataPath, { recursive: true });
 app.setPath('userData', userDataPath);
+
+const cacheRoot = process.platform === 'win32' && process.env.LOCALAPPDATA
+  ? process.env.LOCALAPPDATA
+  : app.getPath('appData');
+const cachePath = path.join(cacheRoot, 'TurboDown', 'Cache');
+fs.mkdirSync(cachePath, { recursive: true });
+app.setPath('cache', cachePath);
 
 // ─── Electron Store ──────────────────────────────────────────────────────────
 const store = new Store({
@@ -34,6 +49,7 @@ const store = new Store({
 
 // ─── Active downloads registry ───────────────────────────────────────────────
 const activeDownloads = new Map(); // downloadId → child process
+const downloadJobs = new Map();
 
 // ─── Main window & Tray ─────────────────────────────────────────────────────
 let mainWindow = null;
@@ -171,6 +187,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  initializeAutoUpdater();
+
   // Allow webview to load YouTube
   app.on('web-contents-created', (event, contents) => {
     if (contents.getType() === 'webview') {
@@ -247,6 +265,16 @@ ipcMain.handle('set-download-path', async () => {
   return null;
 });
 
+ipcMain.handle('get-download-space', async () => {
+  const targetPath = store.get('downloadPath') || app.getPath('downloads');
+  const stats = await fs.promises.statfs(targetPath);
+  return {
+    path: targetPath,
+    freeBytes: stats.bavail * stats.bsize,
+    totalBytes: stats.blocks * stats.bsize
+  };
+});
+
 // ─── Background Image ─────────────────────────────────────────────────────────
 ipcMain.handle('select-background-image', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -264,12 +292,29 @@ ipcMain.handle('select-background-image', async () => {
 
 // ─── Helper: Get yt-dlp binary path ─────────────────────────────────────────
 function getYtDlpPath() {
-  const fs = require('fs');
-  const localBin = path.join(app.getAppPath(), 'bin', 'yt-dlp.exe');
-  if (fs.existsSync(localBin)) {
-    return localBin;
+  const candidates = [
+    path.join(app.getPath('userData'), 'bin', 'yt-dlp.exe'),
+    path.join(process.resourcesPath || '', 'bin', 'yt-dlp.exe'),
+    path.join(__dirname, '..', 'bin', 'yt-dlp.exe')
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
   }
   return 'yt-dlp';
+}
+
+function getDownloadPreferences() {
+  const storedVideo = store.get('videoFormat');
+  const storedAudio = store.get('audioFormat');
+  const legacyFormat = store.get('defaultFormat', '720p');
+  return {
+    videoFormat: VIDEO_FORMATS.includes(storedVideo)
+      ? storedVideo
+      : (VIDEO_FORMATS.includes(legacyFormat) ? legacyFormat : '720p'),
+    audioFormat: AUDIO_FORMATS.includes(storedAudio)
+      ? storedAudio
+      : (AUDIO_FORMATS.includes(legacyFormat) ? legacyFormat : 'mp3')
+  };
 }
 
 // ─── Inspect Playlist ────────────────────────────────────────────────────────
@@ -316,243 +361,245 @@ ipcMain.handle('inspect-playlist', async (event, url) => {
   });
 });
 
-// ─── Download Media ───────────────────────────────────────────────────────────
-ipcMain.handle('download-media', async (event, { url, format, outputPath, downloadId, downloadPlaylist = true, playlistFolder = '' }) => {
+// ─── Download queue and process control ──────────────────────────────────────
+function sendDownloadProgress(job, data) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('download-progress', {
+    downloadId: job.request.downloadId,
+    ...data
+  });
+}
+
+function stopDownloadProcess(child) {
+  if (!child || !child.pid) return;
+  if (process.platform === 'win32') {
+    const killer = spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], {
+      windowsHide: true,
+      stdio: 'ignore'
+    });
+    killer.on('error', () => child.kill());
+    child.kill();
+    return;
+  }
+  child.kill('SIGTERM');
+}
+
+function createDownloadPlan(request) {
+  const isAudio = AUDIO_FORMATS.includes(request.format);
+  const isPlaylist = request.downloadPlaylist &&
+    (request.url.includes('list=') || request.url.includes('/playlist'));
+  const baseDir = request.outputPath || store.get('downloadPath') || app.getPath('downloads');
+  const categoryDir = path.join(baseDir, isPlaylist ? 'Playlists' : (isAudio ? 'Músicas' : 'Vídeos'));
+  fs.mkdirSync(categoryDir, { recursive: true });
+
+  const args = getFormatArgs(request.format);
+  if (isPlaylist) {
+    args.push('-o', path.join(categoryDir, '%(playlist_title,playlist)s', '%(playlist_index)02d - %(title)s.%(ext)s'));
+  } else {
+    args.push('--no-playlist', '-o', path.join(categoryDir, '%(title)s.%(ext)s'));
+  }
+  args.push('--continue', '--newline', request.url);
+
+  return { args, targetFolder: categoryDir };
+}
+
+function runDownloadJob(job) {
+  const { request } = job;
+  let plan;
+  try {
+    plan = createDownloadPlan(request);
+  } catch (error) {
+    job.status = 'error';
+    job.errorMessage = `Não foi possível preparar a pasta de destino: ${error.message}`;
+    sendDownloadProgress(job, { status: 'error', message: job.errorMessage });
+    return Promise.reject(new Error(job.errorMessage));
+  }
+
   return new Promise((resolve, reject) => {
-    const fs = require('fs');
+    const id = request.downloadId;
+    const child = spawn(getYtDlpPath(), plan.args, { shell: false, windowsHide: true });
+    job.child = child;
+    job.status = 'downloading';
+    job.pauseRequested = false;
+    job.cancelRequested = false;
+    job.stderr = '';
+    job.lastProgress = 0;
+    job.currentItem = 0;
+    job.totalItems = 0;
+    job.detectedTitle = '';
+    job.lastSavedFilePath = '';
+    activeDownloads.set(id, child);
+    let stdoutBuffer = '';
+    let settled = false;
 
-    // Build yt-dlp arguments
-    const args = [];
+    const finishError = (error, code) => {
+      if (settled) return;
+      settled = true;
+      activeDownloads.delete(id);
+      job.child = null;
+      job.status = 'error';
+      job.errorMessage = error
+        ? `Não foi possível iniciar o yt-dlp: ${error.message}`
+        : formatDownloadError(job.stderr, code);
+      sendDownloadProgress(job, {
+        status: 'error',
+        percent: job.lastProgress,
+        message: job.errorMessage,
+        details: job.stderr.trim()
+      });
+      reject(new Error(job.errorMessage));
+    };
 
-    // Format selection
-    const audioFormats = ['mp3', 'm4a', 'opus'];
-    const heightMap = { '1080p': 1080, '720p': 720, '480p': 480, '360p': 360 };
-    const isAudio = audioFormats.includes(format);
+    const processLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
 
-    if (isAudio) {
-      args.push('--extract-audio');
-      args.push('--audio-format', format);
-      args.push('--audio-quality', '0');
-    } else {
-      const height = heightMap[format] || 720;
-      args.push('-f', `bestvideo[height<=${height}]+bestaudio/best[height<=${height}]`);
-      args.push('--merge-output-format', 'mp4');
-    }
+      const itemMatch = trimmed.match(/\[download\]\s+Downloading\s+(?:item|video)\s+(\d+)\s+of\s+(\d+)/i);
+      if (itemMatch) {
+        job.currentItem = Number.parseInt(itemMatch[1], 10);
+        job.totalItems = Number.parseInt(itemMatch[2], 10);
+      }
 
-    // ── Gerenciamento Avançado de Pastas por Categoria ─────────────────────────
-    // 1. Playlists -> Pasta Playlists/[Nome da Playlist]/
-    // 2. Músicas avulsas -> Pasta Músicas/
-    // 3. Vídeos avulsos -> Pasta Vídeos/
-    const baseDir = outputPath || app.getPath('downloads');
-    const playlistsDir = path.join(baseDir, 'Playlists');
-    const musicasDir   = path.join(baseDir, 'Músicas');
-    const videosDir    = path.join(baseDir, 'Vídeos');
+      const progressMatch = trimmed.match(
+        /\[download\]\s+([\d.]+)%\s+of\s+([\d.]+\w+)(?:\s+at\s+([\d.]+\w+\/s))?(?:\s+ETA\s+([\d:]+))?/
+      );
+      if (progressMatch) {
+        job.lastProgress = Number.parseFloat(progressMatch[1]);
+        sendDownloadProgress(job, {
+          percent: job.lastProgress,
+          size: progressMatch[2],
+          speed: progressMatch[3] || '',
+          eta: progressMatch[4] || '',
+          currentItem: job.currentItem,
+          totalItems: job.totalItems,
+          title: job.detectedTitle,
+          status: 'downloading'
+        });
+      }
 
-    try {
-      if (!fs.existsSync(playlistsDir)) fs.mkdirSync(playlistsDir, { recursive: true });
-      if (!fs.existsSync(musicasDir))   fs.mkdirSync(musicasDir,   { recursive: true });
-      if (!fs.existsSync(videosDir))    fs.mkdirSync(videosDir,    { recursive: true });
-    } catch (e) {}
-
-    const isPlaylistTarget = downloadPlaylist && (url.includes('list=') || url.includes('/playlist'));
-    let defaultTargetFolder = baseDir;
-
-    if (isPlaylistTarget) {
-      // Ex: Downloads/Playlists/As Melhores Tocadas/01 - Titulo.mp3
-      defaultTargetFolder = playlistsDir;
-      args.push('-o', path.join(playlistsDir, '%(playlist_title,playlist)s', '%(playlist_index)02d - %(title)s.%(ext)s'));
-    } else if (isAudio) {
-      // Ex: Downloads/Músicas/Titulo.mp3
-      defaultTargetFolder = musicasDir;
-      args.push('--no-playlist');
-      args.push('-o', path.join(musicasDir, '%(title)s.%(ext)s'));
-    } else {
-      // Ex: Downloads/Vídeos/Titulo.mp4
-      defaultTargetFolder = videosDir;
-      args.push('--no-playlist');
-      args.push('-o', path.join(videosDir, '%(title)s.%(ext)s'));
-    }
-
-    // Output template
-    args.push('--newline');
-    args.push('--no-part');
-    args.push(url);
-
-    const ytDlpCmd = getYtDlpPath();
-    const child = spawn(ytDlpCmd, args, { shell: false });
-    activeDownloads.set(downloadId, child);
-
-    let lastProgress = 0;
-    let currentItem = 0;
-    let totalItems = 0;
-    let detectedTitle = '';
-    let lastSavedFilePath = '';
+      if (trimmed.startsWith('[download] Destination:')) {
+        job.lastSavedFilePath = trimmed.replace('[download] Destination:', '').trim();
+        job.detectedTitle = path.basename(job.lastSavedFilePath);
+        sendDownloadProgress(job, {
+          percent: job.lastProgress,
+          currentItem: job.currentItem,
+          totalItems: job.totalItems,
+          title: job.detectedTitle,
+          filePath: job.lastSavedFilePath,
+          status: 'downloading',
+          message: `Baixando: ${job.detectedTitle}`
+        });
+      } else if (trimmed.startsWith('[Merger]')) {
+        sendDownloadProgress(job, {
+          percent: job.lastProgress,
+          currentItem: job.currentItem,
+          totalItems: job.totalItems,
+          title: job.detectedTitle,
+          filePath: job.lastSavedFilePath,
+          status: 'processing',
+          message: 'Finalizando o arquivo...'
+        });
+      }
+    };
 
     child.stdout.on('data', (data) => {
-      const lines = data.toString().split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        // Detectar item da playlist: [download] Downloading item 1 of 15
-        const itemMatch = trimmed.match(/\[download\]\s+Downloading\s+(?:item|video)\s+(\d+)\s+of\s+(\d+)/i);
-        if (itemMatch) {
-          currentItem = parseInt(itemMatch[1]);
-          totalItems = parseInt(itemMatch[2]);
-        }
-
-        // Parse progress line: [download]  XX.X% of YY.YYMiB at ZZ.ZZKiB/s ETA HH:MM
-        const progressMatch = trimmed.match(
-          /\[download\]\s+([\d.]+)%\s+of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/
-        );
-
-        if (progressMatch) {
-          const percent = parseFloat(progressMatch[1]);
-          const size = progressMatch[2];
-          const speed = progressMatch[3];
-          const eta = progressMatch[4];
-          lastProgress = percent;
-
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('download-progress', {
-              downloadId,
-              percent,
-              size,
-              speed,
-              eta,
-              currentItem,
-              totalItems,
-              title: detectedTitle,
-              status: 'downloading'
-            });
-          }
-        }
-
-        // Destination line / Title detection
-        if (trimmed.startsWith('[download] Destination:')) {
-          const filePath = trimmed.replace('[download] Destination:', '').trim();
-          lastSavedFilePath = filePath;
-          detectedTitle = path.basename(filePath);
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('download-progress', {
-              downloadId,
-              percent: lastProgress,
-              speed: '',
-              eta: '',
-              currentItem,
-              totalItems,
-              title: detectedTitle,
-              filePath: lastSavedFilePath,
-              status: 'downloading',
-              message: `Baixando: ${detectedTitle}`
-            });
-          }
-        }
-
-        if (trimmed.startsWith('[Merger]') || trimmed.includes('has already been downloaded')) {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('download-progress', {
-              downloadId,
-              percent: lastProgress,
-              speed: '',
-              eta: '',
-              currentItem,
-              totalItems,
-              title: detectedTitle,
-              filePath: lastSavedFilePath,
-              status: 'processing',
-              message: trimmed
-            });
-          }
-        }
-      }
+      stdoutBuffer += data.toString();
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() || '';
+      lines.forEach(processLine);
     });
 
     child.stderr.on('data', (data) => {
-      const text = data.toString().trim();
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('download-progress', {
-          downloadId,
-          percent: lastProgress,
-          speed: '',
-          eta: '',
-          currentItem,
-          totalItems,
-          title: detectedTitle,
-          status: 'processing',
-          message: text
-        });
-      }
+      job.stderr = `${job.stderr}${data.toString()}`.slice(-12000);
     });
 
-    child.on('close', (code) => {
-      activeDownloads.delete(downloadId);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        if (code === 0) {
-          // Determina a pasta exata onde o arquivo (ou subpasta de playlist) foi parar
-          let exactFolder = defaultTargetFolder;
-          if (lastSavedFilePath) {
-            try {
-              exactFolder = path.dirname(lastSavedFilePath);
-            } catch (e) {}
-          }
+    child.once('error', (error) => finishError(error));
+    child.once('close', (code) => {
+      if (stdoutBuffer) processLine(stdoutBuffer);
+      if (settled) return;
+      activeDownloads.delete(id);
+      job.child = null;
 
-          mainWindow.webContents.send('download-progress', {
-            downloadId,
-            percent: 100,
-            speed: '',
-            eta: '',
-            currentItem,
-            totalItems,
-            title: detectedTitle,
-            targetFolder: exactFolder,
-            filePath: lastSavedFilePath,
-            status: 'complete'
-          });
-          resolve({ success: true, folder: exactFolder, file: lastSavedFilePath });
-        } else if (code === null) {
-          // Cancelled
-          mainWindow.webContents.send('download-progress', {
-            downloadId,
-            percent: lastProgress,
-            speed: '',
-            eta: '',
-            currentItem,
-            totalItems,
-            status: 'cancelled'
-          });
-          resolve({ success: false, cancelled: true });
-        } else {
-          mainWindow.webContents.send('download-progress', {
-            downloadId,
-            percent: lastProgress,
-            speed: '',
-            eta: '',
-            currentItem,
-            totalItems,
-            status: 'error',
-            message: `yt-dlp finalizou com codigo ${code}`
-          });
-          reject(new Error(`yt-dlp finalizou com codigo ${code}`));
-        }
+      if (job.pauseRequested) {
+        job.pauseRequested = false;
+        job.status = 'paused';
+        sendDownloadProgress(job, { status: 'paused', percent: job.lastProgress });
+        settled = true;
+        resolve({ paused: true });
+        return;
       }
-    });
 
-    child.on('error', (err) => {
-      activeDownloads.delete(downloadId);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('download-progress', {
-          downloadId,
-          percent: 0,
-          speed: '',
-          eta: '',
-          status: 'error',
-          message: err.message
+      if (job.cancelRequested) {
+        downloadJobs.delete(id);
+        job.status = 'cancelled';
+        sendDownloadProgress(job, { status: 'cancelled', percent: job.lastProgress });
+        settled = true;
+        resolve({ cancelled: true });
+        return;
+      }
+
+      if (code === 0) {
+        let targetFolder = plan.targetFolder;
+        if (job.lastSavedFilePath) targetFolder = path.dirname(job.lastSavedFilePath);
+        downloadJobs.delete(id);
+        job.status = 'complete';
+        sendDownloadProgress(job, {
+          percent: 100,
+          currentItem: job.currentItem,
+          totalItems: job.totalItems,
+          title: job.detectedTitle,
+          targetFolder,
+          filePath: job.lastSavedFilePath,
+          status: 'complete'
         });
+        settled = true;
+        resolve({ success: true, folder: targetFolder, file: job.lastSavedFilePath });
+        return;
       }
-      reject(err);
+
+      finishError(null, code);
     });
   });
+}
+
+ipcMain.handle('download-media', async (_event, input) => {
+  const request = validateDownloadRequest(input);
+  const normalizedRequest = {
+    ...request,
+    outputPath: request.outputPath || store.get('downloadPath') || app.getPath('downloads')
+  };
+  let job = downloadJobs.get(request.downloadId);
+
+  if (job) {
+    if (!['paused', 'error'].includes(job.status)) {
+      throw new Error('Este download já está em andamento.');
+    }
+    if (job.request.url !== normalizedRequest.url || job.request.format !== normalizedRequest.format) {
+      throw new Error('Não é possível reutilizar o identificador para outro download.');
+    }
+    job.request = normalizedRequest;
+  } else {
+    job = {
+      request: normalizedRequest,
+      status: 'pending',
+      child: null,
+      pauseRequested: false,
+      cancelRequested: false
+    };
+    downloadJobs.set(request.downloadId, job);
+  }
+
+  return runDownloadJob(job);
+});
+
+ipcMain.handle('pause-download', (_event, downloadId) => {
+  const job = downloadJobs.get(downloadId);
+  if (!job || !job.child || job.status !== 'downloading') return false;
+  job.pauseRequested = true;
+  job.status = 'pausing';
+  sendDownloadProgress(job, { status: 'pausing', percent: job.lastProgress });
+  stopDownloadProcess(job.child);
+  return true;
 });
 
 // ─── Open Category Folder ─────────────────────────────────────────────────────
@@ -575,17 +622,18 @@ ipcMain.handle('open-category-folder', (event, { category, basePath }) => {
 
 // ─── Cancel Download ──────────────────────────────────────────────────────────
 ipcMain.handle('cancel-download', (event, downloadId) => {
-  const child = activeDownloads.get(downloadId);
-  if (child) {
-    child.kill('SIGTERM');
-    // Windows fallback
-    if (process.platform === 'win32') {
-      spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
-    }
-    activeDownloads.delete(downloadId);
-    return true;
+  const job = downloadJobs.get(downloadId);
+  if (!job) return false;
+  job.cancelRequested = true;
+  job.pauseRequested = false;
+  if (job.child) {
+    stopDownloadProcess(job.child);
+  } else {
+    downloadJobs.delete(downloadId);
+    job.status = 'cancelled';
+    sendDownloadProgress(job, { status: 'cancelled', percent: job.lastProgress || 0 });
   }
-  return false;
+  return true;
 });
 
 // ─── Open File / Folder ───────────────────────────────────────────────────────
@@ -597,12 +645,180 @@ ipcMain.handle('open-folder', (event, folderPath) => {
   return shell.openPath(folderPath);
 });
 
-// ─── Default format persistence ───────────────────────────────────────────────
-ipcMain.handle('get-default-format', () => {
-  return store.get('defaultFormat');
+// ─── Download preferences and tool diagnostics ───────────────────────────────
+ipcMain.handle('get-download-preferences', () => getDownloadPreferences());
+
+ipcMain.handle('save-download-preferences', (_event, preferences) => {
+  if (!preferences || !VIDEO_FORMATS.includes(preferences.videoFormat) ||
+      !AUDIO_FORMATS.includes(preferences.audioFormat)) {
+    throw new Error('Qualidade padrão de vídeo ou áudio inválida.');
+  }
+  store.set('videoFormat', preferences.videoFormat);
+  store.set('audioFormat', preferences.audioFormat);
+  store.set('defaultFormat', preferences.videoFormat);
+  return getDownloadPreferences();
 });
 
-ipcMain.handle('save-default-format', (event, fmt) => {
-  store.set('defaultFormat', fmt);
-  return true;
+function runVersionCommand(command, args, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const child = spawn(command, args, { shell: false, windowsHide: true });
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish({ exitCode: null, stdout, stderr, error: 'Tempo limite excedido.' });
+    }, timeoutMs);
+
+    child.stdout.on('data', data => { stdout += data.toString(); });
+    child.stderr.on('data', data => { stderr += data.toString(); });
+    child.once('error', error => finish({ exitCode: null, stdout, stderr, error: error.message }));
+    child.once('close', exitCode => finish({ exitCode, stdout, stderr }));
+  });
+}
+
+async function checkInstalledTool(command, args) {
+  const result = await runVersionCommand(command, args);
+  if (result.exitCode !== 0) {
+    return {
+      installed: false,
+      version: null,
+      error: result.error || result.stderr.trim() || 'Comando não encontrado.'
+    };
+  }
+  const output = `${result.stdout}\n${result.stderr}`.trim();
+  return { installed: true, version: output.split(/\r?\n/)[0] || 'Versão desconhecida' };
+}
+
+ipcMain.handle('check-download-tools', async () => {
+  const [ytDlp, ffmpeg] = await Promise.all([
+    checkInstalledTool(getYtDlpPath(), ['--version']),
+    checkInstalledTool('ffmpeg', ['-version'])
+  ]);
+  return { ytDlp, ffmpeg };
+});
+
+ipcMain.handle('update-ytdlp', async () => {
+  if (activeDownloads.size > 0) {
+    throw new Error('Aguarde os downloads ativos terminarem antes de atualizar o yt-dlp.');
+  }
+  const command = getYtDlpPath();
+  const result = await runVersionCommand(command, ['-U'], 120000);
+  if (result.exitCode !== 0) {
+    throw new Error(result.error || result.stderr.trim() || 'O yt-dlp não conseguiu se atualizar.');
+  }
+  return checkInstalledTool(command, ['--version']);
+});
+
+// ─── Application updates ─────────────────────────────────────────────────────
+let appUpdateStatus = {
+  status: 'idle',
+  version: app.getVersion(),
+  message: 'A verificação de atualizações ainda não foi executada.'
+};
+
+function sendAppUpdateStatus(status, details = {}) {
+  appUpdateStatus = { ...appUpdateStatus, ...details, status };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('app-update-status', appUpdateStatus);
+  }
+}
+
+function initializeAutoUpdater() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on('checking-for-update', () => {
+    sendAppUpdateStatus('checking', { message: 'Verificando atualizações...', error: null });
+  });
+  autoUpdater.on('update-available', (info) => {
+    sendAppUpdateStatus('available', {
+      version: info.version,
+      message: `Nova versão ${info.version} encontrada. O download começará automaticamente.`,
+      error: null
+    });
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Atualização do TurboDown disponível',
+        body: `A versão ${info.version} está sendo baixada.`
+      }).show();
+    }
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    sendAppUpdateStatus('up-to-date', {
+      version: info.version || app.getVersion(),
+      message: 'O TurboDown está atualizado.',
+      error: null
+    });
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    sendAppUpdateStatus('downloading', {
+      percent: Math.round(progress.percent),
+      message: `Baixando atualização: ${Math.round(progress.percent)}%`
+    });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    sendAppUpdateStatus('downloaded', {
+      version: info.version,
+      message: `Versão ${info.version} pronta para instalar.`
+    });
+  });
+  autoUpdater.on('error', (error) => {
+    const noRelease = /404|latest\.yml/i.test(error.message);
+    sendAppUpdateStatus('error', {
+      message: noRelease
+        ? 'Ainda não há uma versão publicada para atualização.'
+        : 'Não foi possível verificar ou baixar atualizações.',
+      error: error.message
+    });
+  });
+
+  const isPortableBuild = process.platform === 'win32' && !!process.env.PORTABLE_EXECUTABLE_DIR;
+  if (app.isPackaged && !isPortableBuild) {
+    autoUpdater.checkForUpdates().catch(error => {
+      const noRelease = /404|latest\.yml/i.test(error.message);
+      sendAppUpdateStatus('error', {
+        message: noRelease
+          ? 'Ainda não há uma versão publicada para atualização.'
+          : 'Não foi possível verificar atualizações. Confira se há uma versão publicada.',
+        error: error.message
+      });
+    });
+  } else if (isPortableBuild) {
+    sendAppUpdateStatus('portable', {
+      message: 'A atualização automática está disponível apenas na versão instalada pelo Setup.'
+    });
+  } else {
+    sendAppUpdateStatus('development', {
+      message: 'A verificação de atualizações funciona na versão instalada do TurboDown.'
+    });
+  }
+}
+
+ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('get-app-update-status', () => appUpdateStatus);
+ipcMain.handle('check-app-update', async () => {
+  if (!app.isPackaged || (process.platform === 'win32' && !!process.env.PORTABLE_EXECUTABLE_DIR)) {
+    const portable = process.platform === 'win32' && !!process.env.PORTABLE_EXECUTABLE_DIR;
+    return {
+      status: portable ? 'portable' : 'development',
+      message: portable
+        ? 'A atualização automática está disponível apenas na versão instalada pelo Setup.'
+        : 'A verificação funciona na versão instalada do TurboDown.'
+    };
+  }
+  await autoUpdater.checkForUpdates();
+  return appUpdateStatus;
+});
+ipcMain.handle('install-app-update', () => {
+  if (appUpdateStatus.status !== 'downloaded') {
+    throw new Error('Nenhuma atualização está pronta para instalar.');
+  }
+  autoUpdater.quitAndInstall(false, true);
 });
