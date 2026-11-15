@@ -13,6 +13,8 @@ let downloadPath = '';
 let currentTheme = {};
 let activeDownloadCount = 0;
 const downloads = new Map(); // downloadId → { url, format, status, percent, ... }
+const appShell = document.getElementById('app');
+const btnMenuToggle = document.getElementById('btn-menu-toggle');
 
 // ── DOM Refs ───────────────────────────────────────────────────────────────
 const webview        = document.getElementById('youtube-player');
@@ -92,6 +94,18 @@ const btnGoogleForward      = document.getElementById('btn-google-forward');
 const btnGoogleReload       = document.getElementById('btn-google-reload');
 const btnGoogleHome         = document.getElementById('btn-google-home');
 const googleLoading         = document.getElementById('google-loading');
+
+// Social sidebar browser
+const socialWebview          = document.getElementById('social-player');
+const socialLoading          = document.getElementById('social-loading');
+const socialError            = document.getElementById('social-error');
+const socialCurrentName      = document.getElementById('social-current-name');
+const socialCurrentUrl       = document.getElementById('social-current-url');
+const btnSocialBack          = document.getElementById('btn-social-back');
+const btnSocialForward       = document.getElementById('btn-social-forward');
+const btnSocialReload        = document.getElementById('btn-social-reload');
+const btnSocialHome          = document.getElementById('btn-social-home');
+let currentSocialUrl         = 'https://web.whatsapp.com/';
 
 // Wallpapers browser
 const wallpapersWebview      = document.getElementById('wallpapers-player');
@@ -390,18 +404,42 @@ function isLightColor(hex) {
 function switchTab(tabId) {
   currentTab = tabId;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.classList.remove('active');
+    item.removeAttribute('aria-current');
+  });
 
   const tab     = document.getElementById(`tab-${tabId}`);
   const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
   if (tab)     tab.classList.add('active');
-  if (navItem) navItem.classList.add('active');
+  if (navItem) {
+    navItem.classList.add('active');
+    navItem.setAttribute('aria-current', 'page');
+  }
 }
 
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
     switchTab(item.dataset.tab);
   });
+});
+
+function setSidebarCollapsed(collapsed) {
+  appShell.classList.toggle('sidebar-collapsed', collapsed);
+  btnMenuToggle.setAttribute('aria-expanded', String(!collapsed));
+  btnMenuToggle.setAttribute('aria-label', collapsed ? 'Expandir menu' : 'Recolher menu');
+  btnMenuToggle.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+  localStorage.setItem('sidebar-collapsed', String(collapsed));
+}
+
+const savedSidebarState = localStorage.getItem('sidebar-collapsed');
+const sidebarStartsCollapsed = savedSidebarState === null
+  ? window.matchMedia('(max-width: 950px)').matches
+  : savedSidebarState === 'true';
+setSidebarCollapsed(sidebarStartsCollapsed);
+
+btnMenuToggle.addEventListener('click', () => {
+  setSidebarCollapsed(!appShell.classList.contains('sidebar-collapsed'));
 });
 
 // ── WINDOW CONTROLS ────────────────────────────────────────────────────────
@@ -1363,14 +1401,83 @@ document.querySelectorAll('.pill-btn').forEach(btn => {
   });
 });
 
-document.querySelectorAll('.social-card').forEach(card => {
-  card.addEventListener('click', () => {
-    const url = card.dataset.socialUrl;
-    if (!url) return;
-    switchTab('google');
-    loadGoogleUrl(url);
+function loadSocialPage(button) {
+  const url = button.dataset.socialUrl;
+  if (!url || !socialWebview) return;
+
+  currentSocialUrl = url;
+  document.querySelectorAll('.social-link').forEach((item) => {
+    item.classList.toggle('active', item === button);
+    if (item === button) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
   });
+
+  const name = button.dataset.socialName || button.title || 'Página';
+  if (socialCurrentName) socialCurrentName.textContent = name;
+  if (socialCurrentUrl) socialCurrentUrl.textContent = new URL(url).hostname;
+  if (socialLoading) {
+    const loadingLabel = socialLoading.querySelector('span');
+    if (loadingLabel) loadingLabel.textContent = `Carregando ${name}...`;
+  }
+  if (socialError) socialError.classList.add('hidden');
+  socialWebview.src = url;
+}
+
+document.querySelectorAll('.social-link').forEach((button) => {
+  button.addEventListener('click', () => loadSocialPage(button));
 });
+
+if (btnSocialBack) {
+  btnSocialBack.addEventListener('click', () => {
+    if (socialWebview && socialWebview.canGoBack && socialWebview.canGoBack()) socialWebview.goBack();
+  });
+}
+
+if (btnSocialForward) {
+  btnSocialForward.addEventListener('click', () => {
+    if (socialWebview && socialWebview.canGoForward && socialWebview.canGoForward()) socialWebview.goForward();
+  });
+}
+
+if (btnSocialReload) {
+  btnSocialReload.addEventListener('click', () => {
+    if (socialWebview && socialWebview.reload) socialWebview.reload();
+  });
+}
+
+if (btnSocialHome) {
+  btnSocialHome.addEventListener('click', () => {
+    if (socialWebview && currentSocialUrl) socialWebview.src = currentSocialUrl;
+  });
+}
+
+if (socialWebview) {
+  socialWebview.addEventListener('did-start-loading', () => {
+    if (socialLoading) socialLoading.classList.remove('hidden');
+    if (socialError) socialError.classList.add('hidden');
+  });
+
+  socialWebview.addEventListener('did-stop-loading', () => {
+    if (socialLoading) socialLoading.classList.add('hidden');
+  });
+
+  socialWebview.addEventListener('did-navigate', (event) => {
+    try {
+      if (socialCurrentUrl) socialCurrentUrl.textContent = new URL(event.url).hostname;
+    } catch (error) {
+      console.warn('URL de navegação social inválida:', error);
+    }
+  });
+
+  socialWebview.addEventListener('did-fail-load', (event) => {
+    if (!event.isMainFrame || event.errorCode === -3) return;
+    if (socialLoading) socialLoading.classList.add('hidden');
+    if (socialError) {
+      socialError.textContent = `Não foi possível carregar ${socialCurrentName ? socialCurrentName.textContent : 'a página'}. Verifique a conexão e tente novamente.`;
+      socialError.classList.remove('hidden');
+    }
+  });
+}
 
 // Google Webview events (loading and navigation)
 if (googleWebview) {

@@ -12,6 +12,11 @@
 
     <!-- ══════════ CUSTOM TITLEBAR ══════════ -->
     <div id="titlebar">
+      <button id="btn-menu-toggle" type="button" aria-label="Recolher menu" aria-expanded="true" aria-controls="sidebar" title="Recolher menu">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
       <div id="titlebar-drag">
         <img src="../assets/turbodown-logo.png" id="titlebar-icon" alt="TurboDown" />
         <span id="titlebar-title">TurboDown</span>
@@ -34,50 +39,61 @@
         </div>
 
         <div class="nav-section">
-          <div class="nav-item active" data-tab="home">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">Início</span>
+          <div class="nav-group">
+            <span class="nav-group-label">NAVEGAR</span>
+            <button type="button" class="nav-item active" data-tab="home" title="Início" aria-current="page">
+              <span class="nav-icon">🏠</span>
+              <span class="nav-label">Início</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="google" title="Google Web">
+              <span class="nav-icon">🌐</span>
+              <span class="nav-label">Google Web</span>
+            </button>
           </div>
-          <div class="nav-item" data-tab="google">
-            <span class="nav-icon">🌐</span>
-            <span class="nav-label">Google Web</span>
+
+          <div class="nav-group">
+            <span class="nav-group-label">DESCOBRIR</span>
+            <button type="button" class="nav-item" data-tab="wallpapers" title="Wallpapers HD">
+              <span class="nav-icon">🖼️</span>
+              <span class="nav-label">Wallpapers HD</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="goalzen" title="Goalzen">
+              <span class="nav-icon">⚽</span>
+              <span class="nav-label">Goalzen</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="pluto" title="Pluto TV">
+              <span class="nav-icon">📺</span>
+              <span class="nav-label">Pluto TV</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="twitch" title="Twitch">
+              <span class="nav-icon">🟣</span>
+              <span class="nav-label">Twitch</span>
+            </button>
           </div>
-          <div class="nav-item" data-tab="wallpapers">
-            <span class="nav-icon">🖼️</span>
-            <span class="nav-label">Wallpapers HD</span>
-          </div>
-          <div class="nav-item" data-tab="goalzen">
-            <span class="nav-icon">⚽</span>
-            <span class="nav-label">Goalzen</span>
-          </div>
-          <div class="nav-item" data-tab="pluto">
-            <span class="nav-icon">📺</span>
-            <span class="nav-label">Pluto TV</span>
-          </div>
-          <div class="nav-item" data-tab="gemini">
-            <span class="nav-icon">✨</span>
-            <span class="nav-label">Gemini</span>
-          </div>
-          <div class="nav-item" data-tab="twitch">
-            <span class="nav-icon">🟣</span>
-            <span class="nav-label">Twitch</span>
-          </div>
-          <div class="nav-item" data-tab="downloads">
-            <span class="nav-icon">⬇️</span>
-            <span class="nav-label">Downloads</span>
-            <span class="nav-badge hidden" id="dl-badge">0</span>
-          </div>
-          <div class="nav-item" data-tab="settings">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">Configurações</span>
+
+          <div class="nav-group">
+            <span class="nav-group-label">FERRAMENTAS</span>
+            <button type="button" class="nav-item" data-tab="gemini" title="Gemini">
+              <span class="nav-icon">✨</span>
+              <span class="nav-label">Gemini</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="downloads" title="Downloads">
+              <span class="nav-icon">⬇️</span>
+              <span class="nav-label">Downloads</span>
+              <span class="nav-badge hidden" id="dl-badge">0</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="settings" title="Configurações">
+              <span class="nav-icon">⚙️</span>
+              <span class="nav-label">Configurações</span>
+            </button>
           </div>
         </div>
 
         <div id="sidebar-footer">
-          <div class="nav-item" data-tab="social">
+          <button type="button" class="nav-item" data-tab="social" title="Redes Sociais">
             <span class="nav-icon">💬</span>
             <span class="nav-label">Redes Sociais</span>
-          </div>
+          </button>
           <div id="now-playing" class="hidden">
             <div class="np-dot"></div>
             <span id="np-title">Reproduzindo...</span>
@@ -90,54 +106,92 @@
 
         <!-- ════ TAB: SOCIAL NETWORKS ════ -->
         <div class="tab" id="tab-social">
-          <div id="social-wrapper">
-            <div id="social-header">
-              <span class="social-kicker">SEUS ESPAÇOS DIGITAIS</span>
-              <h2 class="tab-title">Redes Sociais</h2>
-              <p>Escolha uma rede para abrir no navegador integrado.</p>
-            </div>
-            <div class="social-grid">
-              <button class="social-card" data-social-url="https://web.whatsapp.com/" aria-label="Abrir WhatsApp Web">
+          <div id="social-layout">
+            <aside id="social-rail" aria-label="Redes sociais e canais de futebol">
+            <div class="social-rail-group">
+              <span class="social-rail-label">SOCIAIS</span>
+              <button type="button" class="social-link active" data-social-url="https://web.whatsapp.com/" data-social-name="WhatsApp" title="WhatsApp" aria-label="Abrir WhatsApp" aria-current="page">
                 <span class="social-icon social-whatsapp" aria-hidden="true">☎</span>
-                <span class="social-copy"><strong>WhatsApp Web</strong><small>Mensagens e chamadas</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">WhatsApp</span>
               </button>
-              <button class="social-card" data-social-url="https://web.telegram.org/" aria-label="Abrir Telegram Web">
+              <button type="button" class="social-link" data-social-url="https://web.telegram.org/" data-social-name="Telegram" title="Telegram" aria-label="Abrir Telegram">
                 <span class="social-icon social-telegram" aria-hidden="true">➤</span>
-                <span class="social-copy"><strong>Telegram</strong><small>Conversas e canais</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">Telegram</span>
               </button>
-              <button class="social-card" data-social-url="https://www.instagram.com/" aria-label="Abrir Instagram">
+              <button type="button" class="social-link" data-social-url="https://www.instagram.com/" data-social-name="Instagram" title="Instagram" aria-label="Abrir Instagram">
                 <span class="social-icon social-instagram" aria-hidden="true">◎</span>
-                <span class="social-copy"><strong>Instagram</strong><small>Fotos, reels e mensagens</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">Instagram</span>
               </button>
-              <button class="social-card" data-social-url="https://www.facebook.com/" aria-label="Abrir Facebook">
+              <button type="button" class="social-link" data-social-url="https://www.facebook.com/" data-social-name="Facebook" title="Facebook" aria-label="Abrir Facebook">
                 <span class="social-icon social-facebook" aria-hidden="true">f</span>
-                <span class="social-copy"><strong>Facebook</strong><small>Amigos e comunidades</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">Facebook</span>
               </button>
-              <button class="social-card" data-social-url="https://x.com/" aria-label="Abrir X">
+              <button type="button" class="social-link" data-social-url="https://x.com/" data-social-name="X" title="X" aria-label="Abrir X">
                 <span class="social-icon social-x" aria-hidden="true">X</span>
-                <span class="social-copy"><strong>X</strong><small>Assuntos em tempo real</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">X</span>
               </button>
-              <button class="social-card" data-social-url="https://www.tiktok.com/" aria-label="Abrir TikTok">
+              <button type="button" class="social-link" data-social-url="https://www.tiktok.com/" data-social-name="TikTok" title="TikTok" aria-label="Abrir TikTok">
                 <span class="social-icon social-tiktok" aria-hidden="true">♪</span>
-                <span class="social-copy"><strong>TikTok</strong><small>Vídeos curtos e lives</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">TikTok</span>
               </button>
-              <button class="social-card" data-social-url="https://www.youtube.com/" aria-label="Abrir YouTube">
+              <button type="button" class="social-link" data-social-url="https://www.youtube.com/" data-social-name="YouTube" title="YouTube" aria-label="Abrir YouTube">
                 <span class="social-icon social-youtube" aria-hidden="true">▶</span>
-                <span class="social-copy"><strong>YouTube</strong><small>Vídeos e transmissões</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">YouTube</span>
               </button>
-              <button class="social-card" data-social-url="https://discord.com/app" aria-label="Abrir Discord">
+              <button type="button" class="social-link" data-social-url="https://discord.com/app" data-social-name="Discord" title="Discord" aria-label="Abrir Discord">
                 <span class="social-icon social-discord" aria-hidden="true">◉</span>
-                <span class="social-copy"><strong>Discord</strong><small>Comunidades e chamadas</small></span>
-                <span class="social-open" aria-hidden="true">↗</span>
+                <span class="social-link-label">Discord</span>
               </button>
             </div>
+            <div class="social-rail-divider" role="separator"></div>
+            <div class="social-rail-group">
+              <span class="social-rail-label">FUTEBOL</span>
+              <button type="button" class="social-link" data-social-url="https://www.youtube.com/@getv" data-social-name="ge tv" title="ge tv" aria-label="Abrir canal ge tv">
+                <span class="social-icon social-ge" aria-hidden="true">ge</span>
+                <span class="social-link-label">ge tv</span>
+              </button>
+              <button type="button" class="social-link" data-social-url="https://www.youtube.com/@CazeTV" data-social-name="CazéTV" title="CazéTV" aria-label="Abrir canal CazéTV">
+                <span class="social-icon social-caze" aria-hidden="true">C</span>
+                <span class="social-link-label">CazéTV</span>
+              </button>
+              <button type="button" class="social-link" data-social-url="https://www.youtube.com/@TNTSportsBR" data-social-name="TNT Sports" title="TNT Sports" aria-label="Abrir canal TNT Sports">
+                <span class="social-icon social-tnt" aria-hidden="true">TNT</span>
+                <span class="social-link-label">TNT Sports</span>
+              </button>
+              <button type="button" class="social-link" data-social-url="https://www.youtube.com/@espnbrasil" data-social-name="ESPN Brasil" title="ESPN Brasil" aria-label="Abrir canal ESPN Brasil">
+                <span class="social-icon social-espn" aria-hidden="true">E</span>
+                <span class="social-link-label">ESPN Brasil</span>
+              </button>
+            </div>
+            </aside>
+
+            <section id="social-browser" aria-label="Página selecionada">
+            <header id="social-toolbar">
+              <div class="social-browser-controls">
+                <button id="btn-social-back" class="nav-control-btn" title="Voltar">‹</button>
+                <button id="btn-social-forward" class="nav-control-btn" title="Avançar">›</button>
+                <button id="btn-social-reload" class="nav-control-btn" title="Recarregar">↻</button>
+                <button id="btn-social-home" class="nav-control-btn" title="Abrir página inicial selecionada">⌂</button>
+              </div>
+              <div id="social-current-site">
+                <strong id="social-current-name">WhatsApp</strong>
+                <span id="social-current-url">web.whatsapp.com</span>
+              </div>
+            </header>
+            <div id="social-webview-container">
+              <webview
+                id="social-player"
+                src="https://web.whatsapp.com/"
+                partition="persist:social"
+                allowpopups
+              ></webview>
+              <div id="social-loading" class="social-loading">
+                <div class="loader-ring"></div>
+                <span>Carregando WhatsApp...</span>
+              </div>
+              <div id="social-error" class="social-error hidden" role="status"></div>
+            </div>
+            </section>
           </div>
         </div>
 

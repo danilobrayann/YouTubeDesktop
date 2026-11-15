@@ -35,7 +35,7 @@
 - 📺 **Aba Pluto TV**: Abra a Pluto TV Brasil dentro do app, com controles de navegação, recarga e página inicial.
 - ✨ **Aba Gemini**: Abra o Gemini em uma aba própria, com sessão persistente e controles de navegação.
 - 🟣 **Aba Twitch**: Acesse transmissões e jogos da Twitch em uma aba própria, com sessão persistente e controles de navegação.
-- 💬 **Redes Sociais**: Acesso rápido ao WhatsApp Web, Telegram, Instagram, Facebook, X, TikTok, YouTube e Discord pelo navegador integrado.
+- 💬 **Redes Sociais e Futebol**: Atalhos em uma barra lateral para WhatsApp Web, Telegram, Instagram, Facebook, X, TikTok, YouTube, Discord e os canais ge tv, CazéTV, TNT Sports e ESPN Brasil; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
 - ⬇️ **Downloads Inteligentes e Organizados por Pastas**:
   - **📁 Separação Automática por Tipo**:
     - **Vídeos avulsos**: salvos automaticamente na pasta `Downloads/Vídeos/`
@@ -50,7 +50,7 @@
   - Suporte a **Gradientes personalizados** (escolha o ângulo e as duas cores).
   - Controle de **Transparência e Efeito Vidro (Glassmorphism)** com ajuste fino de desfoque (blur) e opacidade.
   - Suporte a **Imagem de Fundo**: selecione qualquer foto ou papel de parede do seu próprio computador (`.jpg`, `.png`, `.webp`).
-- 🪟 **Interface Fluida e Moderna**: Janela sem bordas (frameless), barra de título personalizada, botões de janela nativos e atalho na Área de Trabalho com ícone oficial.
+- 🪟 **Interface Fluida e Moderna**: Janela sem bordas (frameless), barra de título personalizada, menu lateral categorizado com botão hambúrguer animado e preferência de recolhimento salva, botões de janela nativos e atalho na Área de Trabalho com ícone oficial.
 
 ---
 
