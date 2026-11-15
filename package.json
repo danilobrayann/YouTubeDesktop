@@ -1,6 +1,6 @@
 {
   "name": "turbodown",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Assistir e baixar vídeos do YouTube com visual moderno",
   "productName": "TurboDown",
   "main": "src/main.js",
@@ -71,7 +71,8 @@
       "installerHeaderIcon": "assets/icon.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "perMachine": false
+      "perMachine": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "publish": {
       "provider": "github",

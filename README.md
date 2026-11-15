@@ -98,7 +98,7 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
      - Não requer privilégios de Administrador e não dá erros de permissão.
      - Atualiza o atalho da Área de Trabalho para abrir o executável diretamente.
    - **Opção `2` — Instalador Setup Completo (.exe)**:
-     - Gera o instalador assistido `TurboDown Setup 1.1.0.exe` em `dist\`.
+     - Gera o instalador assistido `TurboDown-Setup-1.2.0.exe` em `dist\`.
      - *Dica*: Caso utilize a opção 2, execute o `construir.bat` clicando com o botão direito e selecionando **"Executar como Administrador"**.
 
 ---
@@ -180,7 +180,7 @@ O script `instalar.bat` já instala tudo de forma automática. Caso prefira inst
 
 A atualização automática funciona nas versões instaladas pelo Setup do Windows; a versão portátil e a execução com `npm start` não se atualizam automaticamente. Para receber uma atualização, o projeto precisa ter uma nova versão publicada em **GitHub Releases**. O TurboDown verifica atualizações ao iniciar, baixa a nova versão e oferece o botão **Reiniciar e instalar**.
 
-Quem estiver usando uma versão antiga, sem o atualizador, precisará instalar manualmente uma vez a versão 1.1.0; as versões seguintes poderão ser atualizadas pelo próprio app.
+Quem estiver usando uma versão antiga, sem o atualizador, precisará instalar manualmente uma vez a versão 1.1.0 ou mais recente; as versões seguintes poderão ser atualizadas pelo próprio app.
 
 Para publicar uma versão, atualize `version` em `package.json`, gere o Setup e publique os artefatos do electron-builder em uma Release do GitHub. A publicação automatizada usa `GH_TOKEN` no ambiente e o comando:
 
