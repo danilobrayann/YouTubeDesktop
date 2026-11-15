@@ -91,33 +91,6 @@
                 <span class="nav-icon">🖼️</span>
                 <span class="nav-label">Wallpapers HD</span>
               </button>
-              <button
-                type="button"
-                class="nav-item"
-                data-tab="goalzen"
-                title="Goalzen"
-              >
-                <span class="nav-icon">⚽</span>
-                <span class="nav-label">Goalzen</span>
-              </button>
-              <button
-                type="button"
-                class="nav-item"
-                data-tab="pluto"
-                title="Pluto TV"
-              >
-                <span class="nav-icon">📺</span>
-                <span class="nav-label">Pluto TV</span>
-              </button>
-              <button
-                type="button"
-                class="nav-item"
-                data-tab="twitch"
-                title="Twitch"
-              >
-                <span class="nav-icon">🟣</span>
-                <span class="nav-label">Twitch</span>
-              </button>
             </div>
 
             <div class="nav-group">
@@ -288,10 +261,36 @@
                     >
                     <span class="social-link-label">Discord</span>
                   </button>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.twitch.tv/"
+                    data-social-name="Twitch"
+                    title="Twitch"
+                    aria-label="Abrir Twitch"
+                  >
+                    <span class="social-icon social-twitch" aria-hidden="true"
+                      >T</span
+                    >
+                    <span class="social-link-label">Twitch</span>
+                  </button>
                 </div>
                 <div class="social-rail-divider" role="separator"></div>
                 <div class="social-rail-group">
                   <span class="social-rail-label">FUTEBOL</span>
+                  <button
+                    type="button"
+                    class="social-link"
+                    data-social-url="https://www.goalzen.site"
+                    data-social-name="Goalzen"
+                    title="Goalzen"
+                    aria-label="Abrir Goalzen"
+                  >
+                    <span class="social-icon social-goalzen" aria-hidden="true"
+                      >G</span
+                    >
+                    <span class="social-link-label">Goalzen</span>
+                  </button>
                   <button
                     type="button"
                     class="social-link"
@@ -789,14 +788,8 @@
               <button class="pill-btn" data-url="https://www.goalzen.site">
                 ⚽ Goalzen
               </button>
-              <button class="pill-btn" data-url="https://pluto.tv/br/">
-                📺 Pluto TV
-              </button>
               <button class="pill-btn" data-url="https://gemini.google.com/app">
                 ✨ Gemini
-              </button>
-              <button class="pill-btn" data-url="https://www.twitch.tv">
-                🟣 Twitch
               </button>
             </div>
 
@@ -868,112 +861,6 @@
             </div>
           </div>
 
-          <!-- ════ TAB: GOALZEN ════ -->
-          <div class="tab" id="tab-goalzen">
-            <div class="browser-bar wallpapers-browser-bar">
-              <div class="wallpapers-browser-nav">
-                <button
-                  id="btn-goalzen-back"
-                  class="nav-control-btn"
-                  title="Voltar"
-                >
-                  ‹
-                </button>
-                <button
-                  id="btn-goalzen-forward"
-                  class="nav-control-btn"
-                  title="Avançar"
-                >
-                  ›
-                </button>
-                <button
-                  id="btn-goalzen-reload"
-                  class="nav-control-btn"
-                  title="Recarregar"
-                >
-                  ↻
-                </button>
-                <button
-                  id="btn-goalzen-home"
-                  class="nav-control-btn"
-                  title="Página inicial do Goalzen"
-                >
-                  ⚽
-                </button>
-              </div>
-              <div class="wallpapers-site-label">
-                <strong>Goalzen</strong>
-                <span>Futebol e esportes</span>
-              </div>
-            </div>
-            <div class="webview-container-full">
-              <webview
-                id="goalzen-player"
-                src="https://www.goalzen.site"
-                partition="persist:goalzen"
-                allowpopups
-                webpreferences="contextIsolation=false"
-              ></webview>
-              <div id="goalzen-loading" class="hidden">
-                <div class="loader-ring"></div>
-                <span>Carregando Goalzen...</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ════ TAB: PLUTO TV ════ -->
-          <div class="tab" id="tab-pluto">
-            <div class="browser-bar wallpapers-browser-bar">
-              <div class="wallpapers-browser-nav">
-                <button
-                  id="btn-pluto-back"
-                  class="nav-control-btn"
-                  title="Voltar"
-                >
-                  ‹
-                </button>
-                <button
-                  id="btn-pluto-forward"
-                  class="nav-control-btn"
-                  title="Avançar"
-                >
-                  ›
-                </button>
-                <button
-                  id="btn-pluto-reload"
-                  class="nav-control-btn"
-                  title="Recarregar"
-                >
-                  ↻
-                </button>
-                <button
-                  id="btn-pluto-home"
-                  class="nav-control-btn"
-                  title="Página inicial da Pluto TV"
-                >
-                  📺
-                </button>
-              </div>
-              <div class="wallpapers-site-label">
-                <strong>Pluto TV</strong>
-                <span>TV e filmes grátis</span>
-              </div>
-            </div>
-            <div class="webview-container-full">
-              <webview
-                id="pluto-player"
-                src="https://pluto.tv/br/"
-                partition="persist:pluto-tv"
-                allowpopups
-                webpreferences="contextIsolation=false"
-              ></webview>
-              <div id="pluto-loading" class="hidden">
-                <div class="loader-ring"></div>
-                <span>Carregando Pluto TV...</span>
-              </div>
-            </div>
-          </div>
-
           <!-- ════ TAB: GEMINI ════ -->
           <div class="tab" id="tab-gemini">
             <div class="browser-bar wallpapers-browser-bar">
@@ -1023,59 +910,6 @@
               <div id="gemini-loading" class="hidden">
                 <div class="loader-ring"></div>
                 <span>Carregando Gemini...</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ════ TAB: TWITCH ════ -->
-          <div class="tab" id="tab-twitch">
-            <div class="browser-bar wallpapers-browser-bar">
-              <div class="wallpapers-browser-nav">
-                <button
-                  id="btn-twitch-back"
-                  class="nav-control-btn"
-                  title="Voltar"
-                >
-                  ‹
-                </button>
-                <button
-                  id="btn-twitch-forward"
-                  class="nav-control-btn"
-                  title="Avançar"
-                >
-                  ›
-                </button>
-                <button
-                  id="btn-twitch-reload"
-                  class="nav-control-btn"
-                  title="Recarregar"
-                >
-                  ↻
-                </button>
-                <button
-                  id="btn-twitch-home"
-                  class="nav-control-btn"
-                  title="Página inicial da Twitch"
-                >
-                  🟣
-                </button>
-              </div>
-              <div class="wallpapers-site-label">
-                <strong>Twitch</strong>
-                <span>Lives e jogos</span>
-              </div>
-            </div>
-            <div class="webview-container-full">
-              <webview
-                id="twitch-player"
-                src="https://www.twitch.tv"
-                partition="persist:twitch"
-                allowpopups
-                webpreferences="contextIsolation=false"
-              ></webview>
-              <div id="twitch-loading" class="hidden">
-                <div class="loader-ring"></div>
-                <span>Carregando Twitch...</span>
               </div>
             </div>
           </div>
