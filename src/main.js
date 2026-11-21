@@ -84,6 +84,9 @@ function configureBrowserSession(partition) {
   if (configuredBrowserSessions.has(browserSession)) return;
   configuredBrowserSessions.add(browserSession);
 
+  // Set modern userAgent for sites like WhatsApp Web
+  browserSession.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+
   browserSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*'] },
     (details, callback) => {
@@ -240,12 +243,14 @@ app.whenReady().then(() => {
     'persist:gemini'
   ].forEach(configureBrowserSession);
 
-  // Allow webview to load YouTube
+  // Allow webview to load YouTube and set proper userAgent for WhatsApp Web
   app.on('web-contents-created', (event, contents) => {
     if (contents.getType() === 'webview') {
       contents.session.setPermissionRequestHandler((webContents, permission, callback) => {
         callback(true);
       });
+      // Set modern userAgent for sites like WhatsApp Web that check Chrome version
+      contents.session.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
     }
   });
 
