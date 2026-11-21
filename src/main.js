@@ -51,7 +51,7 @@ const store = new Store({
 
 let googleShieldsEnabled = store.get('googleShieldsEnabled', true);
 let googleBlockedRequestCount = 0;
-const configuredGoogleSessions = new WeakSet();
+const configuredBrowserSessions = new WeakSet();
 
 // ─── Active downloads registry ───────────────────────────────────────────────
 const activeDownloads = new Map(); // downloadId → child process
@@ -79,10 +79,10 @@ function queueGoogleShieldStatus() {
   }, 300);
 }
 
-function configureGoogleBrowserSession(partition) {
+function configureBrowserSession(partition) {
   const browserSession = session.fromPartition(partition);
-  if (configuredGoogleSessions.has(browserSession)) return;
-  configuredGoogleSessions.add(browserSession);
+  if (configuredBrowserSessions.has(browserSession)) return;
+  configuredBrowserSessions.add(browserSession);
 
   browserSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*'] },
@@ -230,8 +230,15 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initializeAutoUpdater();
-  configureGoogleBrowserSession('persist:google');
-  configureGoogleBrowserSession('google-private');
+  [
+    'persist:google',
+    'google-private',
+    'persist:music',
+    'persist:youtube',
+    'persist:social',
+    'persist:wallpapers',
+    'persist:gemini'
+  ].forEach(configureBrowserSession);
 
   // Allow webview to load YouTube
   app.on('web-contents-created', (event, contents) => {
@@ -359,14 +366,27 @@ ipcMain.handle('select-background-image', async () => {
 // ─── Helper: Get yt-dlp binary path ─────────────────────────────────────────
 function getYtDlpPath() {
   const candidates = [
-    path.join(app.getPath('userData'), 'bin', 'yt-dlp.exe'),
     path.join(process.resourcesPath || '', 'bin', 'yt-dlp.exe'),
-    path.join(__dirname, '..', 'bin', 'yt-dlp.exe')
+    path.join(__dirname, '..', 'bin', 'yt-dlp.exe'),
+    path.join(app.getPath('userData'), 'bin', 'yt-dlp.exe')
   ];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return candidate;
   }
   return 'yt-dlp';
+}
+
+// ─── Helper: Get ffmpeg binary path ─────────────────────────────────────────
+function getFfmpegPath() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'bin', 'ffmpeg.exe'),
+    path.join(__dirname, '..', 'bin', 'ffmpeg.exe'),
+    path.join(app.getPath('userData'), 'bin', 'ffmpeg.exe')
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return 'ffmpeg';
 }
 
 function getDownloadPreferences() {
@@ -459,6 +479,10 @@ function createDownloadPlan(request) {
   fs.mkdirSync(categoryDir, { recursive: true });
 
   const args = getFormatArgs(request.format);
+  const ffmpegPath = getFfmpegPath();
+  if (fs.existsSync(ffmpegPath)) {
+    args.push('--ffmpeg-location', path.dirname(ffmpegPath));
+  }
   if (isPlaylist) {
     args.push('-o', path.join(categoryDir, '%(playlist_title,playlist)s', '%(playlist_index)02d - %(title)s.%(ext)s'));
   } else {
@@ -765,10 +789,13 @@ async function checkInstalledTool(command, args) {
 ipcMain.handle('check-download-tools', async () => {
   const [ytDlp, ffmpeg] = await Promise.all([
     checkInstalledTool(getYtDlpPath(), ['--version']),
-    checkInstalledTool('ffmpeg', ['-version'])
+    checkInstalledTool(getFfmpegPath(), ['-version'])
   ]);
   return { ytDlp, ffmpeg };
 });
+
+ipcMain.handle('get-ffmpeg-path', () => getFfmpegPath());
+ipcMain.handle('get-ytdlp-path', () => getYtDlpPath());
 
 ipcMain.handle('update-ytdlp', async () => {
   if (activeDownloads.size > 0) {

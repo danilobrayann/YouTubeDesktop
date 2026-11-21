@@ -98,6 +98,10 @@ const gradc2Label        = document.getElementById('gradc2-label');
 const angleVal           = document.getElementById('angle-val');
 const blurVal            = document.getElementById('blur-val');
 const opacityVal         = document.getElementById('opacity-val');
+const musicPlayer        = document.getElementById('music-player');
+const musicLoading       = document.getElementById('music-loading');
+const musicLoadingText   = document.getElementById('music-loading-text');
+const musicRetry         = document.getElementById('music-retry');
 
 // Google Web DOM refs
 const googleWebviews        = document.getElementById('google-webviews');
@@ -427,6 +431,10 @@ function switchTab(tabId) {
     navItem.classList.add('active');
     navItem.setAttribute('aria-current', 'page');
   }
+
+  if (tabId === 'music' && !musicPlayer.getAttribute('src')) {
+    musicPlayer.setAttribute('src', 'https://music.youtube.com/');
+  }
 }
 
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -434,6 +442,25 @@ document.querySelectorAll('.nav-item').forEach(item => {
     switchTab(item.dataset.tab);
   });
 });
+
+musicPlayer.addEventListener('did-start-loading', () => {
+  musicLoading.classList.remove('hidden');
+  musicLoadingText.textContent = 'Carregando YouTube Music...';
+  musicRetry.classList.add('hidden');
+});
+
+musicPlayer.addEventListener('dom-ready', () => {
+  musicLoading.classList.add('hidden');
+});
+
+musicPlayer.addEventListener('did-fail-load', (event) => {
+  if (event.errorCode === -3 || !event.isMainFrame) return;
+  musicLoading.classList.remove('hidden');
+  musicLoadingText.textContent = 'Não foi possível carregar o YouTube Music. Verifique a conexão e tente novamente.';
+  musicRetry.classList.remove('hidden');
+});
+
+musicRetry.addEventListener('click', () => musicPlayer.reload());
 
 function setSidebarCollapsed(collapsed) {
   appShell.classList.toggle('sidebar-collapsed', collapsed);
@@ -1343,12 +1370,21 @@ async function checkDownloadTools() {
   toolFfmpegStatus.textContent = 'Verificando...';
   try {
     const tools = await api.checkDownloadTools();
+    const ffmpegPath = await api.getFfmpegPath();
+    const ytDlpPath = await api.getYtDlpPath();
+
     toolYtDlpStatus.textContent = tools.ytDlp.installed
-      ? `Instalado — ${tools.ytDlp.version}`
+      ? `Instalado — ${tools.ytDlp.version}${ytDlpPath.includes('resources') ? ' (embutido)' : ''}`
       : `Não encontrado — ${tools.ytDlp.error || 'verifique a instalação'}`;
     toolFfmpegStatus.textContent = tools.ffmpeg.installed
-      ? `Instalado — ${tools.ffmpeg.version}`
+      ? `Instalado — ${tools.ffmpeg.version}${ffmpegPath.includes('resources') ? ' (embutido)' : ''}`
       : `Não encontrado — ${tools.ffmpeg.error || 'instale FFmpeg'}`;
+
+    // Desabilitar botão de atualizar yt-dlp se o binário está embutido no instalador
+    if (ytDlpPath.includes('resources')) {
+      btnUpdateYtDlp.disabled = true;
+      btnUpdateYtDlp.title = 'O yt-dlp é fornecido pelo instalador. Atualize o app para obter versões mais recentes.';
+    }
   } catch (error) {
     toolYtDlpStatus.textContent = `Falha ao verificar: ${error.message}`;
     toolFfmpegStatus.textContent = 'Verificação não concluída';

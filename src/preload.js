@@ -41,6 +41,8 @@ window.api = {
   saveDownloadPreferences: (preferences) => ipcRenderer.invoke('save-download-preferences', preferences),
   checkDownloadTools: () => ipcRenderer.invoke('check-download-tools'),
   updateYtDlp: () => ipcRenderer.invoke('update-ytdlp'),
+  getFfmpegPath: () => ipcRenderer.invoke('get-ffmpeg-path'),
+  getYtDlpPath: () => ipcRenderer.invoke('get-ytdlp-path'),
 
   // Application updates
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
