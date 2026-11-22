@@ -6,6 +6,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu, Notific
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const https = require('https');
 const { spawn } = require('child_process');
 const Store = require('electron-store');
@@ -264,6 +265,70 @@ ipcMain.handle('telegram-download-file', async (_event, id) => {
     return { success: true, path: save.filePath };
   } catch (e) {
     return { success: false, message: e.message };
+  }
+});
+
+// ===== Pastas virtuais da nuvem =====
+ipcMain.handle('telegram-get-folders', () => {
+  const fromFiles = getTelegramFiles().map(f => f.folder).filter(Boolean);
+  const custom = store.get('telegramFolders', []);
+  return [...new Set([...custom, ...fromFiles])].sort((a, b) => a.localeCompare(b));
+});
+
+ipcMain.handle('telegram-create-folder', (_event, name) => {
+  const clean = String(name || '').trim().slice(0, 60);
+  if (!clean) return { success: false, message: 'Nome vazio' };
+  const folders = store.get('telegramFolders', []);
+  if (!folders.includes(clean)) { folders.push(clean); store.set('telegramFolders', folders); }
+  return { success: true };
+});
+
+ipcMain.handle('telegram-move-file', (_event, { id, folder }) => {
+  const list = getTelegramFiles();
+  const entry = list.find(f => f.id === id);
+  if (!entry) return { success: false, message: 'Arquivo não encontrado' };
+  entry.folder = String(folder || '').slice(0, 60);
+  store.set('telegramFiles', list);
+  return { success: true };
+});
+
+ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
+  const entries = getTelegramFiles().filter(f => (f.folder || '') === folderName && f.fileId);
+  if (!entries.length) return { success: false, message: 'Pasta vazia ou sem arquivos com file_id (reenvie arquivos antigos)' };
+  const bot = ensureTelegramBot();
+  if (!bot) return { success: false, message: 'Bot não conectado' };
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tdcloud-'));
+  try {
+    for (const e of entries) {
+      try {
+        const info = await bot.getFile(e.fileId);
+        if (!info || !info.file_path) continue;
+        const res = await fetch(bot.fileDownloadUrl(info.file_path));
+        if (!res.ok) continue;
+        const buf = Buffer.from(await res.arrayBuffer());
+        const safe = e.fileName.replace(/[<>:"/\\|?*]/g, '_');
+        fs.writeFileSync(path.join(tmpDir, safe), buf);
+      } catch (err) { /* pula arquivo com falha */ }
+    }
+    const zipPath = path.join(os.tmpdir(), `tdfolder-${Date.now()}.zip`);
+    await new Promise((resolve) => {
+      const ps = spawn('powershell.exe', ['-NoProfile', '-Command',
+        `Compress-Archive -Path '${tmpDir.replace(/'/g, "''")}\\*' -DestinationPath '${zipPath.replace(/'/g, "''")}' -Force`],
+        { windowsHide: true });
+      ps.on('close', resolve);
+      ps.on('error', resolve);
+    });
+    if (!fs.existsSync(zipPath)) return { success: false, message: 'Falha ao compactar a pasta' };
+    const save = await dialog.showSaveDialog(mainWindow, {
+      title: 'Salvar pasta da nuvem',
+      defaultPath: path.join(app.getPath('downloads'), `${folderName || 'nuvem'}.zip`)
+    });
+    if (save.canceled || !save.filePath) { try { fs.unlinkSync(zipPath); } catch (e) {} return { success: false, canceled: true }; }
+    fs.copyFileSync(zipPath, save.filePath);
+    try { fs.unlinkSync(zipPath); } catch (e) {}
+    return { success: true, path: save.filePath, count: entries.length };
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}
   }
 });
 

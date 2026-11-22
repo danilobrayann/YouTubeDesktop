@@ -2562,10 +2562,62 @@ api.on('telegram-upload-event', (data) => {
   updateTelegramCloudUI();
 });
 
+let tgFolderFilter = '';
+
 async function renderTelegramFiles() {
   if (!telegramFilesList) return;
   try {
     let files = await api.telegramGetFiles();
+    // Barra de pastas virtuais
+    const foldersBar = document.getElementById('tg-folders-bar');
+    if (foldersBar && api.telegramGetFolders) {
+      const folders = await api.telegramGetFolders();
+      foldersBar.replaceChildren();
+      const counts = {};
+      files.forEach(f => { const k = f.folder || ''; counts[k] = (counts[k] || 0) + 1; });
+      const mkChip = (label, value, title, extra) => {
+        const chip = document.createElement('button');
+        chip.className = 'tg-folder-chip' + (tgFolderFilter === value ? ' active' : '');
+        chip.textContent = label;
+        chip.title = title || label;
+        chip.addEventListener('click', (e) => {
+          if (e.target.classList.contains('tg-folder-zip')) return;
+          tgFolderFilter = value;
+          renderTelegramFiles();
+        });
+        if (extra) chip.appendChild(extra);
+        return chip;
+      };
+      foldersBar.appendChild(mkChip(`Todas (${files.length})`, '', 'Mostrar todos os arquivos'));
+      folders.forEach(fn => {
+        const zipBtn = document.createElement('span');
+        zipBtn.className = 'tg-folder-zip';
+        zipBtn.textContent = ' ⬇';
+        zipBtn.title = 'Baixar pasta como .zip';
+        zipBtn.addEventListener('click', async () => {
+          zipBtn.textContent = ' ⏳';
+          const res = await api.telegramDownloadFolder(fn);
+          zipBtn.textContent = ' ⬇';
+          if (res && res.success) alert(`Pasta salva em:\n${res.path}`);
+          else if (!(res && res.canceled)) alert(res && res.message || 'Falha ao baixar pasta');
+        });
+        foldersBar.appendChild(mkChip(`📁 ${fn} (${counts[fn] || 0})`, fn, `Pasta: ${fn}`, zipBtn));
+      });
+      const addBtn = document.createElement('button');
+      addBtn.className = 'tg-folder-chip tg-folder-new';
+      addBtn.textContent = '＋ Pasta';
+      addBtn.title = 'Criar pasta virtual';
+      addBtn.addEventListener('click', async () => {
+        const name = prompt('Nome da nova pasta:');
+        if (!name || !name.trim()) return;
+        const res = await api.telegramCreateFolder(name.trim());
+        if (res && res.success) renderTelegramFiles();
+        else alert(res && res.message || 'Falha ao criar pasta');
+      });
+      foldersBar.appendChild(addBtn);
+    }
+    // Filtro por pasta
+    if (tgFolderFilter) files = files.filter(f => (f.folder || '') === tgFolderFilter);
     // Busca
     const q = (document.getElementById('tg-search')?.value || '').trim().toLowerCase();
     if (q) files = files.filter(f => (f.fileName || '').toLowerCase().includes(q) || (f.title || '').toLowerCase().includes(q));
@@ -2587,6 +2639,7 @@ async function renderTelegramFiles() {
       return;
     }
     let totalSize = 0;
+    const allFoldersForMove = api.telegramGetFolders ? await api.telegramGetFolders() : [];
     files.forEach(f => {
       totalSize += f.size || 0;
       const row = document.createElement('div');
@@ -2627,7 +2680,24 @@ async function renderTelegramFiles() {
         if (res && res.success) renderTelegramFiles();
         else { del.disabled = false; alert(res && res.message || 'Falha ao deletar'); }
       });
-      row.append(icon, info, dl, del);
+      // Seletor de pasta virtual
+      const mv = document.createElement('select');
+      mv.className = 'tg-move-folder';
+      mv.title = 'Mover para pasta';
+      const opts = [''].concat(allFoldersForMove.filter(x => x !== (f.folder || '')));
+      opts.forEach(fn => {
+        const o = document.createElement('option');
+        o.value = fn;
+        o.textContent = fn ? `📁 ${fn}` : 'Sem pasta';
+        if (fn === (f.folder || '')) o.selected = true;
+        mv.appendChild(o);
+      });
+      mv.addEventListener('change', async () => {
+        mv.disabled = true;
+        await api.telegramMoveFile(f.id, mv.value);
+        renderTelegramFiles();
+      });
+      row.append(icon, info, mv, dl, del);
       telegramFilesList.appendChild(row);
     });
     telegramCloudLabel.textContent = `${files.length} arquivo(s) • ${formatBytes(totalSize)} na nuvem`;

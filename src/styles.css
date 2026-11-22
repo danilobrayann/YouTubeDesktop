@@ -1689,6 +1689,52 @@ body.has-bg-image {
   font-size: 11px;
 }
 
+.tg-folders-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tg-folder-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: var(--text-primary, #fff);
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tg-folder-chip.active {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-color: transparent;
+}
+
+.tg-folder-new {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.tg-folder-zip {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.tg-folder-zip:hover {
+  opacity: 1;
+}
+
+.tg-move-folder {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary, #fff);
+  padding: 2px 4px;
+  font-size: 10px;
+  max-width: 90px;
+}
+
 .telegram-files-list {
   max-height: 220px;
   overflow-y: auto;
