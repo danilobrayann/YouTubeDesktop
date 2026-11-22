@@ -1216,10 +1216,14 @@ function updateDownloadCard(id, data) {
       addAction('🗑 Remover', '', () => removeDownloadCard(id));
     } else if (status === 'complete') {
       addAction('📂 Abrir Pasta', 'primary', () => {
-        api.openFolder(dl.targetFolder || downloadPath);
+        if (dl.filePath) {
+          api.revealPath(dl.filePath).catch(() => api.openFolder(dl.targetFolder || downloadPath));
+        } else {
+          api.openFolder(dl.targetFolder || downloadPath).catch(err => alert(err.message));
+        }
       });
       if (dl.filePath && !dl.isPlaylist) {
-        addAction('▶ Reproduzir', '', () => api.openFile(dl.filePath));
+        addAction('▶ Reproduzir', '', () => api.openFile(dl.filePath).catch(err => alert(err.message)));
       }
       addAction('🗑 Remover', '', () => removeDownloadCard(id));
     } else if (status === 'cancelled') {
@@ -1372,24 +1376,24 @@ btnChangePath.addEventListener('click', async () => {
 btnRefreshSpace.addEventListener('click', updateDownloadSpace);
 
 btnOpenFolder.addEventListener('click', () => {
-  if (downloadPath) api.openFolder(downloadPath);
+  if (downloadPath) api.openFolder(downloadPath).catch(err => alert(err.message));
 });
 
 if (btnOpenVideos) {
   btnOpenVideos.addEventListener('click', () => {
-    api.openCategoryFolder('videos', downloadPath);
+    api.openCategoryFolder('videos', downloadPath).catch(err => alert(err.message));
   });
 }
 
 if (btnOpenMusicas) {
   btnOpenMusicas.addEventListener('click', () => {
-    api.openCategoryFolder('musicas', downloadPath);
+    api.openCategoryFolder('musicas', downloadPath).catch(err => alert(err.message));
   });
 }
 
 if (btnOpenPlaylists) {
   btnOpenPlaylists.addEventListener('click', () => {
-    api.openCategoryFolder('playlists', downloadPath);
+    api.openCategoryFolder('playlists', downloadPath).catch(err => alert(err.message));
   });
 }
 

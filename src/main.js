@@ -723,21 +723,26 @@ ipcMain.handle('pause-download', (_event, downloadId) => {
 });
 
 // ─── Open Category Folder ─────────────────────────────────────────────────────
-ipcMain.handle('open-category-folder', (event, { category, basePath }) => {
+ipcMain.handle('open-category-folder', async (event, { category, basePath } = {}) => {
   const root = basePath || store.get('downloadPath') || app.getPath('downloads');
-  let target = root;
-  if (category === 'videos')         target = path.join(root, 'Vídeos');
-  else if (category === 'musicas')   target = path.join(root, 'Músicas');
-  else if (category === 'playlists') target = path.join(root, 'Playlists');
+  const categories = {
+    videos: 'Vídeos',
+    musicas: 'Músicas',
+    playlists: 'Playlists'
+  };
+  const target = categories[category] ? path.join(root, categories[category]) : root;
 
-  const fs = require('fs');
   try {
     if (!fs.existsSync(target)) {
       fs.mkdirSync(target, { recursive: true });
     }
   } catch (e) {}
 
-  return shell.openPath(target);
+  const error = await shell.openPath(target);
+  if (error) {
+    throw new Error(`Não foi possível abrir a pasta: ${error}`);
+  }
+  return true;
 });
 
 // ─── Cancel Download ──────────────────────────────────────────────────────────
@@ -757,12 +762,38 @@ ipcMain.handle('cancel-download', (event, downloadId) => {
 });
 
 // ─── Open File / Folder ───────────────────────────────────────────────────────
-ipcMain.handle('open-file', (event, filePath) => {
-  return shell.openPath(filePath);
+ipcMain.handle('open-file', async (event, filePath) => {
+  const error = await shell.openPath(filePath);
+  if (error) {
+    throw new Error(`Não foi possível abrir o arquivo: ${error}`);
+  }
+  return true;
 });
 
-ipcMain.handle('open-folder', (event, folderPath) => {
-  return shell.openPath(folderPath);
+ipcMain.handle('open-folder', async (event, folderPath) => {
+  const target = folderPath || store.get('downloadPath') || app.getPath('downloads');
+  try {
+    if (!fs.existsSync(target)) {
+      fs.mkdirSync(target, { recursive: true });
+    }
+  } catch (e) {}
+  const error = await shell.openPath(target);
+  if (error) {
+    throw new Error(`Não foi possível abrir a pasta: ${error}`);
+  }
+  return true;
+});
+
+// Reabre a pasta do arquivo já com ele selecionado no Explorer
+ipcMain.handle('reveal-path', async (event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return false;
+  if (process.platform === 'win32') {
+    spawn('explorer.exe', ['/select,', filePath], { windowsHide: true, detached: true });
+    return true;
+  }
+  const error = await shell.openPath(path.dirname(filePath));
+  if (error) throw new Error(`Não foi possível abrir a pasta: ${error}`);
+  return true;
 });
 
 // ─── Download preferences and tool diagnostics ───────────────────────────────
