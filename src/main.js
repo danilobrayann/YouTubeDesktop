@@ -46,7 +46,10 @@ const store = new Store({
     downloadPath: null,
     defaultFormat: '720p',
     googleShieldsEnabled: true,
-    customUserAgent: null
+    customUserAgent: null,
+    speedLimit: '5M',
+    proxyUrl: null,
+    cookiesFromBrowser: null
   }
 });
 
@@ -464,9 +467,30 @@ function sendDownloadProgress(job, data) {
   });
 }
 
-function stopDownloadProcess(child) {
+function stopDownloadProcess(child, { graceful = false } = {}) {
   if (!child || !child.pid) return;
   if (process.platform === 'win32') {
+    if (graceful) {
+      // taskkill sem /f envia pedido de fechamento — yt-dlp trata como SIGINT
+      // e grava o progresso parcial antes de sair (permite retomar depois).
+      const polite = spawn('taskkill', ['/pid', String(child.pid)], {
+        windowsHide: true,
+        stdio: 'ignore'
+      });
+      polite.on('error', () => child.kill());
+      // Se não sair em 4s, força o encerramento
+      setTimeout(() => {
+        if (child.exitCode === null && !child.killed) {
+          const killer = spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], {
+            windowsHide: true,
+            stdio: 'ignore'
+          });
+          killer.on('error', () => child.kill());
+          child.kill();
+        }
+      }, 4000);
+      return;
+    }
     const killer = spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], {
       windowsHide: true,
       stdio: 'ignore'
@@ -475,7 +499,7 @@ function stopDownloadProcess(child) {
     child.kill();
     return;
   }
-  child.kill('SIGTERM');
+  child.kill(graceful ? 'SIGINT' : 'SIGTERM');
 }
 
 function createDownloadPlan(request) {
@@ -491,6 +515,17 @@ function createDownloadPlan(request) {
     thumbnail: request.thumbnail,
     mp3Quality: request.mp3Quality
   });
+
+  // Opções avançadas de download (velocidade, proxy, cookies)
+  const speedLimit = store.get('speedLimit');
+  if (speedLimit) args.push('--limit-rate', speedLimit);
+
+  const proxyUrl = store.get('proxyUrl');
+  if (proxyUrl) args.push('--proxy', proxyUrl);
+
+  const cookiesBrowser = store.get('cookiesFromBrowser');
+  if (cookiesBrowser) args.push('--cookies-from-browser', cookiesBrowser);
+
   const ffmpegPath = getFfmpegPath();
   if (fs.existsSync(ffmpegPath)) {
     args.push('--ffmpeg-location', path.dirname(ffmpegPath));
@@ -504,6 +539,45 @@ function createDownloadPlan(request) {
 
   return { args, targetFolder: categoryDir };
 }
+
+// ─── Download logs ───────────────────────────────────────────────────────────
+function getLogsDir() {
+  const dir = path.join(app.getPath('userData'), 'logs');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function writeDownloadLog(job, plan, exitCode) {
+  try {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = path.join(getLogsDir(), `download-${job.request.downloadId}-${stamp}.log`);
+    const header = [
+      `TurboDown download log`,
+      `Date: ${new Date().toISOString()}`,
+      `URL: ${job.request.url}`,
+      `Format: ${job.request.format}`,
+      `Status: ${job.status}`,
+      `Exit code: ${exitCode}`,
+      `Error: ${job.errorMessage || 'none'}`,
+      ``,
+      `Command: yt-dlp ${plan.args.map(a => JSON.stringify(a)).join(' ')}`,
+      ``,
+      `─── yt-dlp output ───`,
+      job.stderr || '(empty)'
+    ].join('\n');
+    fs.writeFileSync(file, header, 'utf8');
+    job.logFile = file;
+  } catch (e) {
+    console.warn('Failed to write download log:', e);
+  }
+}
+
+ipcMain.handle('open-logs-folder', async () => {
+  const dir = getLogsDir();
+  const error = await shell.openPath(dir);
+  if (error) throw new Error(`Não foi possível abrir a pasta de logs: ${error}`);
+  return true;
+});
 
 function runDownloadJob(job) {
   const { request } = job;
@@ -543,6 +617,7 @@ function runDownloadJob(job) {
       job.errorMessage = error
         ? `Não foi possível iniciar o yt-dlp: ${error.message}`
         : formatDownloadError(job.stderr, code);
+      writeDownloadLog(job, plan, code);
       sendDownloadProgress(job, {
         status: 'error',
         percent: job.lastProgress,
@@ -654,6 +729,7 @@ function runDownloadJob(job) {
         if (job.lastSavedFilePath) targetFolder = path.dirname(job.lastSavedFilePath);
         downloadJobs.delete(id);
         job.status = 'complete';
+        writeDownloadLog(job, plan, code);
         sendDownloadProgress(job, {
           percent: 100,
           currentItem: job.currentItem,
@@ -664,12 +740,24 @@ function runDownloadJob(job) {
           status: 'complete'
         });
 
-        // Enviar notificação de sucesso
+        // Enviar notificação de sucesso (clicável abre a pasta do arquivo)
         if (Notification.isSupported()) {
-          new Notification({
+          const notification = new Notification({
             title: 'Download Concluído',
             body: job.detectedTitle || 'Download finalizado com sucesso!'
-          }).show();
+          });
+          notification.on('click', () => {
+            if (job.lastSavedFilePath && fs.existsSync(job.lastSavedFilePath)) {
+              if (process.platform === 'win32') {
+                spawn('explorer.exe', ['/select,', job.lastSavedFilePath], { windowsHide: true, detached: true });
+              } else {
+                shell.showItemInFolder(job.lastSavedFilePath);
+              }
+            } else if (targetFolder) {
+              shell.openPath(targetFolder);
+            }
+          });
+          notification.show();
         }
 
         settled = true;
@@ -718,7 +806,7 @@ ipcMain.handle('pause-download', (_event, downloadId) => {
   job.pauseRequested = true;
   job.status = 'pausing';
   sendDownloadProgress(job, { status: 'pausing', percent: job.lastProgress });
-  stopDownloadProcess(job.child);
+  stopDownloadProcess(job.child, { graceful: true });
   return true;
 });
 
@@ -858,11 +946,74 @@ ipcMain.handle('check-download-tools', async () => {
 ipcMain.handle('get-ffmpeg-path', () => getFfmpegPath());
 ipcMain.handle('get-ytdlp-path', () => getYtDlpPath());
 
+// ─── Settings backup / restore ───────────────────────────────────────────────
+const BACKUP_KEYS = [
+  'theme', 'downloadPath', 'defaultFormat', 'videoFormat', 'audioFormat',
+  'googleShieldsEnabled', 'customUserAgent',
+  'speedLimit', 'proxyUrl', 'cookiesFromBrowser'
+];
+
+ipcMain.handle('export-settings', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exportar configurações',
+    defaultPath: path.join(app.getPath('documents'), 'turbodown-config.json'),
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return null;
+
+  const data = {};
+  for (const key of BACKUP_KEYS) {
+    const value = store.get(key);
+    if (value !== undefined) data[key] = value;
+  }
+  data._exportedAt = new Date().toISOString();
+  data._app = 'TurboDown';
+  fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2), 'utf8');
+  return result.filePath;
+});
+
+ipcMain.handle('import-settings', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Importar configurações',
+    properties: ['openFile'],
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+
+  const raw = fs.readFileSync(result.filePaths[0], 'utf8');
+  const data = JSON.parse(raw);
+  if (!data || typeof data !== 'object') {
+    throw new Error('Arquivo de configuração inválido.');
+  }
+
+  const applied = [];
+  for (const key of BACKUP_KEYS) {
+    if (data[key] !== undefined) {
+      store.set(key, data[key]);
+      applied.push(key);
+    }
+  }
+  return { applied, file: result.filePaths[0] };
+});
+
 ipcMain.handle('get-custom-user-agent', () => store.get('customUserAgent'));
 ipcMain.handle('set-custom-user-agent', (_event, userAgent) => {
   store.set('customUserAgent', userAgent || null);
   // Reconfigurar sessões existentes com o novo User-Agent
   session.defaultSession.setUserAgent(userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+  return true;
+});
+
+ipcMain.handle('get-download-advanced', () => ({
+  speedLimit: store.get('speedLimit') || '',
+  proxyUrl: store.get('proxyUrl') || '',
+  cookiesFromBrowser: store.get('cookiesFromBrowser') || ''
+}));
+
+ipcMain.handle('save-download-advanced', (_event, options = {}) => {
+  store.set('speedLimit', options.speedLimit || null);
+  store.set('proxyUrl', options.proxyUrl || null);
+  store.set('cookiesFromBrowser', options.cookiesFromBrowser || null);
   return true;
 });
 

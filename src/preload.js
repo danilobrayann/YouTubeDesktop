@@ -46,6 +46,11 @@ window.api = {
   getYtDlpPath: () => ipcRenderer.invoke('get-ytdlp-path'),
   getCustomUserAgent: () => ipcRenderer.invoke('get-custom-user-agent'),
   setCustomUserAgent: (userAgent) => ipcRenderer.invoke('set-custom-user-agent', userAgent),
+  getDownloadAdvanced: () => ipcRenderer.invoke('get-download-advanced'),
+  saveDownloadAdvanced: (options) => ipcRenderer.invoke('save-download-advanced', options),
+  exportSettings: () => ipcRenderer.invoke('export-settings'),
+  importSettings: () => ipcRenderer.invoke('import-settings'),
+  openLogsFolder: () => ipcRenderer.invoke('open-logs-folder'),
 
   // Application updates
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),

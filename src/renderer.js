@@ -40,6 +40,9 @@ const btnOpenMusicas    = document.getElementById('btn-open-musicas');
 const btnOpenPlaylists  = document.getElementById('btn-open-playlists');
 const downloadList   = document.getElementById('download-list');
 const dlEmptyState   = document.getElementById('dl-empty-state');
+const downloadHistory = document.getElementById('download-history');
+const historyList    = document.getElementById('history-list');
+const btnClearHistory = document.getElementById('btn-clear-history');
 const dlBadge        = document.getElementById('dl-badge');
 const webviewLoading = document.getElementById('webview-loading');
 const modalBackdrop  = document.getElementById('modal-backdrop');
@@ -77,12 +80,17 @@ const setTransparency    = document.getElementById('set-transparency');
 const setDefaultVideoFormat = document.getElementById('set-default-video-format');
 const setDefaultAudioFormat = document.getElementById('set-default-audio-format');
 const setCustomUserAgent = document.getElementById('set-custom-user-agent');
+const setSpeedLimit     = document.getElementById('set-speed-limit');
+const setProxy          = document.getElementById('set-proxy');
+const setCookiesBrowser = document.getElementById('set-cookies-browser');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
 const bgPreviewText      = document.getElementById('bg-preview-text');
 const btnSaveTheme       = document.getElementById('btn-save-theme');
 const saveStatus         = document.getElementById('save-status');
+const btnExportSettings  = document.getElementById('btn-export-settings');
+const btnImportSettings  = document.getElementById('btn-import-settings');
 const settingsDlPath     = document.getElementById('settings-dl-path');
 const btnSettingsChPath  = document.getElementById('btn-settings-change-path');
 const dlSpaceDisplay     = document.getElementById('dl-space-display');
@@ -965,6 +973,14 @@ async function processDownloadQueue() {
           updateDownloadCard(id, { status: 'cancelled' });
         } else if (result && result.success) {
           updateDownloadCard(id, { status: 'complete', targetFolder: result.folder, filePath: result.file });
+          recordHistory({
+            url: download.url,
+            format: download.format,
+            isPlaylist: download.isPlaylist,
+            title: download.playlistTitle || download.url,
+            filePath: result.file,
+            targetFolder: result.folder
+          });
         }
       } catch (error) {
         updateDownloadCard(id, { status: 'error', message: error.message });
@@ -1194,28 +1210,28 @@ function updateDownloadCard(id, data) {
     const addAction = (label, className, handler, disabled = false) => {
       const button = document.createElement('button');
       button.className = `dl-action-btn${className ? ` ${className}` : ''}`;
-      button.textContent = label;
+      button.innerHTML = label;
       button.disabled = disabled;
       button.addEventListener('click', handler);
       actEl.appendChild(button);
     };
 
     if (status === 'pending') {
-      addAction('✕ Remover da fila', 'danger', () => cancelDownload(id));
+      addAction('<svg class="icon"><use href="#i-x"/></svg> Remover da fila', 'danger', () => cancelDownload(id));
     } else if (status === 'downloading' || status === 'processing') {
-      addAction('⏸ Pausar', '', () => pauseDownload(id));
-      addAction('✕ Cancelar', 'danger', () => cancelDownload(id));
+      addAction('<svg class="icon"><use href="#i-pause"/></svg> Pausar', '', () => pauseDownload(id));
+      addAction('<svg class="icon"><use href="#i-x"/></svg> Cancelar', 'danger', () => cancelDownload(id));
     } else if (status === 'pausing') {
-      addAction('⏳ Pausando...', '', () => {}, true);
-      addAction('✕ Cancelar', 'danger', () => cancelDownload(id));
+      addAction('<svg class="icon"><use href="#i-clock"/></svg> Pausando...', '', () => {}, true);
+      addAction('<svg class="icon"><use href="#i-x"/></svg> Cancelar', 'danger', () => cancelDownload(id));
     } else if (status === 'paused') {
-      addAction('▶ Retomar', 'primary', () => resumeDownload(id));
-      addAction('✕ Cancelar', 'danger', () => cancelDownload(id));
+      addAction('<svg class="icon"><use href="#i-play"/></svg> Retomar', 'primary', () => resumeDownload(id));
+      addAction('<svg class="icon"><use href="#i-x"/></svg> Cancelar', 'danger', () => cancelDownload(id));
     } else if (status === 'error') {
-      addAction('↻ Tentar novamente', 'primary', () => retryDownload(id));
-      addAction('🗑 Remover', '', () => removeDownloadCard(id));
+      addAction('<svg class="icon"><use href="#i-refresh"/></svg> Tentar novamente', 'primary', () => retryDownload(id));
+      addAction('<svg class="icon"><use href="#i-trash"/></svg> Remover', '', () => removeDownloadCard(id));
     } else if (status === 'complete') {
-      addAction('📂 Abrir Pasta', 'primary', () => {
+      addAction('<svg class="icon"><use href="#i-folder-open"/></svg> Abrir Pasta', 'primary', () => {
         if (dl.filePath) {
           api.revealPath(dl.filePath).catch(() => api.openFolder(dl.targetFolder || downloadPath));
         } else {
@@ -1223,11 +1239,11 @@ function updateDownloadCard(id, data) {
         }
       });
       if (dl.filePath && !dl.isPlaylist) {
-        addAction('▶ Reproduzir', '', () => api.openFile(dl.filePath).catch(err => alert(err.message)));
+        addAction('<svg class="icon"><use href="#i-play"/></svg> Reproduzir', '', () => api.openFile(dl.filePath).catch(err => alert(err.message)));
       }
-      addAction('🗑 Remover', '', () => removeDownloadCard(id));
+      addAction('<svg class="icon"><use href="#i-trash"/></svg> Remover', '', () => removeDownloadCard(id));
     } else if (status === 'cancelled') {
-      addAction('🗑 Remover', '', () => removeDownloadCard(id));
+      addAction('<svg class="icon"><use href="#i-trash"/></svg> Remover', '', () => removeDownloadCard(id));
     }
   }
 
@@ -1249,6 +1265,97 @@ function removeDownloadCard(id) {
       if (downloads.size === 0) dlEmptyState.classList.remove('hidden');
     }, 300);
   }
+}
+
+// ── DOWNLOAD HISTORY ────────────────────────────────────────────────────────
+const HISTORY_KEY = 'turbodown-download-history';
+const HISTORY_MAX = 50;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(items) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, HISTORY_MAX)));
+}
+
+function recordHistory(entry) {
+  const history = loadHistory().filter(h => h.url !== entry.url);
+  history.unshift({ ...entry, date: Date.now() });
+  saveHistory(history);
+  renderHistory();
+}
+
+function formatHistoryDate(ts) {
+  try {
+    return new Date(ts).toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+  } catch {
+    return '';
+  }
+}
+
+function renderHistory() {
+  if (!historyList || !downloadHistory) return;
+  const history = loadHistory();
+  if (!history.length) {
+    downloadHistory.classList.add('hidden');
+    return;
+  }
+  downloadHistory.classList.remove('hidden');
+  historyList.replaceChildren();
+
+  history.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    const info = document.createElement('div');
+    info.className = 'history-item-info';
+    const title = document.createElement('div');
+    title.className = 'history-item-title';
+    title.textContent = item.title || item.url;
+    title.title = item.url;
+    const meta = document.createElement('div');
+    meta.className = 'history-item-meta';
+    meta.textContent = `${(item.format || '720p').toUpperCase()} · ${formatHistoryDate(item.date)}`;
+    info.append(title, meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'history-item-actions';
+
+    const btnDl = document.createElement('button');
+    btnDl.className = 'dl-action-btn primary';
+    btnDl.innerHTML = '<svg class="icon"><use href="#i-download"/></svg> Baixar';
+    btnDl.addEventListener('click', () => {
+      switchTab('downloads');
+      startDownload(item.url, item.format || '720p', item.isPlaylist !== false);
+    });
+
+    if (item.filePath) {
+      const btnOpen = document.createElement('button');
+      btnOpen.className = 'dl-action-btn';
+      btnOpen.innerHTML = '<svg class="icon"><use href="#i-folder-open"/></svg>';
+      btnOpen.title = 'Abrir pasta';
+      btnOpen.addEventListener('click', () => api.revealPath(item.filePath).catch(() => api.openFolder(item.targetFolder || downloadPath)));
+      actions.append(btnOpen);
+    }
+    actions.append(btnDl);
+
+    row.append(info, actions);
+    historyList.appendChild(row);
+  });
+}
+
+if (btnClearHistory) {
+  btnClearHistory.addEventListener('click', () => {
+    saveHistory([]);
+    renderHistory();
+  });
 }
 
 function updateBadge() {
@@ -1432,6 +1539,13 @@ async function checkDownloadTools() {
 }
 
 btnCheckTools.addEventListener('click', checkDownloadTools);
+
+const btnOpenLogs = document.getElementById('btn-open-logs');
+if (btnOpenLogs) {
+  btnOpenLogs.addEventListener('click', () => {
+    api.openLogsFolder().catch(err => alert(err.message));
+  });
+}
 
 btnUpdateYtDlp.addEventListener('click', async () => {
   btnUpdateYtDlp.disabled = true;
@@ -1622,6 +1736,43 @@ btnSaveTheme.addEventListener('click', async () => {
 setCustomUserAgent.addEventListener('change', async () => {
   await api.setCustomUserAgent(setCustomUserAgent.value.trim());
 });
+
+// Opções avançadas de download
+const saveAdvancedOptions = () => api.saveDownloadAdvanced({
+  speedLimit: setSpeedLimit.value,
+  proxyUrl: setProxy.value.trim(),
+  cookiesFromBrowser: setCookiesBrowser.value
+});
+setSpeedLimit.addEventListener('change', saveAdvancedOptions);
+setCookiesBrowser.addEventListener('change', saveAdvancedOptions);
+setProxy.addEventListener('change', saveAdvancedOptions);
+
+// Backup de configurações
+if (btnExportSettings) {
+  btnExportSettings.addEventListener('click', async () => {
+    try {
+      const file = await api.exportSettings();
+      if (file) alert(`Configurações exportadas para:\n${file}`);
+    } catch (error) {
+      alert(`Falha ao exportar: ${error.message}`);
+    }
+  });
+}
+
+if (btnImportSettings) {
+  btnImportSettings.addEventListener('click', async () => {
+    try {
+      const result = await api.importSettings();
+      if (result) {
+        alert(`Configurações importadas (${result.applied.length} itens). Reinicie o app para aplicar tudo.`);
+        await loadTheme();
+        await loadDownloadPath();
+      }
+    } catch (error) {
+      alert(`Falha ao importar: ${error.message}`);
+    }
+  });
+}
 
 const GOOGLE_HOME_URL = 'https://www.google.com/';
 const GOOGLE_HISTORY_KEY = 'turbodown-google-history';
@@ -2211,6 +2362,14 @@ async function init() {
 
   const customUA = await api.getCustomUserAgent();
   if (customUA) setCustomUserAgent.value = customUA;
+
+  const advanced = await api.getDownloadAdvanced();
+  if (advanced) {
+    setSpeedLimit.value = advanced.speedLimit || '';
+    setProxy.value = advanced.proxyUrl || '';
+    setCookiesBrowser.value = advanced.cookiesFromBrowser || '';
+  }
+  renderHistory();
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),

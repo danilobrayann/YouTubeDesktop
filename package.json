@@ -1,6 +1,6 @@
 {
   "name": "turbodown",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Assistir e baixar vídeos do YouTube com visual moderno",
   "productName": "TurboDown",
   "main": "src/main.js",

@@ -20,7 +20,11 @@ const TRACKER_DOMAINS = Object.freeze([
   'adnxs.com',
   'adsrvr.org',
   'amazon-adsystem.com',
-  'quantserve.com'
+  'quantserve.com',
+  'omnitagjs.com',
+  'programmaticx.ai',
+  'sonobi.com',
+  'balance-x.com'
 ]);
 
 function resolveNavigationTarget(input) {

@@ -2845,3 +2845,435 @@ input:focus-visible {
     padding-left: 7px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v1.4.0 — Professional Polish Layer
+   Refines the whole UI on top of the existing theme engine.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Refined design tokens ────────────────────────────────────────────────── */
+:root {
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --titlebar-bg: rgba(8, 8, 16, 0.72);
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+/* ── Background image: professional overlay ─────────────────────────────────
+   When a custom image is set, dim it slightly and add a top gradient so the
+   UI stays readable over ANY image — this is what makes it look "pro". */
+body.has-bg-image::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(5, 5, 12, 0.55) 0%, rgba(5, 5, 12, 0.35) 40%, rgba(5, 5, 12, 0.65) 100%);
+  pointer-events: none;
+}
+
+body.has-bg-image #app {
+  background: transparent;
+}
+
+/* Stronger glass when a background image is present */
+body.has-bg-image #sidebar,
+body.has-bg-image .glass-card,
+body.has-bg-image .dl-card {
+  background: rgba(12, 12, 22, 0.72);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+/* ── Titlebar ─────────────────────────────────────────────────────────────── */
+#titlebar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#titlebar-title {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  background: linear-gradient(90deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.win-btn {
+  border-radius: 8px;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+#sidebar {
+  background: rgba(10, 10, 20, 0.55);
+}
+
+#sidebar-logo {
+  padding: 14px 18px 18px;
+}
+
+#sidebar-logo img {
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+#sidebar-logo span {
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 14px 18px 6px;
+}
+
+.nav-item {
+  position: relative;
+  border-radius: 10px;
+  margin: 1px 10px;
+  padding: 9px 12px;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(2px);
+}
+
+.nav-item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.nav-item.active .nav-icon {
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+/* ── URL bar ──────────────────────────────────────────────────────────────── */
+.url-bar-inner,
+#url-bar {
+  border-radius: 14px;
+}
+
+.url-bar-inner:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn-primary {
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 16px var(--accent-dim), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 22px var(--accent-dim), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary {
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.btn-ghost {
+  border-radius: 8px;
+}
+
+/* ── Download cards ───────────────────────────────────────────────────────── */
+.dl-card {
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+
+.dl-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.dl-card.status-complete {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.06), rgba(255, 255, 255, 0.04));
+}
+
+.dl-card.status-error {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.dl-card.status-paused {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.dl-card-format {
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.dl-action-btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.dl-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dl-progress-fill {
+  border-radius: 999px;
+}
+
+/* ── Modals ───────────────────────────────────────────────────────────────── */
+.modal {
+  border-radius: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: modalIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+#modal-backdrop {
+  background: rgba(5, 5, 12, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* ── Settings cards ───────────────────────────────────────────────────────── */
+.glass-card,
+.settings-section {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+}
+
+.section-title {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.maintenance-row,
+.maintenance-grid > * {
+  border-radius: 12px;
+}
+
+/* ── Selects & inputs ─────────────────────────────────────────────────────── */
+.glass-select {
+  border-radius: 10px;
+}
+
+.glass-input {
+  border-radius: 10px;
+}
+
+/* ── Badges & status chips ────────────────────────────────────────────────── */
+.dl-badge,
+.playlist-count-badge {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* ── Nav badge / counters ─────────────────────────────────────────────────── */
+.nav-badge {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* ── Empty states ─────────────────────────────────────────────────────────── */
+#dl-empty-state,
+.google-library-empty {
+  border-radius: 16px;
+}
+
+/* ── Focus visibility (accessibility + pro feel) ──────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Smooth scrollbars ────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ── Light theme polish ───────────────────────────────────────────────────── */
+body[data-theme="light"] ::-webkit-scrollbar-thumb,
+:root.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── v1.4.0 Icon system ───────────────────────────────────────────────────── */
+.icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  display: inline-block;
+  vertical-align: -3px;
+}
+
+.icon-lg { width: 22px; height: 22px; }
+.icon-sm { width: 15px; height: 15px; vertical-align: -2px; }
+.icon-xl { width: 28px; height: 28px; }
+
+.nav-item .icon {
+  width: 19px;
+  height: 19px;
+}
+
+.dl-action-btn .icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.btn-primary .icon,
+.btn-secondary .icon,
+.btn-ghost .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.symbol-fill,
+.symbol-fill * {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ── v1.4.0 Download history ──────────────────────────────────────────────── */
+.download-history {
+  margin-top: 22px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.history-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.history-header h3 .icon { width: 17px; height: 17px; }
+
+#history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--glass-border);
+}
+
+.history-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
