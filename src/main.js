@@ -380,7 +380,7 @@ app.whenReady().then(() => {
   // evitar que o Google acumule flags de "bot" na sessão persistente.
   if (store.get('youtubeAnonymous', true)) {
     try {
-      const ytSession = session.fromPartition('persist:youtube');
+      const ytSession = session.fromPartition('persist:google');
       ytSession.clearStorageData({
         origins: ['https://www.youtube.com', 'https://youtube.com', 'https://music.youtube.com']
       }).then(() => {
@@ -399,7 +399,7 @@ app.whenReady().then(() => {
   } else {
     // Cookie de consentimento do YouTube — sem ele o Google trata como bot
     try {
-      const ytSession = session.fromPartition('persist:youtube');
+      const ytSession = session.fromPartition('persist:google');
       ytSession.cookies.set({
         url: 'https://www.youtube.com',
         name: 'CONSENT',
@@ -1279,7 +1279,7 @@ ipcMain.handle('toggle-miniplayer', () => {
     resizable: true,
     skipTaskbar: false,
     webPreferences: {
-      partition: 'persist:music',
+      partition: 'persist:google',
       contextIsolation: true,
       nodeIntegration: false
     }
