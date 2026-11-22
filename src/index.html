@@ -189,6 +189,13 @@
               <svg class="icon nav-icon-svg" aria-hidden="true"><use href="#i-send"/></svg>
               <span class="nav-label">Redes + 1.000</span>
             </button>
+            <button
+              class="nav-item"
+              data-tab="nuvem"
+              title="Nuvem Telegram"
+            >
+              <span class="nav-label">☁️ Nuvem</span>
+            </button>
             <div id="now-playing" class="hidden">
               <div class="np-dot"></div>
               <span id="np-title">Reproduzindo...</span>
@@ -1477,6 +1484,101 @@
           </div>
 
           <!-- ════ TAB: SETTINGS ════ -->
+          <div class="tab" id="tab-nuvem">
+            <div class="nuvem-wrap">
+              <h2 class="nuvem-title">☁️ Nuvem Telegram — seus arquivos na nuvem</h2>
+                <!-- Telegram Auto-Upload -->
+                <div class="settings-section glass-card">
+                  <h3 class="section-title">📤 Telegram Auto-Upload</h3>
+                  <div class="settings-grid">
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-telegram-enabled" />
+                        Habilitar upload automático
+                      </label>
+                    </div>
+                    <div class="setting-row">
+                      <label>Token do Bot</label>
+                      <input
+                        type="text"
+                        id="set-telegram-bot-token"
+                        class="glass-input glass-input-sm"
+                        placeholder="Cole o token do @BotFather"
+                      />
+                    </div>
+                    <div class="setting-row">
+                      <label>Status de conexão</label>
+                      <span id="telegram-connection-status" class="telegram-status">Não conectado</span>
+                    </div>
+                    <div class="setting-row">
+                      <button id="btn-telegram-login" class="btn-primary">Conectar com Telegram</button>
+                      <button id="btn-telegram-cancel" class="btn-secondary hidden">Cancelar</button>
+                    </div>
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-telegram-auto-upload" />
+                        Enviar downloads automaticamente
+                      </label>
+                    </div>
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-telegram-delete-after-upload" />
+                        Deletar arquivo local após upload (modo nuvem)
+                      </label>
+                    </div>
+
+                    <!-- Painel da nuvem -->
+                    <div class="telegram-cloud" id="telegram-cloud">
+                      <div class="telegram-cloud-fill" id="telegram-cloud-fill"></div>
+                      <div class="telegram-cloud-content">
+                        <div class="telegram-cloud-pct" id="telegram-cloud-pct">0%</div>
+                        <div class="telegram-cloud-label" id="telegram-cloud-label">Nuvem vazia</div>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <button id="btn-telegram-upload-file" class="btn-secondary">📄 Enviar arquivo</button>
+                      <button id="btn-telegram-upload-folder" class="btn-secondary">📁 Enviar pasta</button>
+                    </div>
+                    <div class="setting-row">
+                      <label>Pasta vigiada (solta arquivo → sobe)</label>
+                      <button id="btn-telegram-watch-folder" class="btn-ghost">Escolher pasta</button>
+                    </div>
+                    <div class="setting-row" id="telegram-watch-folder-row" style="display:none;">
+                      <span id="telegram-watch-folder-path" class="maintenance-message" style="margin:0;"></span>
+                    </div>
+
+                    <div class="setting-row" style="align-items:flex-start;">
+                      <div class="telegram-files-panel">
+                        <div class="telegram-files-header">
+                          <span>☁️ Arquivos na nuvem</span>
+                          <div class="telegram-files-tools">
+                            <input type="text" id="tg-search" class="tg-search" placeholder="🔍 Buscar..." />
+                            <select id="tg-sort" class="tg-sort">
+                              <option value="date">Recentes</option>
+                              <option value="name">Nome</option>
+                              <option value="size">Tamanho</option>
+                            </select>
+                            <button id="btn-telegram-refresh-files" class="btn-ghost btn-xs" title="Atualizar">↻</button>
+                            <button id="btn-telegram-clear-index" class="btn-ghost btn-xs" title="Limpar índice">🧹</button>
+                          </div>
+                        </div>
+                        <div id="tg-folders-bar" class="tg-folders-bar"></div>
+                        <div id="telegram-files-list" class="telegram-files-list">
+                          <p class="maintenance-message" style="margin:0;">Nenhum arquivo enviado ainda.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p class="maintenance-message" style="grid-column: 1 / -1;">
+                      Para conectar: 1) Crie um bot no @BotFather (/newbot) e copie o token. 2) Cole o token acima e clique em "Conectar".
+                      3) Envie /start para o bot: na conversa privada OU em um grupo onde o bot foi adicionado.
+                      Arquivos serão salvos onde o /start foi enviado.
+                    </p>
+                  </div>
+                </div>
+            </div>
+          </div>
           <div class="tab" id="tab-settings">
             <div id="settings-wrapper">
               <div id="settings-header">
@@ -1885,96 +1987,6 @@
                   </div>
                 </div>
 
-                <!-- Telegram Auto-Upload -->
-                <div class="settings-section glass-card">
-                  <h3 class="section-title">📤 Telegram Auto-Upload</h3>
-                  <div class="settings-grid">
-                    <div class="setting-row">
-                      <label>
-                        <input type="checkbox" id="set-telegram-enabled" />
-                        Habilitar upload automático
-                      </label>
-                    </div>
-                    <div class="setting-row">
-                      <label>Token do Bot</label>
-                      <input
-                        type="text"
-                        id="set-telegram-bot-token"
-                        class="glass-input glass-input-sm"
-                        placeholder="Cole o token do @BotFather"
-                      />
-                    </div>
-                    <div class="setting-row">
-                      <label>Status de conexão</label>
-                      <span id="telegram-connection-status" class="telegram-status">Não conectado</span>
-                    </div>
-                    <div class="setting-row">
-                      <button id="btn-telegram-login" class="btn-primary">Conectar com Telegram</button>
-                      <button id="btn-telegram-cancel" class="btn-secondary hidden">Cancelar</button>
-                    </div>
-                    <div class="setting-row">
-                      <label>
-                        <input type="checkbox" id="set-telegram-auto-upload" />
-                        Enviar downloads automaticamente
-                      </label>
-                    </div>
-                    <div class="setting-row">
-                      <label>
-                        <input type="checkbox" id="set-telegram-delete-after-upload" />
-                        Deletar arquivo local após upload (modo nuvem)
-                      </label>
-                    </div>
-
-                    <!-- Painel da nuvem -->
-                    <div class="telegram-cloud" id="telegram-cloud">
-                      <div class="telegram-cloud-fill" id="telegram-cloud-fill"></div>
-                      <div class="telegram-cloud-content">
-                        <div class="telegram-cloud-pct" id="telegram-cloud-pct">0%</div>
-                        <div class="telegram-cloud-label" id="telegram-cloud-label">Nuvem vazia</div>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <button id="btn-telegram-upload-file" class="btn-secondary">📄 Enviar arquivo</button>
-                      <button id="btn-telegram-upload-folder" class="btn-secondary">📁 Enviar pasta</button>
-                    </div>
-                    <div class="setting-row">
-                      <label>Pasta vigiada (solta arquivo → sobe)</label>
-                      <button id="btn-telegram-watch-folder" class="btn-ghost">Escolher pasta</button>
-                    </div>
-                    <div class="setting-row" id="telegram-watch-folder-row" style="display:none;">
-                      <span id="telegram-watch-folder-path" class="maintenance-message" style="margin:0;"></span>
-                    </div>
-
-                    <div class="setting-row" style="align-items:flex-start;">
-                      <div class="telegram-files-panel">
-                        <div class="telegram-files-header">
-                          <span>☁️ Arquivos na nuvem</span>
-                          <div class="telegram-files-tools">
-                            <input type="text" id="tg-search" class="tg-search" placeholder="🔍 Buscar..." />
-                            <select id="tg-sort" class="tg-sort">
-                              <option value="date">Recentes</option>
-                              <option value="name">Nome</option>
-                              <option value="size">Tamanho</option>
-                            </select>
-                            <button id="btn-telegram-refresh-files" class="btn-ghost btn-xs" title="Atualizar">↻</button>
-                            <button id="btn-telegram-clear-index" class="btn-ghost btn-xs" title="Limpar índice">🧹</button>
-                          </div>
-                        </div>
-                        <div id="tg-folders-bar" class="tg-folders-bar"></div>
-                        <div id="telegram-files-list" class="telegram-files-list">
-                          <p class="maintenance-message" style="margin:0;">Nenhum arquivo enviado ainda.</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p class="maintenance-message" style="grid-column: 1 / -1;">
-                      Para conectar: 1) Crie um bot no @BotFather (/newbot) e copie o token. 2) Cole o token acima e clique em "Conectar".
-                      3) Envie /start para o bot: na conversa privada OU em um grupo onde o bot foi adicionado.
-                      Arquivos serão salvos onde o /start foi enviado.
-                    </p>
-                  </div>
-                </div>
 
                 <!-- Tool status and application updates -->
                 <div class="settings-section glass-card">

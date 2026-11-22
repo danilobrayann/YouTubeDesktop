@@ -92,6 +92,7 @@ window.api = {
   telegramCreateFolder: (name) => ipcRenderer.invoke('telegram-create-folder', name),
   telegramMoveFile: (id, folder) => ipcRenderer.invoke('telegram-move-file', { id, folder }),
   telegramDownloadFolder: (folder) => ipcRenderer.invoke('telegram-download-folder', folder),
+  telegramRenameFolder: (oldName, newName) => ipcRenderer.invoke('telegram-rename-folder', { oldName, newName }),
   telegramDeleteFile: (id) => ipcRenderer.invoke('telegram-delete-file', id),
   telegramUploadPath: (filePath) => ipcRenderer.invoke('telegram-upload-path', filePath),
   telegramPickUploadFile: () => ipcRenderer.invoke('telegram-pick-upload-file'),

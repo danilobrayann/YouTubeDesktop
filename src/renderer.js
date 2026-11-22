@@ -2601,7 +2601,21 @@ async function renderTelegramFiles() {
           if (res && res.success) alert(`Pasta salva em:\n${res.path}`);
           else if (!(res && res.canceled)) alert(res && res.message || 'Falha ao baixar pasta');
         });
-        foldersBar.appendChild(mkChip(`📁 ${fn} (${counts[fn] || 0})`, fn, `Pasta: ${fn}`, zipBtn));
+        const renBtn = document.createElement('span');
+        renBtn.className = 'tg-folder-zip';
+        renBtn.textContent = ' ✎';
+        renBtn.title = 'Renomear pasta';
+        renBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const nn = prompt('Novo nome da pasta:', fn);
+          if (nn && nn.trim() && nn.trim() !== fn) {
+            await api.telegramRenameFolder(fn, nn.trim());
+            renderTelegramFiles();
+          }
+        });
+        const wrap = document.createElement('span');
+        wrap.append(zipBtn, renBtn);
+        foldersBar.appendChild(mkChip(`📁 ${fn} (${counts[fn] || 0})`, fn, `Pasta: ${fn}`, wrap));
       });
       const addBtn = document.createElement('button');
       addBtn.className = 'tg-folder-chip tg-folder-new';

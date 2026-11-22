@@ -292,6 +292,18 @@ ipcMain.handle('telegram-move-file', (_event, { id, folder }) => {
   return { success: true };
 });
 
+ipcMain.handle('telegram-rename-folder', (_event, { oldName, newName }) => {
+  const clean = String(newName || '').trim().slice(0, 60);
+  if (!clean || clean === oldName) return { success: false, message: 'Nome inválido' };
+  const list = getTelegramFiles();
+  list.forEach(f => { if ((f.folder || '') === oldName) f.folder = clean; });
+  store.set('telegramFiles', list);
+  const folders = store.get('telegramFolders', []);
+  const idx = folders.indexOf(oldName);
+  if (idx !== -1) { folders[idx] = clean; store.set('telegramFolders', folders); }
+  return { success: true };
+});
+
 ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
   const entries = getTelegramFiles().filter(f => (f.folder || '') === folderName && f.fileId);
   if (!entries.length) return { success: false, message: 'Pasta vazia ou sem arquivos com file_id (reenvie arquivos antigos)' };
