@@ -3931,3 +3931,10 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 .td-prompt-msg{margin-bottom:10px;font-size:14px}
 .td-prompt-input{width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--text-primary,#fff);font-size:14px;margin-bottom:14px;box-sizing:border-box}
 .td-prompt-btns{display:flex;gap:8px;justify-content:flex-end}
+
+/* ===== Dropzone Nuvem ===== */
+.nuvem-wrap.tg-drop-active {
+  outline: 3px dashed #3b82f6;
+  outline-offset: -8px;
+  background: rgba(59, 130, 246, 0.08);
+}

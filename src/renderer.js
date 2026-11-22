@@ -2785,6 +2785,31 @@ if (btnTelegramRefreshFiles) {
   btnTelegramRefreshFiles.addEventListener('click', renderTelegramFiles);
 }
 
+// Drag & drop de arquivos/pastas na aba Nuvem
+const nuvemWrap = document.querySelector('.nuvem-wrap');
+if (nuvemWrap && api.telegramUploadDropped) {
+  ['dragenter', 'dragover'].forEach(ev => nuvemWrap.addEventListener(ev, (e) => {
+    e.preventDefault();
+    nuvemWrap.classList.add('tg-drop-active');
+  }));
+  ['dragleave', 'drop'].forEach(ev => nuvemWrap.addEventListener(ev, (e) => {
+    e.preventDefault();
+    nuvemWrap.classList.remove('tg-drop-active');
+  }));
+  nuvemWrap.addEventListener('drop', async (e) => {
+    const paths = [];
+    for (const f of e.dataTransfer.files) {
+      const p = api.tdGetPathForFile(f);
+      if (p) paths.push(p);
+    }
+    if (!paths.length) { alert('Não foi possível ler os itens soltos.'); return; }
+    const res = await api.telegramUploadDropped(paths);
+    if (res && res.message && !res.success) alert(res.message);
+    else if (res) alert(`Upload concluído: ${res.ok} enviado(s), ${res.fail} falha(s)`);
+    renderTelegramFiles();
+  });
+}
+
 // Busca / ordenação / limpar índice da nuvem
 const tgSearch = document.getElementById('tg-search');
 const tgSort = document.getElementById('tg-sort');

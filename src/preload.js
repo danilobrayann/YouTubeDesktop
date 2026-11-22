@@ -1,6 +1,6 @@
 'use strict';
 
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webUtils } = require('electron');
 const { resolveNavigationTarget } = require('./browser-utils');
 
 // ─── Expose API to renderer ───────────────────────────────────────────────────
@@ -93,6 +93,8 @@ window.api = {
   telegramMoveFile: (id, folder) => ipcRenderer.invoke('telegram-move-file', { id, folder }),
   telegramDownloadFolder: (folder) => ipcRenderer.invoke('telegram-download-folder', folder),
   telegramRenameFolder: (oldName, newName) => ipcRenderer.invoke('telegram-rename-folder', { oldName, newName }),
+  tdGetPathForFile: (f) => { try { return webUtils.getPathForFile(f); } catch (e) { return null; } },
+  telegramUploadDropped: (paths) => ipcRenderer.invoke('telegram-upload-dropped', paths),
   telegramDeleteFile: (id) => ipcRenderer.invoke('telegram-delete-file', id),
   telegramUploadPath: (filePath) => ipcRenderer.invoke('telegram-upload-path', filePath),
   telegramPickUploadFile: () => ipcRenderer.invoke('telegram-pick-upload-file'),
