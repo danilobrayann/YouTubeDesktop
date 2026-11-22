@@ -93,6 +93,7 @@ window.api = {
   telegramMoveFile: (id, folder) => ipcRenderer.invoke('telegram-move-file', { id, folder }),
   telegramDownloadFolder: (folder) => ipcRenderer.invoke('telegram-download-folder', folder),
   telegramRenameFolder: (oldName, newName) => ipcRenderer.invoke('telegram-rename-folder', { oldName, newName }),
+  telegramDeleteFolder: (folder) => ipcRenderer.invoke('telegram-delete-folder', folder),
   tdGetPathForFile: (f) => { try { return webUtils.getPathForFile(f); } catch (e) { return null; } },
   telegramUploadDropped: (paths) => ipcRenderer.invoke('telegram-upload-dropped', paths),
   telegramDeleteFile: (id) => ipcRenderer.invoke('telegram-delete-file', id),

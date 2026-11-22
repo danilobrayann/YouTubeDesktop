@@ -292,6 +292,23 @@ ipcMain.handle('telegram-move-file', (_event, { id, folder }) => {
   return { success: true };
 });
 
+ipcMain.handle('telegram-delete-folder', async (_event, folderName) => {
+  const bot = ensureTelegramBot();
+  const list = getTelegramFiles();
+  // Remove arquivos da pasta e subpastas (folder === name ou name/...)
+  const match = (f) => (f.folder || '') === folderName || (f.folder || '').startsWith(folderName + '/');
+  const targets = list.filter(match);
+  for (const e of targets) {
+    try {
+      if (bot && e.messageId) await bot.deleteMessage(e.chatId || telegramChatId, e.messageId);
+    } catch (err) {}
+  }
+  store.set('telegramFiles', list.filter(f => !match(f)));
+  const folders = store.get('telegramFolders', []).filter(x => x !== folderName);
+  store.set('telegramFolders', folders);
+  return { success: true, removed: targets.length };
+});
+
 ipcMain.handle('telegram-rename-folder', (_event, { oldName, newName }) => {
   const clean = String(newName || '').trim().slice(0, 60);
   if (!clean || clean === oldName) return { success: false, message: 'Nome inválido' };

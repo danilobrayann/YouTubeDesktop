@@ -2634,7 +2634,18 @@ async function renderTelegramFiles() {
             renderTelegramFiles();
           }
         });
-        acts.append(zipBtn, renBtn);
+        const delBtn = document.createElement('span');
+        delBtn.className = 'tg-folder-zip tg-folder-del';
+        delBtn.textContent = '🗑';
+        delBtn.title = 'Excluir pasta e seus arquivos da nuvem';
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm(`Excluir a pasta "${fn}" e TODOS os arquivos dela da nuvem?\nIsso apaga as mensagens no Telegram.`)) return;
+          const res = await api.telegramDeleteFolder(fn);
+          if (res && res.success) { if (tgFolderFilter === fn) tgFolderFilter = ''; renderTelegramFiles(); }
+          else alert(res && res.message || 'Falha ao excluir pasta');
+        });
+        acts.append(zipBtn, renBtn, delBtn);
         foldersBar.appendChild(mkCard('📁', fn, `${counts[fn] || 0} itens`, fn, `Pasta: ${fn}`, acts));
       });
       const addCard = document.createElement('div');
