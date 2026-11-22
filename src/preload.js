@@ -80,6 +80,10 @@ window.api = {
   clearGooglePrivateData: () => ipcRenderer.invoke('clear-google-private-data'),
   getGoogleAccountStatus: () => ipcRenderer.invoke('get-google-account-status'),
   googleLogout: () => ipcRenderer.invoke('google-logout'),
+  getTelegramConfig: () => ipcRenderer.invoke('get-telegram-config'),
+  saveTelegramConfig: (config) => ipcRenderer.invoke('save-telegram-config', config),
+  startTelegramWait: () => ipcRenderer.invoke('start-telegram-wait'),
+  cancelTelegramWait: () => ipcRenderer.invoke('cancel-telegram-wait'),
   resolveNavigationTarget,
 
   // IPC event listeners

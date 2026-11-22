@@ -1885,6 +1885,61 @@
                   </div>
                 </div>
 
+                <!-- Telegram Auto-Upload -->
+                <div class="settings-section glass-card">
+                  <h3 class="section-title">📤 Telegram Auto-Upload</h3>
+                  <div class="settings-grid">
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-telegram-enabled" />
+                        Habilitar upload automático
+                      </label>
+                    </div>
+                    <div class="setting-row">
+                      <label>Token do Bot</label>
+                      <input
+                        type="text"
+                        id="set-telegram-bot-token"
+                        class="glass-input glass-input-sm"
+                        placeholder="Obtenha em @BotFather"
+                      />
+                    </div>
+                    <div class="setting-row">
+                      <label>Nome do usuário do bot (@exemplo)</label>
+                      <input
+                        type="text"
+                        id="set-telegram-bot-username"
+                        class="glass-input glass-input-sm"
+                        placeholder="@bot_nome"
+                      />
+                    </div>
+                    <div class="setting-row">
+                      <label>Status de conexão</label>
+                      <span id="telegram-connection-status" class="telegram-status">Não conectado</span>
+                    </div>
+                    <div class="setting-row">
+                      <button id="btn-telegram-login" class="btn-primary">Conectar com Telegram</button>
+                      <button id="btn-telegram-cancel" class="btn-secondary hidden">Cancelar</button>
+                    </div>
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-telegram-auto-upload" />
+                        Enviar downloads automaticamente
+                      </label>
+                    </div>
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-telegram-delete-after-upload" />
+                        Deletar arquivo local após upload (modo nuvem)
+                      </label>
+                    </div>
+                    <p class="maintenance-message" style="grid-column: 1 / -1;">
+                      Para conectar: 1) Crie um bot no @BotFather e copie o token. 2) Cole o token e o nome do usuário acima.
+                      3) Clique em "Conectar com Telegram" e abra o bot no seu celular/envie /start. O app salvará os downloads na conversa privada do bot (sua nuvem pessoal).
+                    </p>
+                  </div>
+                </div>
+
                 <!-- Tool status and application updates -->
                 <div class="settings-section glass-card">
                   <h3 class="section-title">🛠️ Diagnóstico e atualizações</h3>

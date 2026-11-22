@@ -12,6 +12,7 @@ const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const { isAdRequest, isTrackerRequest, isYouTubeAdStream } = require('./browser-utils');
 const { DiscordRPC } = require('./discord-rpc');
+const TelegramBot = require('node-telegram-bot-api');
 const {
   AUDIO_FORMATS,
   VIDEO_FORMATS,
@@ -59,7 +60,14 @@ const store = new Store({
     discordClientId: '1574051479168487525',
     scheduledDownloads: [],
     onboardingDone: false,
-    youtubeAnonymous: true
+    youtubeAnonymous: true,
+    telegram: {
+      enabled: false,
+      botToken: '',
+      chatId: '',
+      autoUpload: false,
+      deleteAfterUpload: false
+    }
   }
 });
 
@@ -125,6 +133,152 @@ function updateDiscordForJob(job, data = {}) {
     if (activeDownloads.size === 0 && tray) tray.setToolTip('TurboDown');
   }
 }
+
+// ─── Telegram Bot (auto-upload de downloads) ─────────────────────────────────
+let telegramBot = null;
+let telegramEnabled = false;
+let telegramChatId = null;
+let telegramAutoUpload = false;
+let telegramDeleteAfterUpload = false;
+let telegramBotUsername = null;
+let telegramWaitingForStart = false;
+let telegramPollingTimeout = null;
+
+function ensureTelegramBot() {
+  const config = store.get('telegram') || {};
+  if (!config.enabled || !config.botToken) {
+    if (telegramBot) {
+      telegramBot.stopPolling();
+      telegramBot = null;
+    }
+    telegramEnabled = false;
+    telegramChatId = null;
+    telegramAutoUpload = false;
+    telegramDeleteAfterUpload = false;
+    telegramBotUsername = null;
+    return null;
+  }
+  if (telegramBot) return telegramBot;
+  try {
+    telegramBot = new TelegramBot(config.botToken, { polling: false });
+    telegramEnabled = true;
+    telegramChatId = config.chatId || null;
+    telegramAutoUpload = config.autoUpload;
+    telegramDeleteAfterUpload = config.deleteAfterUpload;
+    telegramBotUsername = config.botUsername || null;
+    return telegramBot;
+  } catch (e) {
+    console.warn('Failed to initialize Telegram bot:', e);
+    return null;
+  }
+}
+
+async function uploadToTelegram(filePath, title, mediaType = 'document') {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false };
+  try {
+    const stats = fs.statSync(filePath);
+    if (stats.size > 2 * 1024 * 1024 * 1024) {
+      console.warn('File exceeds 2GB Telegram limit, skipping upload');
+      return { success: false, reason: 'file_too_large' };
+    }
+    const options = {
+      caption: title || path.basename(filePath),
+      filename: path.basename(filePath)
+    };
+    if (mediaType === 'video') {
+      await bot.sendVideo(telegramChatId, filePath, options);
+    } else if (mediaType === 'audio') {
+      await bot.sendAudio(telegramChatId, filePath, options);
+    } else {
+      await bot.sendDocument(telegramChatId, filePath, options);
+    }
+    return { success: true };
+  } catch (e) {
+    console.warn('Telegram upload failed:', e);
+    return { success: false, reason: e.message };
+  }
+}
+
+ipcMain.handle('get-telegram-config', () => {
+  return store.get('telegram') || { enabled: false, botToken: '', chatId: '', botUsername: '', autoUpload: false, deleteAfterUpload: false };
+});
+
+ipcMain.handle('save-telegram-config', (_event, config) => {
+  if (!config || typeof config !== 'object') throw new Error('Configuração inválida');
+  store.set('telegram', {
+    enabled: Boolean(config.enabled),
+    botToken: String(config.botToken || '').trim(),
+    chatId: String(config.chatId || '').trim(),
+    botUsername: String(config.botUsername || '').trim(),
+    autoUpload: Boolean(config.autoUpload),
+    deleteAfterUpload: Boolean(config.deleteAfterUpload)
+  });
+  ensureTelegramBot();
+  return true;
+});
+
+ipcMain.handle('test-telegram-connection', async () => {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false, message: 'Bot não configurado' };
+  try {
+    await bot.sendMessage(telegramChatId, '🔗 TurboDown conectado com sucesso!');
+    return { success: true, message: 'Mensagem enviada com sucesso' };
+  } catch (e) {
+    return { success: false, message: `Erro: ${e.message}` };
+  }
+});
+
+// Aguarda o usuário iniciar uma conversa com o bot para obter o Chat ID automaticamente
+ipcMain.handle('start-telegram-wait', async () => {
+  const bot = ensureTelegramBot();
+  if (!bot) return { success: false, message: 'Bot não configurado' };
+  if (telegramWaitingForStart) return { success: false, message: 'Já aguardando conversa' };
+
+  telegramWaitingForStart = true;
+  telegramChatId = null;
+
+  // Escuta /start do usuário
+  bot.onText(/\/start/, (msg) => {
+    if (!telegramWaitingForStart) return;
+    telegramChatId = String(msg.chat.id);
+    telegramWaitingForStart = false;
+    if (telegramPollingTimeout) {
+      clearTimeout(telegramPollingTimeout);
+      telegramPollingTimeout = null;
+    }
+    store.set('telegram.chatId', telegramChatId);
+    bot.sendMessage(telegramChatId, '✅ TurboDown conectado! Seus downloads serão salvos aqui automaticamente.');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('telegram-login-success', { chatId: telegramChatId });
+    }
+  });
+
+  // Ativa polling temporário para escanear /start
+  bot.startPolling();
+
+  // Timeout de 5 minutos
+  telegramPollingTimeout = setTimeout(() => {
+    telegramWaitingForStart = false;
+    bot.stopPolling();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('telegram-login-timeout');
+    }
+  }, 5 * 60 * 1000);
+
+  return { success: true, message: 'Aguardando /start no Telegram...' };
+});
+
+ipcMain.handle('cancel-telegram-wait', () => {
+  const bot = ensureTelegramBot();
+  if (bot) bot.stopPolling();
+  telegramWaitingForStart = false;
+  if (telegramPollingTimeout) {
+    clearTimeout(telegramPollingTimeout);
+    telegramPollingTimeout = null;
+  }
+  return true;
+});
 
 ipcMain.handle('set-discord-music-state', (_event, state = {}) => {
   if (!discordEnabled) return false;
@@ -1087,7 +1241,25 @@ async function runDownloadJob(job) {
         }
 
         settled = true;
-        resolve({ success: true, folder: targetFolder, file: job.lastSavedFilePath });
+        const finalFilePath = job.lastSavedFilePath;
+
+        // Auto-upload para Telegram se configurado (assíncrono)
+        if (telegramAutoUpload && finalFilePath && fs.existsSync(finalFilePath)) {
+          const isAudio = AUDIO_FORMATS.includes(job.request.format);
+          const mediaType = isAudio ? 'audio' : 'video';
+          uploadToTelegram(finalFilePath, job.detectedTitle, mediaType).then(result => {
+            if (result.success && telegramDeleteAfterUpload) {
+              try {
+                fs.unlinkSync(finalFilePath);
+                console.log('Arquivo local deletado após upload:', finalFilePath);
+              } catch (e) {
+                console.warn('Não foi possível deletar arquivo local:', e);
+              }
+            }
+          }).catch(() => {});
+        }
+
+        resolve({ success: true, folder: targetFolder, file: finalFilePath });
         return;
       }
 
@@ -1524,8 +1696,22 @@ function executeSchedule(item) {
       child: null,
       pauseRequested: false,
       cancelRequested: false
-    }).then(() => {
+    }).then((result) => {
       addScheduleLog({ label: item.label, status: 'success', message: 'Download concluído' });
+      if (telegramAutoUpload && result && result.file && fs.existsSync(result.file)) {
+        const isAudio = AUDIO_FORMATS.includes(validated.format);
+        const mediaType = isAudio ? 'audio' : 'video';
+        uploadToTelegram(result.file, item.label, mediaType).then(uploadResult => {
+          if (uploadResult.success && telegramDeleteAfterUpload) {
+            try {
+              fs.unlinkSync(result.file);
+              console.log('Arquivo agendado deletado após upload:', result.file);
+            } catch (e) {
+              console.warn('Não foi possível deletar arquivo agendado:', e);
+            }
+          }
+        }).catch(() => {});
+      }
     }).catch((err) => {
       addScheduleLog({ label: item.label, status: 'error', message: err.message });
     });

@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const api = window.api;
+const { ipcRenderer } = require('electron');
 
 // ── State ──────────────────────────────────────────────────────────────────
 let currentTab = 'home';
@@ -91,6 +92,14 @@ const setYoutubeAnon     = document.getElementById('set-youtube-anon');
 const googleAccountStatus = document.getElementById('google-account-status');
 const btnGoogleLogin     = document.getElementById('btn-google-login');
 const btnGoogleLogout    = document.getElementById('btn-google-logout');
+const setTelegramEnabled = document.getElementById('set-telegram-enabled');
+const setTelegramBotToken = document.getElementById('set-telegram-bot-token');
+const setTelegramBotUsername = document.getElementById('set-telegram-bot-username');
+const setTelegramAutoUpload = document.getElementById('set-telegram-auto-upload');
+const setTelegramDeleteAfterUpload = document.getElementById('set-telegram-delete-after-upload');
+const telegramConnectionStatus = document.getElementById('telegram-connection-status');
+const btnTelegramLogin = document.getElementById('btn-telegram-login');
+const btnTelegramCancel = document.getElementById('btn-telegram-cancel');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -2338,6 +2347,73 @@ if (setYoutubeAnon) {
   });
 }
 
+// Telegram configuration
+async function saveTelegramConfig() {
+  await api.saveTelegramConfig({
+    enabled: setTelegramEnabled.checked,
+    botToken: setTelegramBotToken.value.trim(),
+    botUsername: setTelegramBotUsername.value.trim(),
+    autoUpload: setTelegramAutoUpload.checked,
+    deleteAfterUpload: setTelegramDeleteAfterUpload.checked
+  });
+}
+if (setTelegramEnabled) setTelegramEnabled.addEventListener('change', saveTelegramConfig);
+if (setTelegramBotToken) setTelegramBotToken.addEventListener('change', saveTelegramConfig);
+if (setTelegramBotUsername) setTelegramBotUsername.addEventListener('change', saveTelegramConfig);
+if (setTelegramAutoUpload) setTelegramAutoUpload.addEventListener('change', saveTelegramConfig);
+if (setTelegramDeleteAfterUpload) setTelegramDeleteAfterUpload.addEventListener('change', saveTelegramConfig);
+
+// Login via Telegram (/start)
+if (btnTelegramLogin) {
+  btnTelegramLogin.addEventListener('click', async () => {
+    await saveTelegramConfig();
+    btnTelegramLogin.disabled = true;
+    btnTelegramLogin.textContent = 'Aguardando /start...';
+    btnTelegramCancel.classList.remove('hidden');
+    telegramConnectionStatus.textContent = 'Aguardando conexão...';
+    telegramConnectionStatus.classList.remove('logged-in', 'logged-out');
+
+    const result = await api.startTelegramWait();
+    if (!result.success) {
+      btnTelegramLogin.disabled = false;
+      btnTelegramLogin.textContent = 'Conectar com Telegram';
+      btnTelegramCancel.classList.add('hidden');
+      alert(result.message);
+      return;
+    }
+  });
+}
+
+if (btnTelegramCancel) {
+  btnTelegramCancel.addEventListener('click', async () => {
+    await api.cancelTelegramWait();
+    btnTelegramLogin.disabled = false;
+    btnTelegramLogin.textContent = 'Conectar com Telegram';
+    btnTelegramCancel.classList.add('hidden');
+    telegramConnectionStatus.textContent = 'Cancelado';
+  });
+}
+
+// Listeners para sucesso/timeout do login
+ipcRenderer.on('telegram-login-success', (event, data) => {
+  telegramConnectionStatus.textContent = 'Conectado';
+  telegramConnectionStatus.classList.add('logged-in');
+  telegramConnectionStatus.classList.remove('logged-out');
+  btnTelegramLogin.disabled = false;
+  btnTelegramLogin.textContent = 'Conectado';
+  btnTelegramCancel.classList.add('hidden');
+  alert('Conectado com sucesso! Seus downloads serão salvos no Telegram.');
+});
+
+ipcRenderer.on('telegram-login-timeout', () => {
+  telegramConnectionStatus.textContent = 'Tempo esgotado';
+  telegramConnectionStatus.classList.add('logged-out');
+  btnTelegramLogin.disabled = false;
+  btnTelegramLogin.textContent = 'Conectar com Telegram';
+  btnTelegramCancel.classList.add('hidden');
+  alert('Tempo esgotado. Tente novamente.');
+});
+
 // Backup de configurações
 if (btnExportSettings) {
   btnExportSettings.addEventListener('click', async () => {
@@ -2976,6 +3052,19 @@ async function init() {
   if (setYoutubeAnon) setYoutubeAnon.checked = Boolean(ytAnon);
 
   refreshGoogleAccountStatus();
+
+  const telegramConfig = await api.getTelegramConfig();
+  if (telegramConfig) {
+    setTelegramEnabled.checked = Boolean(telegramConfig.enabled);
+    setTelegramBotToken.value = telegramConfig.botToken || '';
+    setTelegramBotUsername.value = telegramConfig.botUsername || '';
+    setTelegramAutoUpload.checked = Boolean(telegramConfig.autoUpload);
+    setTelegramDeleteAfterUpload.checked = Boolean(telegramConfig.deleteAfterUpload);
+    if (telegramConfig.chatId) {
+      telegramConnectionStatus.textContent = 'Conectado';
+      telegramConnectionStatus.classList.add('logged-in');
+    }
+  }
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),
