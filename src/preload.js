@@ -84,6 +84,7 @@ window.api = {
   saveTelegramConfig: (config) => ipcRenderer.invoke('save-telegram-config', config),
   startTelegramWait: () => ipcRenderer.invoke('start-telegram-wait'),
   cancelTelegramWait: () => ipcRenderer.invoke('cancel-telegram-wait'),
+  uploadFileTelegram: (opts) => ipcRenderer.invoke('upload-file-telegram', opts),
   resolveNavigationTarget,
 
   // IPC event listeners
@@ -92,7 +93,10 @@ window.api = {
       'download-progress',
       'app-update-status',
       'google-shield-status',
-      'window-maximized'
+      'window-maximized',
+      'telegram-upload-status',
+      'telegram-login-success',
+      'telegram-login-timeout'
     ];
     if (allowedChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));

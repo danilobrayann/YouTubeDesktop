@@ -12,7 +12,7 @@ const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const { isAdRequest, isTrackerRequest, isYouTubeAdStream } = require('./browser-utils');
 const { DiscordRPC } = require('./discord-rpc');
-const TelegramBot = require('node-telegram-bot-api');
+const { TelegramClient } = require('./telegram-client');
 const {
   AUDIO_FORMATS,
   VIDEO_FORMATS,
@@ -160,7 +160,7 @@ function ensureTelegramBot() {
   }
   if (telegramBot) return telegramBot;
   try {
-    telegramBot = new TelegramBot(config.botToken, { polling: false });
+    telegramBot = new TelegramClient(config.botToken);
     telegramEnabled = true;
     telegramChatId = config.chatId || null;
     telegramAutoUpload = config.autoUpload;
@@ -173,13 +173,30 @@ function ensureTelegramBot() {
   }
 }
 
-async function uploadToTelegram(filePath, title, mediaType = 'document') {
+async function uploadToTelegram(filePath, title, mediaType = 'document', downloadId = null) {
   const bot = ensureTelegramBot();
-  if (!bot || !telegramChatId) return { success: false };
+  if (!bot || !telegramChatId) return { success: false, reason: 'not_configured' };
+
+  if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
+    mainWindow.webContents.send('telegram-upload-status', {
+      downloadId,
+      status: 'uploading',
+      message: '📤 Enviando para o Telegram...'
+    });
+  }
+
   try {
     const stats = fs.statSync(filePath);
-    if (stats.size > 2 * 1024 * 1024 * 1024) {
-      console.warn('File exceeds 2GB Telegram limit, skipping upload');
+    if (stats.size > 50 * 1024 * 1024) {
+      const msg = 'Arquivo maior que 50MB (limite padrão do Telegram)';
+      console.warn(msg);
+      if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
+        mainWindow.webContents.send('telegram-upload-status', {
+          downloadId,
+          status: 'error',
+          message: `⚠️ ${msg}`
+        });
+      }
       return { success: false, reason: 'file_too_large' };
     }
     const options = {
@@ -193,12 +210,41 @@ async function uploadToTelegram(filePath, title, mediaType = 'document') {
     } else {
       await bot.sendDocument(telegramChatId, filePath, options);
     }
+
+    if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
+      mainWindow.webContents.send('telegram-upload-status', {
+        downloadId,
+        status: 'success',
+        message: '✅ Enviado para o Telegram!'
+      });
+    }
+
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Telegram',
+        body: `"${title || path.basename(filePath)}" enviado com sucesso!`
+      }).show();
+    }
+
     return { success: true };
   } catch (e) {
     console.warn('Telegram upload failed:', e);
+    if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
+      mainWindow.webContents.send('telegram-upload-status', {
+        downloadId,
+        status: 'error',
+        message: `⚠️ Falha no envio: ${e.message}`
+      });
+    }
     return { success: false, reason: e.message };
   }
 }
+
+ipcMain.handle('upload-file-telegram', async (_event, { filePath, title, format, downloadId }) => {
+  const isAudio = AUDIO_FORMATS.includes(format);
+  const mediaType = isAudio ? 'audio' : 'video';
+  return uploadToTelegram(filePath, title, mediaType, downloadId);
+});
 
 ipcMain.handle('get-telegram-config', () => {
   return store.get('telegram') || { enabled: false, botToken: '', chatId: '', chatType: '', botUsername: '', autoUpload: false, deleteAfterUpload: false };
@@ -210,7 +256,7 @@ ipcMain.handle('save-telegram-config', async (_event, config) => {
   let botUsername = '';
   if (token) {
     try {
-      const tempBot = new TelegramBot(token, { polling: false });
+      const tempBot = new TelegramClient(token);
       const botInfo = await tempBot.getMe();
       botUsername = botInfo.username || '';
     } catch (e) {
@@ -1263,7 +1309,7 @@ async function runDownloadJob(job) {
         if (telegramAutoUpload && finalFilePath && fs.existsSync(finalFilePath)) {
           const isAudio = AUDIO_FORMATS.includes(job.request.format);
           const mediaType = isAudio ? 'audio' : 'video';
-          uploadToTelegram(finalFilePath, job.detectedTitle, mediaType).then(result => {
+          uploadToTelegram(finalFilePath, job.detectedTitle, mediaType, job.request.downloadId).then(result => {
             if (result.success && telegramDeleteAfterUpload) {
               try {
                 fs.unlinkSync(finalFilePath);

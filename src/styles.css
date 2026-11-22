@@ -3619,3 +3619,32 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 .schedule-log-item.error .schedule-log-label { color: #ff6b6b; }
 .schedule-log-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-log-item small { color: var(--text-muted); flex-shrink: 0; }
+
+/* ── Telegram Badges ──────────────────────────────────────────────────────── */
+.dl-telegram-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 3px 9px;
+  margin-top: 6px;
+  width: fit-content;
+  animation: fadeIn 0.25s ease;
+}
+.dl-telegram-badge.uploading {
+  background: rgba(0, 136, 204, 0.15);
+  color: #00b4d8;
+  border: 1px solid rgba(0, 180, 216, 0.35);
+}
+.dl-telegram-badge.success {
+  background: rgba(0, 245, 160, 0.15);
+  color: #00f5a0;
+  border: 1px solid rgba(0, 245, 160, 0.35);
+}
+.dl-telegram-badge.error {
+  background: rgba(255, 68, 68, 0.15);
+  color: #ff6666;
+  border: 1px solid rgba(255, 68, 68, 0.35);
+}

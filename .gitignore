@@ -52,3 +52,5 @@ $RECYCLE.BIN/
 *.sln
 *.sw?
 dist/
+nul
+ytm-rs/target/

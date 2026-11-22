@@ -56,12 +56,12 @@ if "%BTYPE%"=="" set "BTYPE=1"
 echo.
 if "%BTYPE%"=="1" (
     echo  Compilando Executavel Nativo...
-    echo  (Aguarde cerca de 30-60 segundos)
+    echo  (Aguarde a conclusao do empacotamento)
     echo.
     call npm.cmd run build -- --win --dir
 ) else (
     echo  Compilando Instalador Setup .exe...
-    echo  (Aguarde cerca de 1-2 minutos)
+    echo  (Aguarde a conclusao do empacotamento)
     echo.
     call npm.cmd run build:win
 )

@@ -18,25 +18,19 @@ echo.
 :: ---------------------------------------------------------
 :: PASSO 1: Atualizar o projeto antes da instalacao
 :: ---------------------------------------------------------
-echo  [1/5] Buscando a ultima atualizacao do projeto...
+echo  [1/5] Buscando a ultima atualizacao do projeto no GitHub...
 git rev-parse --is-inside-work-tree >nul 2>&1
-if errorlevel 1 (
-    echo  ERRO: Esta pasta nao e um repositorio Git.
-    echo  Baixe ou clone o projeto pelo GitHub e execute o instalador novamente.
-    pause
-    exit /b 1
+if not errorlevel 1 (
+    git pull --no-rebase --autostash
+    if errorlevel 1 (
+        echo  AVISO: Nao foi possivel atualizar via Git (sem internet ou alteracoes pendentes).
+        echo  Continuando com a versao local atual...
+    ) else (
+        echo  OK - Projeto sincronizado com a versao mais recente!
+    )
+) else (
+    echo  AVISO: Repositorio Git nao detectado, continuando com arquivos locais...
 )
-
-git pull --no-rebase --autostash
-if errorlevel 1 (
-    echo.
-    echo  ERRO: Nao foi possivel atualizar o projeto.
-    echo  Verifique sua conexao com a internet e resolva qualquer conflito Git
-    echo  antes de executar o instalador novamente.
-    pause
-    exit /b 1
-)
-echo  OK - Projeto atualizado.
 
 :: ---------------------------------------------------------
 :: PASSO 2: Verificar Node.js

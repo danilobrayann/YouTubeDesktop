@@ -1597,6 +1597,21 @@ api.on('download-progress', (data) => {
   updateBadge();
 });
 
+api.on('telegram-upload-status', (data) => {
+  const { downloadId, status, message } = data;
+  const card = document.getElementById(`card-${downloadId}`);
+  if (!card) return;
+  let tgBadge = document.getElementById(`tg-status-${downloadId}`);
+  if (!tgBadge) {
+    tgBadge = document.createElement('div');
+    tgBadge.id = `tg-status-${downloadId}`;
+    const info = card.querySelector('.dl-card-info');
+    if (info) info.appendChild(tgBadge);
+  }
+  tgBadge.className = `dl-telegram-badge ${status}`;
+  tgBadge.textContent = message;
+});
+
 // ── RENDER DOWNLOAD CARD ───────────────────────────────────────────────────
 function renderDownloadCard(dl) {
   dlEmptyState.classList.add('hidden');
@@ -1801,6 +1816,16 @@ function updateDownloadCard(id, data) {
       if (dl.filePath && !dl.isPlaylist) {
         addAction('<svg class="icon"><use href="#i-play"/></svg> Reproduzir', '', () => api.openFile(dl.filePath).catch(err => alert(err.message)));
       }
+      if (dl.filePath) {
+        addAction('📤 Telegram', '', () => {
+          api.uploadFileTelegram({
+            filePath: dl.filePath,
+            title: dl.title,
+            format: dl.format,
+            downloadId: id
+          });
+        });
+      }
       addAction('<svg class="icon"><use href="#i-trash"/></svg> Remover', '', () => removeDownloadCard(id));
     } else if (status === 'cancelled') {
       addAction('<svg class="icon"><use href="#i-trash"/></svg> Remover', '', () => removeDownloadCard(id));
@@ -1903,6 +1928,33 @@ function renderHistory() {
       btnOpen.title = 'Abrir pasta';
       btnOpen.addEventListener('click', () => api.revealPath(item.filePath).catch(() => api.openFolder(item.targetFolder || downloadPath)));
       actions.append(btnOpen);
+
+      const btnTg = document.createElement('button');
+      btnTg.className = 'dl-action-btn';
+      btnTg.innerHTML = '📤 Telegram';
+      btnTg.title = 'Enviar para o Telegram';
+      btnTg.addEventListener('click', () => {
+        btnTg.disabled = true;
+        btnTg.textContent = '⏳ Enviando...';
+        api.uploadFileTelegram({
+          filePath: item.filePath,
+          title: item.title,
+          format: item.format,
+          downloadId: 'hist-' + (item.date || Date.now())
+        }).then(res => {
+          if (res && res.ok) {
+            btnTg.textContent = '✅ Enviado!';
+          } else {
+            btnTg.disabled = false;
+            btnTg.textContent = '❌ Falhou';
+            alert('Falha ao enviar para o Telegram: ' + ((res && res.error) || 'Verifique se o Bot está configurado e iniciado.'));
+          }
+        }).catch(err => {
+          btnTg.disabled = false;
+          btnTg.textContent = '❌ Erro';
+        });
+      });
+      actions.append(btnTg);
     }
     actions.append(btnDl);
 
@@ -2367,11 +2419,13 @@ if (setTelegramDeleteAfterUpload) setTelegramDeleteAfterUpload.addEventListener(
 // Login via Telegram (/start) — automático ao clicar no botão
 if (btnTelegramLogin) {
   btnTelegramLogin.addEventListener('click', async () => {
-    await saveTelegramConfig();
     if (!setTelegramBotToken.value.trim()) {
       alert('Cole o token do bot primeiro.');
       return;
     }
+    // Habilita automaticamente ao conectar
+    setTelegramEnabled.checked = true;
+    await saveTelegramConfig();
     btnTelegramLogin.disabled = true;
     btnTelegramLogin.textContent = 'Aguardando /start...';
     btnTelegramCancel.classList.remove('hidden');
