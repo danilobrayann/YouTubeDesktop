@@ -2565,13 +2565,24 @@ api.on('telegram-upload-event', (data) => {
 async function renderTelegramFiles() {
   if (!telegramFilesList) return;
   try {
-    const files = await api.telegramGetFiles();
+    let files = await api.telegramGetFiles();
+    // Busca
+    const q = (document.getElementById('tg-search')?.value || '').trim().toLowerCase();
+    if (q) files = files.filter(f => (f.fileName || '').toLowerCase().includes(q) || (f.title || '').toLowerCase().includes(q));
+    // Ordenação
+    const sort = document.getElementById('tg-sort')?.value || 'date';
+    files.sort((a, b) => {
+      if (sort === 'name') return (a.fileName || '').localeCompare(b.fileName || '');
+      if (sort === 'size') return (b.size || 0) - (a.size || 0);
+      if (sort === 'type') return (a.fileName || '').split('.').pop().localeCompare((b.fileName || '').split('.').pop());
+      return new Date(b.date) - new Date(a.date);
+    });
     telegramFilesList.replaceChildren();
     if (!files.length) {
       const empty = document.createElement('p');
       empty.className = 'maintenance-message';
       empty.style.margin = '0';
-      empty.textContent = 'Nenhum arquivo enviado ainda.';
+      empty.textContent = q ? 'Nenhum arquivo encontrado.' : 'Nenhum arquivo enviado ainda.';
       telegramFilesList.appendChild(empty);
       return;
     }
@@ -2592,8 +2603,20 @@ async function renderTelegramFiles() {
       const meta = document.createElement('div');
       meta.className = 'telegram-file-meta';
       const srcLabel = f.source === 'download' ? 'Download' : f.source === 'watch' ? 'Pasta vigiada' : 'Manual';
-      meta.textContent = `${formatBytes(f.size)} • ${new Date(f.date).toLocaleDateString('pt-BR')} • ${srcLabel}`;
+      const folderLabel = f.folder ? ` • 📁 ${f.folder}` : '';
+      meta.textContent = `${formatBytes(f.size)} • ${new Date(f.date).toLocaleDateString('pt-BR')} • ${srcLabel}${folderLabel}`;
       info.append(name, meta);
+      const dl = document.createElement('button');
+      dl.className = 'btn-ghost btn-xs telegram-file-dl';
+      dl.textContent = '⬇';
+      dl.title = 'Baixar da nuvem';
+      dl.addEventListener('click', async () => {
+        dl.disabled = true;
+        const res = await api.telegramDownloadFile(f.id);
+        if (res && res.success) alert(`Salvo em: ${res.path}`);
+        else if (!(res && res.canceled)) alert(res && res.message || 'Falha no download');
+        dl.disabled = false;
+      });
       const del = document.createElement('button');
       del.className = 'btn-ghost btn-xs telegram-file-del';
       del.textContent = '🗑';
@@ -2604,7 +2627,7 @@ async function renderTelegramFiles() {
         if (res && res.success) renderTelegramFiles();
         else { del.disabled = false; alert(res && res.message || 'Falha ao deletar'); }
       });
-      row.append(icon, info, del);
+      row.append(icon, info, dl, del);
       telegramFilesList.appendChild(row);
     });
     telegramCloudLabel.textContent = `${files.length} arquivo(s) • ${formatBytes(totalSize)} na nuvem`;
@@ -2657,6 +2680,20 @@ if (btnTelegramWatchFolder) {
 
 if (btnTelegramRefreshFiles) {
   btnTelegramRefreshFiles.addEventListener('click', renderTelegramFiles);
+}
+
+// Busca / ordenação / limpar índice da nuvem
+const tgSearch = document.getElementById('tg-search');
+const tgSort = document.getElementById('tg-sort');
+const btnTelegramClearIndex = document.getElementById('btn-telegram-clear-index');
+if (tgSearch) tgSearch.addEventListener('input', renderTelegramFiles);
+if (tgSort) tgSort.addEventListener('change', renderTelegramFiles);
+if (btnTelegramClearIndex) {
+  btnTelegramClearIndex.addEventListener('click', async () => {
+    if (!confirm('Limpar o índice local? Os arquivos continuam no Telegram, mas saem desta lista.')) return;
+    await api.telegramClearIndex();
+    renderTelegramFiles();
+  });
 }
 
 async function refreshTelegramCloud() {

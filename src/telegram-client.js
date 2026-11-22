@@ -48,6 +48,17 @@ class TelegramClient {
     return this._sendFile('sendDocument', 'document', chatId, filePath, options);
   }
 
+  async getFile(fileId) {
+    const res = await fetch(`${this.baseUrl}/getFile?file_id=${encodeURIComponent(fileId)}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.description || 'Falha ao obter arquivo');
+    return data.result;
+  }
+
+  fileDownloadUrl(filePath) {
+    return `https://api.telegram.org/file/bot${this.token}/${filePath}`;
+  }
+
   async deleteMessage(chatId, messageId) {
     const res = await fetch(`${this.baseUrl}/deleteMessage`, {
       method: 'POST',

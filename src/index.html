@@ -1950,7 +1950,16 @@
                       <div class="telegram-files-panel">
                         <div class="telegram-files-header">
                           <span>☁️ Arquivos na nuvem</span>
-                          <button id="btn-telegram-refresh-files" class="btn-ghost btn-xs">↻</button>
+                          <div class="telegram-files-tools">
+                            <input type="text" id="tg-search" class="tg-search" placeholder="🔍 Buscar..." />
+                            <select id="tg-sort" class="tg-sort">
+                              <option value="date">Recentes</option>
+                              <option value="name">Nome</option>
+                              <option value="size">Tamanho</option>
+                            </select>
+                            <button id="btn-telegram-refresh-files" class="btn-ghost btn-xs" title="Atualizar">↻</button>
+                            <button id="btn-telegram-clear-index" class="btn-ghost btn-xs" title="Limpar índice">🧹</button>
+                          </div>
                         </div>
                         <div id="telegram-files-list" class="telegram-files-list">
                           <p class="maintenance-message" style="margin:0;">Nenhum arquivo enviado ainda.</p>
