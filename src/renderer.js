@@ -2564,6 +2564,25 @@ api.on('telegram-upload-event', (data) => {
 
 let tgFolderFilter = '';
 
+// Modal de input próprio — window.prompt() não existe no Electron
+function tdPrompt(message, def = '') {
+  return new Promise((resolve) => {
+    const ov = document.createElement('div');
+    ov.className = 'td-prompt-overlay';
+    ov.innerHTML = `<div class="td-prompt"><div class="td-prompt-msg"></div><input class="td-prompt-input" /><div class="td-prompt-btns"><button class="btn-primary td-ok">OK</button><button class="btn-secondary td-cancel">Cancelar</button></div></div>`;
+    ov.querySelector('.td-prompt-msg').textContent = message;
+    const inp = ov.querySelector('.td-prompt-input');
+    inp.value = def || '';
+    document.body.appendChild(ov);
+    inp.focus(); inp.select();
+    const done = (v) => { ov.remove(); resolve(v); };
+    ov.querySelector('.td-ok').onclick = () => done(inp.value);
+    ov.querySelector('.td-cancel').onclick = () => done(null);
+    inp.onkeydown = (e) => { if (e.key === 'Enter') done(inp.value); if (e.key === 'Escape') done(null); };
+    ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
+  });
+}
+
 async function renderTelegramFiles() {
   if (!telegramFilesList) return;
   try {
@@ -2609,7 +2628,7 @@ async function renderTelegramFiles() {
         renBtn.title = 'Renomear pasta';
         renBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const nn = prompt('Novo nome da pasta:', fn);
+          const nn = await tdPrompt('Novo nome da pasta:', fn);
           if (nn && nn.trim() && nn.trim() !== fn) {
             await api.telegramRenameFolder(fn, nn.trim());
             renderTelegramFiles();
@@ -2622,7 +2641,7 @@ async function renderTelegramFiles() {
       addCard.className = 'tg-folder-card tg-folder-new';
       addCard.innerHTML = '<div class="tg-fc-icon">＋</div><div class="tg-fc-name">Nova pasta</div><div class="tg-fc-sub">criar</div>';
       addCard.addEventListener('click', async () => {
-        const name = prompt('Nome da nova pasta:');
+        const name = await tdPrompt('Nome da nova pasta:');
         if (!name || !name.trim()) return;
         const res = await api.telegramCreateFolder(name.trim());
         if (res && res.success) renderTelegramFiles();

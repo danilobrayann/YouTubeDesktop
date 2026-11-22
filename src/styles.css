@@ -3925,3 +3925,9 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
   border-style: dashed;
   opacity: 0.75;
 }
+
+.td-prompt-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999}
+.td-prompt{background:var(--card-bg,#1e1e2e);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:20px;min-width:300px;box-shadow:0 12px 48px rgba(0,0,0,.5)}
+.td-prompt-msg{margin-bottom:10px;font-size:14px}
+.td-prompt-input{width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--text-primary,#fff);font-size:14px;margin-bottom:14px;box-sizing:border-box}
+.td-prompt-btns{display:flex;gap:8px;justify-content:flex-end}
