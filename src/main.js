@@ -215,6 +215,19 @@ function configureBrowserSession(partition) {
       callback({ cancel: false });
     }
   );
+
+  // Client Hints: sem esses headers o YouTube detecta o webview como bot
+  browserSession.webRequest.onBeforeSendHeaders(
+    { urls: ['http://*/*', 'https://*/*'] },
+    (details, callback) => {
+      const headers = { ...details.requestHeaders };
+      headers['sec-ch-ua'] = '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"';
+      headers['sec-ch-ua-mobile'] = '?0';
+      headers['sec-ch-ua-platform'] = '"Windows"';
+      headers['sec-ch-ua-full-version-list'] = '"Chromium";v="130.0.6723.117", "Google Chrome";v="130.0.6723.117", "Not?A_Brand";v="99.0.0.0"';
+      callback({ requestHeaders: headers });
+    }
+  );
 }
 
 function createTray() {
@@ -358,6 +371,20 @@ app.whenReady().then(() => {
     'persist:wallpapers',
     'persist:gemini'
   ].forEach(configureBrowserSession);
+
+  // Cookie de consentimento do YouTube — sem ele o Google trata como bot
+  try {
+    const ytSession = session.fromPartition('persist:youtube');
+    ytSession.cookies.set({
+      url: 'https://www.youtube.com',
+      name: 'CONSENT',
+      value: 'YES+cb.20210328-17-p0.en+FX+410',
+      domain: '.youtube.com',
+      path: '/',
+      secure: true,
+      sameSite: 'no_restriction'
+    }).catch(() => {});
+  } catch (e) {}
 
   // Allow webview to load YouTube and set proper userAgent for WhatsApp Web
   app.on('web-contents-created', (event, contents) => {
