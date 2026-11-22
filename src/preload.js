@@ -59,6 +59,7 @@ window.api = {
   getSuggestions: (query) => ipcRenderer.invoke('youtube-suggestions', query),
   getSchedules: () => ipcRenderer.invoke('get-schedules'),
   addSchedule: (data) => ipcRenderer.invoke('add-schedule', data),
+  updateSchedule: (id, data) => ipcRenderer.invoke('update-schedule', id, data),
   removeSchedule: (id) => ipcRenderer.invoke('remove-schedule', id),
   getOnboardingDone: () => ipcRenderer.invoke('get-onboarding-done'),
   setOnboardingDone: () => ipcRenderer.invoke('set-onboarding-done'),

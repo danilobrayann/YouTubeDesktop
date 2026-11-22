@@ -578,11 +578,21 @@ if (btnMiniPlayer) {
 // ── Downloads agendados ─────────────────────────────────────────────────────
 const btnToggleSchedule = document.getElementById('btn-toggle-schedule');
 const scheduleForm      = document.getElementById('schedule-form');
+const scheduleOptions   = document.getElementById('schedule-options');
 const schedUrl          = document.getElementById('sched-url');
 const schedFormat       = document.getElementById('sched-format');
 const schedTime         = document.getElementById('sched-time');
+const schedRepeat       = document.getElementById('sched-repeat');
+const schedInterval     = document.getElementById('sched-interval');
+const schedCount        = document.getElementById('sched-count');
+const schedOnlyNew      = document.getElementById('sched-onlynew');
 const btnAddSchedule    = document.getElementById('btn-add-schedule');
 const scheduleList      = document.getElementById('schedule-list');
+const scheduleLogEl     = document.getElementById('schedule-log');
+const navSchedBadge     = document.getElementById('nav-sched-badge');
+let editingScheduleId   = null;
+
+const REPEAT_LABELS = { none: '', daily: '· diário', weekly: '· semanal', monthly: '· mensal', interval: '· a cada Xh' };
 
 function fmtScheduleDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', {
@@ -591,43 +601,131 @@ function fmtScheduleDate(iso) {
   });
 }
 
+function fmtCountdown(iso) {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return 'agora';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h >= 24) return `em ${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h > 0) return `em ${h}h ${m}min`;
+  return `em ${m}min`;
+}
+
+function schedMeta(s) {
+  const parts = [];
+  parts.push(REPEAT_LABELS[s.repeat] || '');
+  if (s.repeat === 'interval' && s.intervalHours) parts.push(`${s.intervalHours}h`);
+  if (s.onlyNew) parts.push('só novos');
+  if (s.playlistCount > 0) parts.push(`${s.playlistCount} itens`);
+  return parts.filter(Boolean).join(' ');
+}
+
 async function renderSchedules() {
   if (!scheduleList) return;
-  const schedules = await api.getSchedules();
+  const data = await api.getSchedules();
+  const schedules = data.items || [];
+  const log = data.log || [];
+
+  // Badge no menu
+  if (navSchedBadge) {
+    navSchedBadge.textContent = String(schedules.length);
+    navSchedBadge.classList.toggle('hidden', schedules.length === 0);
+  }
+
   scheduleList.innerHTML = '';
   if (!schedules.length) {
     scheduleList.innerHTML = '<p class="schedule-empty">Nenhum download agendado</p>';
-    return;
   }
   schedules.forEach(s => {
     const row = document.createElement('div');
     row.className = 'schedule-item';
+    const meta = schedMeta(s);
     row.innerHTML = `
       <div class="schedule-item-info">
         <div class="schedule-item-title"></div>
         <div class="schedule-item-time"></div>
       </div>
+      <button class="btn-ghost btn-sm schedule-edit" title="Editar">
+        <svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg>
+      </button>
       <button class="btn-ghost btn-sm schedule-remove" title="Remover">
         <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
       </button>`;
     row.querySelector('.schedule-item-title').textContent = s.label;
-    row.querySelector('.schedule-item-time').textContent = `⏰ ${fmtScheduleDate(s.runAt)} · ${s.format}`;
+    row.querySelector('.schedule-item-time').textContent =
+      `${fmtCountdown(s.runAt)} · ${fmtScheduleDate(s.runAt)} · ${s.format}${meta ? ' · ' + meta : ''}`;
+    row.querySelector('.schedule-edit').addEventListener('click', () => fillScheduleForm(s));
     row.querySelector('.schedule-remove').addEventListener('click', async () => {
       await api.removeSchedule(s.id);
       renderSchedules();
     });
     scheduleList.appendChild(row);
   });
+
+  // Log de execuções
+  if (scheduleLogEl) {
+    scheduleLogEl.innerHTML = '';
+    if (log.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'schedule-log-list';
+      wrap.innerHTML = '<div class="schedule-log-title">Execuções recentes</div>' +
+        log.slice(0, 8).map(l => `
+          <div class="schedule-log-item ${l.status}">
+            <span>${l.status === 'success' ? '✅' : '❌'}</span>
+            <span class="schedule-log-label"></span>
+            <small>${new Date(l.time).toLocaleString('pt-BR')}</small>
+          </div>`).join('');
+      wrap.querySelectorAll('.schedule-log-label').forEach((el, i) => {
+        el.textContent = log[i].label;
+      });
+      scheduleLogEl.appendChild(wrap);
+    }
+  }
+}
+
+// Atualiza countdown a cada minuto
+setInterval(() => { if (scheduleList && scheduleList.children.length) renderSchedules(); }, 60000);
+
+function fillScheduleForm(s) {
+  editingScheduleId = s.id;
+  schedUrl.value = s.url;
+  schedFormat.value = s.format;
+  const d = new Date(s.runAt);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  schedTime.value = d.toISOString().slice(0, 16);
+  schedRepeat.value = s.repeat || 'none';
+  schedInterval.value = s.intervalHours || 24;
+  schedInterval.style.display = s.repeat === 'interval' ? '' : 'none';
+  schedCount.value = s.playlistCount || 0;
+  schedOnlyNew.checked = Boolean(s.onlyNew);
+  scheduleForm.classList.remove('hidden');
+  scheduleOptions.classList.remove('hidden');
+  btnAddSchedule.textContent = 'Salvar';
+}
+
+function resetScheduleForm() {
+  editingScheduleId = null;
+  schedUrl.value = '';
+  btnAddSchedule.textContent = 'Agendar';
 }
 
 if (btnToggleSchedule && scheduleForm) {
   btnToggleSchedule.addEventListener('click', () => {
+    const opening = scheduleForm.classList.contains('hidden');
     scheduleForm.classList.toggle('hidden');
-    if (!scheduleForm.classList.contains('hidden') && !schedTime.value) {
+    scheduleOptions.classList.toggle('hidden', !opening);
+    if (opening && !schedTime.value) {
       const d = new Date(Date.now() + 3600000);
       d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
       schedTime.value = d.toISOString().slice(0, 16);
     }
+    if (!opening) resetScheduleForm();
+  });
+}
+
+if (schedRepeat) {
+  schedRepeat.addEventListener('change', () => {
+    schedInterval.style.display = schedRepeat.value === 'interval' ? '' : 'none';
   });
 }
 
@@ -636,9 +734,22 @@ if (btnAddSchedule) {
     const url = schedUrl.value.trim();
     const runAt = schedTime.value;
     if (!url || !runAt) { alert('Informe a URL e a data/hora.'); return; }
+    const data = {
+      url,
+      format: schedFormat.value,
+      runAt,
+      repeat: schedRepeat.value,
+      intervalHours: parseInt(schedInterval.value, 10) || 24,
+      playlistCount: parseInt(schedCount.value, 10) || 0,
+      onlyNew: schedOnlyNew.checked
+    };
     try {
-      await api.addSchedule({ url, format: schedFormat.value, runAt });
-      schedUrl.value = '';
+      if (editingScheduleId) {
+        await api.updateSchedule(editingScheduleId, data);
+      } else {
+        await api.addSchedule(data);
+      }
+      resetScheduleForm();
       renderSchedules();
     } catch (e) { alert(`Falha ao agendar: ${e.message}`); }
   });

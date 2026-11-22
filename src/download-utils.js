@@ -71,6 +71,9 @@ function validateDownloadRequest(input) {
     mp3Quality: input.mp3Quality || '320k',
     speedLimit: typeof input.speedLimit === 'string' && input.speedLimit.trim()
       ? input.speedLimit.trim()
+      : null,
+    playlistItems: typeof input.playlistItems === 'string' && /^[\d,\-–]+$/.test(input.playlistItems.trim())
+      ? input.playlistItems.trim()
       : null
   };
 }

@@ -669,6 +669,12 @@ function createDownloadPlan(request, { noCookies = false } = {}) {
   if (fs.existsSync(ffmpegPath)) {
     args.push('--ffmpeg-location', path.dirname(ffmpegPath));
   }
+  if (isPlaylist && request.playlistItems) {
+    args.push('--playlist-items', request.playlistItems);
+  }
+  if (request.archivePath) {
+    args.push('--download-archive', request.archivePath);
+  }
   if (isPlaylist) {
     args.push('-o', path.join(categoryDir, '%(playlist_title,playlist)s', '%(playlist_index)02d - %(title)s.%(ext)s'));
   } else {
@@ -1255,21 +1261,72 @@ function saveSchedules(list) {
   store.set('scheduledDownloads', list);
 }
 
-ipcMain.handle('get-schedules', () => getSchedules());
+function getScheduleLog() {
+  return store.get('scheduleLog') || [];
+}
 
-ipcMain.handle('add-schedule', (_event, { url, format, runAt, label }) => {
-  const schedules = getSchedules();
-  const item = {
-    id: `sched-${Date.now()}`,
-    url: String(url).trim(),
-    format: format || 'default-video',
-    runAt: new Date(runAt).toISOString(),
-    label: label || String(url).trim(),
-    createdAt: new Date().toISOString()
+function addScheduleLog(entry) {
+  const log = getScheduleLog();
+  log.unshift({ time: new Date().toISOString(), ...entry });
+  store.set('scheduleLog', log.slice(0, 50));
+}
+
+const REPEAT_LABELS = { none: 'Único', daily: 'Diário', weekly: 'Semanal', monthly: 'Mensal', interval: 'A cada Xh' };
+
+function computeNextRun(runAt, repeat, intervalHours) {
+  const d = new Date(runAt);
+  if (repeat === 'daily') d.setDate(d.getDate() + 1);
+  else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+  else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
+  else if (repeat === 'interval') d.setHours(d.getHours() + (Number(intervalHours) || 24));
+  else return null;
+  return d.toISOString();
+}
+
+ipcMain.handle('get-schedules', () => ({
+  items: getSchedules(),
+  log: getScheduleLog().slice(0, 20)
+}));
+
+function normalizeScheduleInput(data = {}) {
+  const url = String(data.url || '').trim();
+  if (!url || !/^https?:\/\//i.test(url)) throw new Error('URL inválida.');
+  const runAt = new Date(data.runAt);
+  if (isNaN(runAt.getTime())) throw new Error('Data/hora inválida.');
+  const repeat = ['none', 'daily', 'weekly', 'monthly', 'interval'].includes(data.repeat) ? data.repeat : 'none';
+  return {
+    url,
+    format: data.format || 'default-video',
+    runAt: runAt.toISOString(),
+    label: data.label || url,
+    repeat,
+    intervalHours: repeat === 'interval' ? Math.max(1, Math.min(720, Number(data.intervalHours) || 24)) : null,
+    onlyNew: data.onlyNew === true,
+    playlistCount: Math.max(0, Math.min(500, parseInt(data.playlistCount, 10) || 0)),
+    enabled: data.enabled !== false
   };
+}
+
+ipcMain.handle('add-schedule', (_event, data) => {
+  const item = normalizeScheduleInput(data);
+  item.id = `sched-${Date.now()}`;
+  item.createdAt = new Date().toISOString();
+  item.notified5min = false;
+  const schedules = getSchedules();
   schedules.push(item);
   saveSchedules(schedules);
   return item;
+});
+
+ipcMain.handle('update-schedule', (_event, id, data) => {
+  const schedules = getSchedules();
+  const idx = schedules.findIndex(s => s.id === id);
+  if (idx === -1) throw new Error('Agendamento não encontrado.');
+  const merged = { ...schedules[idx], ...normalizeScheduleInput({ ...schedules[idx], ...data }), id, createdAt: schedules[idx].createdAt };
+  merged.notified5min = false;
+  schedules[idx] = merged;
+  saveSchedules(schedules);
+  return merged;
 });
 
 ipcMain.handle('remove-schedule', (_event, id) => {
@@ -1277,48 +1334,98 @@ ipcMain.handle('remove-schedule', (_event, id) => {
   return true;
 });
 
+// Executa um agendamento (disparado pelo timer ou manualmente)
+function executeSchedule(item) {
+  const fmt = item.format === 'default-video'
+    ? (store.get('videoFormat') || '720p')
+    : item.format === 'default-audio'
+      ? (store.get('audioFormat') || 'mp3')
+      : item.format;
+  const request = {
+    url: item.url,
+    format: fmt,
+    downloadId: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    downloadPlaylist: true,
+    subs: false,
+    thumbnail: false,
+    mp3Quality: '320k'
+  };
+  try {
+    const validated = validateDownloadRequest(request);
+    validated.outputPath = store.get('downloadPath') || app.getPath('downloads');
+    // "Só novos": download-archive do yt-dlp pula itens já baixados
+    if (item.onlyNew) {
+      const archiveDir = path.join(app.getPath('userData'), 'schedule-archives');
+      fs.mkdirSync(archiveDir, { recursive: true });
+      validated.archivePath = path.join(archiveDir, `${item.id}.txt`);
+    }
+    // Quantidade de itens da playlist (ex.: primeiros 10 → --playlist-items 1-10)
+    if (item.playlistCount > 0) {
+      validated.playlistItems = `1-${item.playlistCount}`;
+    }
+    runDownloadJob({
+      request: validated,
+      status: 'pending',
+      child: null,
+      pauseRequested: false,
+      cancelRequested: false
+    }).then(() => {
+      addScheduleLog({ label: item.label, status: 'success', message: 'Download concluído' });
+    }).catch((err) => {
+      addScheduleLog({ label: item.label, status: 'error', message: err.message });
+    });
+    return true;
+  } catch (e) {
+    addScheduleLog({ label: item.label, status: 'error', message: e.message });
+    return false;
+  }
+}
+
 // Verifica agendamentos a cada 30s
 setInterval(() => {
   const schedules = getSchedules();
+  if (!schedules.length) return;
   const now = Date.now();
-  const due = schedules.filter(s => new Date(s.runAt).getTime() <= now);
-  if (!due.length) return;
-  saveSchedules(schedules.filter(s => new Date(s.runAt).getTime() > now));
-  for (const s of due) {
-    const fmt = s.format === 'default-video'
-      ? (store.get('videoFormat') || '720p')
-      : s.format === 'default-audio'
-        ? (store.get('audioFormat') || 'mp3')
-        : s.format;
-    const request = {
-      url: s.url,
-      format: fmt,
-      downloadId: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      downloadPlaylist: true,
-      subs: false,
-      thumbnail: false,
-      mp3Quality: '320k'
-    };
-    try {
-      const validated = validateDownloadRequest(request);
-      validated.outputPath = store.get('downloadPath') || app.getPath('downloads');
-      runDownloadJob({
-        request: validated,
-        status: 'pending',
-        child: null,
-        pauseRequested: false,
-        cancelRequested: false
-      }).catch(() => {});
+  let changed = false;
+  const remaining = [];
+
+  for (const s of schedules) {
+    if (s.enabled === false) { remaining.push(s); continue; }
+    const runTime = new Date(s.runAt).getTime();
+
+    // Notificação ~5min antes
+    if (!s.notified5min && runTime - now <= 5 * 60000 && runTime - now > 0) {
+      s.notified5min = true;
+      changed = true;
       if (Notification.isSupported()) {
         new Notification({
-          title: 'Download agendado iniciado',
+          title: 'Download agendado em breve',
+          body: `${s.label} — começa em ~5 minutos`
+        }).show();
+      }
+    }
+
+    if (runTime <= now) {
+      changed = true;
+      s.notified5min = false;
+      const ok = executeSchedule(s);
+      if (Notification.isSupported()) {
+        new Notification({
+          title: ok ? 'Download agendado iniciado' : 'Falha no download agendado',
           body: s.label
         }).show();
       }
-    } catch (e) {
-      console.warn('Scheduled download failed:', e.message);
+      const nextRun = computeNextRun(s.runAt, s.repeat, s.intervalHours);
+      if (nextRun) {
+        s.runAt = nextRun;
+        remaining.push(s);
+      } // senão: one-shot, remove
+    } else {
+      remaining.push(s);
     }
   }
+
+  if (changed) saveSchedules(remaining);
 }, 30000);
 
 ipcMain.handle('update-ytdlp', async () => {
