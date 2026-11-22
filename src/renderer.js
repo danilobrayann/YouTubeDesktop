@@ -869,30 +869,10 @@ const COSMETIC_AD_CSS = `
   .ytp-ad-overlay-container, .ytp-ad-text-overlay { display: none !important; }
 `;
 
-const FLOATING_DOWNLOAD_JS = `(() => {
-  if (window.__tdInjected) return;
-  window.__tdInjected = true;
-  const btn = document.createElement('button');
-  btn.id = 'td-float-download';
-  btn.textContent = '⬇ Baixar';
-  btn.style.cssText = 'position:fixed;bottom:90px;right:20px;z-index:99999;padding:10px 18px;border-radius:24px;border:none;background:#ff4444;color:#fff;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);font-family:sans-serif;';
-  btn.onclick = () => {
-    window.open('turbodown-download://video?url=' + encodeURIComponent(location.href), '_blank');
-  };
-  document.documentElement.appendChild(btn);
-  // Remove botão quando não há vídeo tocando
-  const check = setInterval(() => {
-    const v = document.querySelector('video');
-    const playing = v && !v.paused && !v.ended;
-    btn.style.display = playing ? 'block' : 'none';
-  }, 1000);
-})()`;
-
 function injectWebviewEnhancements(wv) {
   if (!wv) return;
   const inject = () => {
     try { wv.insertCSS(COSMETIC_AD_CSS); } catch (e) {}
-    try { wv.executeJavaScript(FLOATING_DOWNLOAD_JS); } catch (e) {}
   };
   wv.addEventListener('dom-ready', inject);
   wv.addEventListener('did-navigate', inject);
@@ -1003,29 +983,6 @@ webview.addEventListener('page-title-updated', (e) => {
   if (e.title) updateNowPlaying(e.title);
 });
 
-// Intercepta o botão "Baixar" injetado no webview (window.open com protocolo custom)
-webview.addEventListener('new-window', (e) => {
-  const targetUrl = e.url || (e.frame && e.frame.url) || '';
-  if (targetUrl.startsWith('turbodown-download://')) {
-    e.preventDefault();
-    try {
-      const realUrl = new URL(targetUrl.replace('turbodown-download://video?url=', 'https://'));
-      const downloadUrl = decodeURIComponent(realUrl.searchParams.get('url') || '');
-      if (downloadUrl) {
-        switchTab('downloads');
-        startDownload(downloadUrl, 'default-video', false);
-      }
-    } catch (err) {
-      // Fallback: extrai url= diretamente
-      const m = targetUrl.match(/[?&]url=([^&]+)/);
-      if (m) {
-        const downloadUrl = decodeURIComponent(m[1]);
-        switchTab('downloads');
-        startDownload(downloadUrl, 'default-video', false);
-      }
-    }
-  }
-});
 
 function updateNowPlaying(title) {
   if (!title) return;
