@@ -63,6 +63,8 @@ window.api = {
   removeSchedule: (id) => ipcRenderer.invoke('remove-schedule', id),
   getOnboardingDone: () => ipcRenderer.invoke('get-onboarding-done'),
   setOnboardingDone: () => ipcRenderer.invoke('set-onboarding-done'),
+  getYoutubeAnonymous: () => ipcRenderer.invoke('get-youtube-anonymous'),
+  setYoutubeAnonymous: (enabled) => ipcRenderer.invoke('set-youtube-anonymous', enabled),
 
   // Application updates
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),

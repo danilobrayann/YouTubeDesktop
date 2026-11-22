@@ -87,6 +87,7 @@ const setCookiesBrowser = document.getElementById('set-cookies-browser');
 const setDiscordEnabled  = document.getElementById('set-discord-enabled');
 const setDiscordClientId = document.getElementById('set-discord-client-id');
 const setAdblockEnabled  = document.getElementById('set-adblock-enabled');
+const setYoutubeAnon     = document.getElementById('set-youtube-anon');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -2254,6 +2255,13 @@ setAdblockEnabled.addEventListener('change', async () => {
   await api.setAdblock(setAdblockEnabled.checked);
 });
 
+if (setYoutubeAnon) {
+  setYoutubeAnon.addEventListener('change', async () => {
+    await api.setYoutubeAnonymous(setYoutubeAnon.checked);
+    alert('Reinicie o app para aplicar o modo anônimo do YouTube.');
+  });
+}
+
 // Backup de configurações
 if (btnExportSettings) {
   btnExportSettings.addEventListener('click', async () => {
@@ -2887,6 +2895,9 @@ async function init() {
 
   const adblockStatus = await api.getAdblockStatus();
   if (adblockStatus) setAdblockEnabled.checked = Boolean(adblockStatus.enabled);
+
+  const ytAnon = await api.getYoutubeAnonymous();
+  if (setYoutubeAnon) setYoutubeAnon.checked = Boolean(ytAnon);
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),

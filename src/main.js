@@ -55,7 +55,8 @@ const store = new Store({
     discordPresence: true,
     discordClientId: '1574051479168487525',
     scheduledDownloads: [],
-    onboardingDone: false
+    onboardingDone: false,
+    youtubeAnonymous: true
   }
 });
 
@@ -372,19 +373,41 @@ app.whenReady().then(() => {
     'persist:gemini'
   ].forEach(configureBrowserSession);
 
-  // Cookie de consentimento do YouTube — sem ele o Google trata como bot
-  try {
-    const ytSession = session.fromPartition('persist:youtube');
-    ytSession.cookies.set({
-      url: 'https://www.youtube.com',
-      name: 'CONSENT',
-      value: 'YES+cb.20210328-17-p0.en+FX+410',
-      domain: '.youtube.com',
-      path: '/',
-      secure: true,
-      sameSite: 'no_restriction'
-    }).catch(() => {});
-  } catch (e) {}
+  // Modo anônimo: limpa cookies/dados do YouTube a cada abertura para
+  // evitar que o Google acumule flags de "bot" na sessão persistente.
+  if (store.get('youtubeAnonymous', true)) {
+    try {
+      const ytSession = session.fromPartition('persist:youtube');
+      ytSession.clearStorageData({
+        origins: ['https://www.youtube.com', 'https://youtube.com', 'https://music.youtube.com']
+      }).then(() => {
+        // Re-aplica o cookie de consentimento após a limpeza
+        ytSession.cookies.set({
+          url: 'https://www.youtube.com',
+          name: 'CONSENT',
+          value: 'YES+cb.20210328-17-p0.en+FX+410',
+          domain: '.youtube.com',
+          path: '/',
+          secure: true,
+          sameSite: 'no_restriction'
+        }).catch(() => {});
+      }).catch(() => {});
+    } catch (e) {}
+  } else {
+    // Cookie de consentimento do YouTube — sem ele o Google trata como bot
+    try {
+      const ytSession = session.fromPartition('persist:youtube');
+      ytSession.cookies.set({
+        url: 'https://www.youtube.com',
+        name: 'CONSENT',
+        value: 'YES+cb.20210328-17-p0.en+FX+410',
+        domain: '.youtube.com',
+        path: '/',
+        secure: true,
+        sameSite: 'no_restriction'
+      }).catch(() => {});
+    } catch (e) {}
+  }
 
   // Allow webview to load YouTube and set proper userAgent for WhatsApp Web
   app.on('web-contents-created', (event, contents) => {
@@ -1219,6 +1242,12 @@ ipcMain.handle('save-download-advanced', (_event, options = {}) => {
   store.set('speedLimit', options.speedLimit || null);
   store.set('proxyUrl', options.proxyUrl || null);
   store.set('cookiesFromBrowser', options.cookiesFromBrowser || null);
+  return true;
+});
+
+ipcMain.handle('get-youtube-anonymous', () => Boolean(store.get('youtubeAnonymous', true)));
+ipcMain.handle('set-youtube-anonymous', (_event, enabled) => {
+  store.set('youtubeAnonymous', Boolean(enabled));
   return true;
 });
 
