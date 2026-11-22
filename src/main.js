@@ -1,6 +1,9 @@
 'use strict';
 
+// Remove a flag de automação do Chromium — sites como YouTube usam
+// navigator.webdriver / AutomationControlled para detectar webviews.
 const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu, Notification } = require('electron');
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');

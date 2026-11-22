@@ -1007,9 +1007,27 @@ const YT_AD_SKIP_JS = `(() => {
   } catch(e) {}
 })()`;
 
+// Spoofing de fingerprint — esconde que é um webview automatizado
+const FINGERPRINT_JS = `(() => {
+  try {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+    if (!window.chrome) window.chrome = { runtime: {}, app: {}, csi: function(){}, loadTimes: function(){} };
+    const origQuery = navigator.permissions && navigator.permissions.query;
+    if (origQuery) {
+      navigator.permissions.query = (p) => p && p.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : origQuery(p);
+    }
+  } catch(e) {}
+})()`;
+
 function injectWebviewEnhancements(wv) {
   if (!wv) return;
   const inject = () => {
+    try { wv.executeJavaScript(FINGERPRINT_JS); } catch (e) {}
     try { wv.insertCSS(COSMETIC_AD_CSS); } catch (e) {}
     try { wv.executeJavaScript(YT_AD_SKIP_JS); } catch (e) {}
   };
