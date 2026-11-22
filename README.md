@@ -5,6 +5,10 @@
   Construído com Electron, design em Glassmorphism, temas personalizáveis com gradientes e suporte a imagem de fundo do computador.
 </p>
 
+<p align="center">
+  <img src="assets/turbodown-preview.jpg" alt="TurboDown Preview" width="800">
+</p>
+
 ---
 
 ## 📑 Sumário
@@ -14,6 +18,7 @@
 - [📦 Como Gerar o Executável (.exe) Nativo](#-como-gerar-o-executável-exe-nativo)
 - [🎮 Como Usar o Aplicativo](#-como-usar-o-aplicativo)
   - [Assistir Vídeos](#1-assistir-vídeos)
+  - [Aba Música](#aba-música)
   - [Baixar Vídeos, Músicas e Playlists](#2-baixar-vídeos-músicas-e-playlists)
   - [Personalizar Temas e Fundo](#3-personalizar-temas-e-fundo)
 - [⌨️ Atalhos do Teclado](#️-atalhos-do-teclado)
@@ -35,6 +40,7 @@
 - 🖼️ **Aba Wallpapers HD**: Acesse o HDQwalls dentro do app para navegar por wallpapers HD, 4K, 5K e 8K, com controles de voltar, avançar e recarregar.
 - ⚽ **Aba Goalzen**: Acesse o Goalzen diretamente no TurboDown, com navegação própria e controles para voltar, avançar e recarregar.
 - 📺 **Aba Pluto TV**: Abra a Pluto TV Brasil dentro do app, com controles de navegação, recarga e página inicial.
+- 🎵 **Aba Música**: Abra o YouTube Music dentro do TurboDown, sem iniciar uma janela nativa separada.
 - ✨ **Aba Gemini**: Abra o Gemini em uma aba própria, com sessão persistente e controles de navegação.
 - 🟣 **Aba Twitch**: Acesse transmissões e jogos da Twitch em uma aba própria, com sessão persistente e controles de navegação.
 - 💬 **Redes + 1.000**: Atalhos para redes sociais, canais de futebol, streaming, música, quadros colaborativos e compras. Inclui Goalzen, Sofascore, FigJam, Whimsical, Excalidraw, Mural, Lucidspark, Canva Whiteboards, Microsoft Whiteboard, Draw.io, AFFiNE e Stormboard, além de Mercado Livre, KaBuM!, TerabyteShop, Pichau, Amazon, Shopee, AliExpress e Magalu; as páginas abrem no navegador integrado à direita, com controles de navegação e sessão persistente.
@@ -116,6 +122,10 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
   - `🏠` : Voltar à página inicial do YouTube.
   - `⛶` : Alternar o modo tela cheia do player (oculta a barra de endereço para assistir com 100% de aproveitamento de tela).
 
+### Aba Música
+- Clique em **♫ Música** na barra lateral. O YouTube Music será carregado dentro da própria janela do TurboDown; o login e a reprodução usam o serviço oficial.
+- O código completo do `ytm-rs`, incluindo o relay Jam, permanece em `ytm-rs/`. A interface Electron ainda não está conectada ao protocolo Jam.
+
 ### 2. Baixar Vídeos, Músicas e Playlists
 - **Download Rápido**: Enquanto assiste a qualquer vídeo, clique no botão **⬇ Baixar** ao lado da barra de endereço. Uma janela abrirá com o formato desejado (1080p, 720p, MP3, etc.).
 - **Aba de Downloads**:
@@ -170,7 +180,9 @@ Para transformar o projeto em um programa executável `.exe` independente no seu
 
 ## 🛠️ Requisitos Manuais (Opcional)
 
-O script `instalar.bat` já instala tudo de forma automática. Caso prefira instalar os componentes manualmente:
+O instalador de uma versão já compilada não exige Rust. Para compilar o código upstream em `ytm-rs/` ou publicar seu próprio Jam Worker, são necessários a toolchain Rust e, para o Worker, o alvo WASM. A aba Música do TurboDown não depende da compilação do player Rust.
+
+O script `instalar.bat` instala as dependências do Electron. Caso prefira configurar os componentes manualmente:
 
 1. **Node.js** (versão 18 ou superior):
    - Download oficial: [nodejs.org](https://nodejs.org/)
@@ -180,6 +192,13 @@ O script `instalar.bat` já instala tudo de forma automática. Caso prefira inst
    - Ou via terminal: `winget install yt-dlp.yt-dlp`
 3. **FFmpeg** (necessário para extração de MP3 e mesclagem de vídeo 1080p):
    - Via terminal: `winget install Gyan.FFmpeg`
+4. **Rust e MSVC C++ Build Tools** (necessários apenas para compilar o aplicativo upstream):
+   - Rust: [rustup.rs](https://rustup.rs/)
+   - MSVC: [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+
+### Player e código-fonte
+
+O projeto [grapedjuice/ytm-rs](https://github.com/grapedjuice/ytm-rs), incluindo o Jam Worker, está incluído integralmente em `ytm-rs/` no commit upstream `3fb5c23e6a9479548443506065e0e0a9a1c664f8`. A licença GPL-3.0 e os avisos originais estão preservados. O TurboDown também é distribuído sob GPL-3.0-only.
 
 ### Atualização automática do TurboDown
 
@@ -205,6 +224,9 @@ Verifique se o instalador do Windows concluiu a instalação; depois, procure Tu
 
 #### O build do executável travou com erro de symlink / permissão
 Abra o arquivo `construir.bat` e escolha a **Opção 1 (Executável Nativo Direto)**. Ela compila o aplicativo em pasta sem depender do utilitário de links simbólicos do macOS.
+
+#### A aba Música não carrega
+Verifique a conexão com a internet e tente novamente. A aba usa `music.youtube.com` dentro do TurboDown e não depende do executável nativo Rust.
 
 #### Os downloads não iniciam ou dão erro
 Certifique-se de que o **yt-dlp** e o **FFmpeg** estão instalados. Você pode rodar `atualizar-ytdlp.bat` para garantir que o mecanismo esteja na versão mais recente que suporta as últimas atualizações do YouTube.
