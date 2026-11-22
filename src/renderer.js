@@ -88,6 +88,9 @@ const setDiscordEnabled  = document.getElementById('set-discord-enabled');
 const setDiscordClientId = document.getElementById('set-discord-client-id');
 const setAdblockEnabled  = document.getElementById('set-adblock-enabled');
 const setYoutubeAnon     = document.getElementById('set-youtube-anon');
+const googleAccountStatus = document.getElementById('google-account-status');
+const btnGoogleLogin     = document.getElementById('btn-google-login');
+const btnGoogleLogout    = document.getElementById('btn-google-logout');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -452,6 +455,10 @@ function switchTab(tabId) {
 
   if (tabId === 'music' && !musicPlayer.getAttribute('src')) {
     musicPlayer.setAttribute('src', 'https://music.youtube.com/');
+  }
+
+  if (tabId === 'settings') {
+    refreshGoogleAccountStatus();
   }
 }
 
@@ -889,6 +896,47 @@ function loadUrl(url) {
 btnLoad.addEventListener('click', () => {
   loadUrl(urlInput.value);
 });
+
+// ─── Conta Google unificada ──────────────────────────────────────────────────
+async function refreshGoogleAccountStatus() {
+  if (!googleAccountStatus) return;
+  try {
+    const status = await api.getGoogleAccountStatus();
+    if (status && status.loggedIn) {
+      googleAccountStatus.textContent = 'Conectado';
+      googleAccountStatus.classList.add('logged-in');
+      googleAccountStatus.classList.remove('logged-out');
+    } else {
+      googleAccountStatus.textContent = 'Não conectado';
+      googleAccountStatus.classList.add('logged-out');
+      googleAccountStatus.classList.remove('logged-in');
+    }
+  } catch (e) {
+    googleAccountStatus.textContent = 'Indisponível';
+  }
+}
+
+if (btnGoogleLogin) {
+  btnGoogleLogin.addEventListener('click', () => {
+    switchTab('home');
+    webview.src = 'https://accounts.google.com/ServiceLogin?continue=' +
+      encodeURIComponent('https://www.youtube.com');
+    urlInput.value = 'https://accounts.google.com/';
+    setTimeout(refreshGoogleAccountStatus, 15000);
+  });
+}
+
+if (btnGoogleLogout) {
+  btnGoogleLogout.addEventListener('click', async () => {
+    btnGoogleLogout.disabled = true;
+    try {
+      await api.googleLogout();
+      await refreshGoogleAccountStatus();
+    } finally {
+      btnGoogleLogout.disabled = false;
+    }
+  });
+}
 
 // Botão de login Google/YouTube
 const btnYtLogin = document.getElementById('btn-yt-login');
@@ -2926,6 +2974,8 @@ async function init() {
 
   const ytAnon = await api.getYoutubeAnonymous();
   if (setYoutubeAnon) setYoutubeAnon.checked = Boolean(ytAnon);
+
+  refreshGoogleAccountStatus();
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),

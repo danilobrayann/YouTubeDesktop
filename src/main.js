@@ -498,6 +498,51 @@ ipcMain.handle('clear-google-private-data', async () => {
   return true;
 });
 
+// ─── Conta Google unificada ─────────────────────────────────────────────────
+ipcMain.handle('get-google-account-status', async () => {
+  try {
+    const cookies = await session.fromPartition('persist:google')
+      .cookies.get({ domain: '.google.com' });
+    const authNames = ['SID', 'HSID', 'SSID', 'LSID', '__Secure-1PSID', '__Secure-3PSID'];
+    return { loggedIn: cookies.some(c => authNames.includes(c.name)) };
+  } catch (e) {
+    return { loggedIn: false };
+  }
+});
+
+ipcMain.handle('google-logout', async () => {
+  try {
+    const googleSession = session.fromPartition('persist:google');
+    const cookies = await googleSession.cookies.get({ domain: '.google.com' });
+    await Promise.all(cookies.map(c => googleSession.cookies.remove({
+      url: `https://${String(c.domain).replace(/^\./, '')}${c.path || '/'}`,
+      name: c.name
+    }).catch(() => {})));
+    await googleSession.clearStorageData({
+      origins: [
+        'https://accounts.google.com',
+        'https://www.google.com',
+        'https://google.com',
+        'https://www.youtube.com',
+        'https://youtube.com',
+        'https://music.youtube.com'
+      ]
+    });
+    await googleSession.cookies.set({
+      url: 'https://www.youtube.com',
+      name: 'CONSENT',
+      value: 'YES+cb.20210328-17-p0.en+FX+410',
+      domain: '.youtube.com',
+      path: '/',
+      secure: true,
+      sameSite: 'no_restriction'
+    }).catch(() => {});
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
 // ─── Theme ───────────────────────────────────────────────────────────────────
 ipcMain.handle('get-theme', () => {
   return store.get('theme');

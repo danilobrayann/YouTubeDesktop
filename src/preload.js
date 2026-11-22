@@ -78,6 +78,8 @@ window.api = {
   getAdblockStatus: () => ipcRenderer.invoke('get-adblock-status'),
   setAdblock: (enabled) => ipcRenderer.invoke('set-adblock', enabled),
   clearGooglePrivateData: () => ipcRenderer.invoke('clear-google-private-data'),
+  getGoogleAccountStatus: () => ipcRenderer.invoke('get-google-account-status'),
+  googleLogout: () => ipcRenderer.invoke('google-logout'),
   resolveNavigationTarget,
 
   // IPC event listeners
