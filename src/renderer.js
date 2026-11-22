@@ -2797,13 +2797,50 @@ if (nuvemWrap && api.telegramUploadDropped) {
     nuvemWrap.classList.remove('tg-drop-active');
   }));
   nuvemWrap.addEventListener('drop', async (e) => {
-    const paths = [];
-    for (const f of e.dataTransfer.files) {
-      const p = api.tdGetPathForFile(f);
-      if (p) paths.push(p);
+    const groups = [];
+    // Traversia entradas para manter nome da pasta e subpastas
+    const readDir = (entry, base, out) => new Promise((resolve) => {
+      const reader = entry.createReader();
+      const batch = () => reader.readEntries((entries) => {
+        if (!entries.length) return resolve();
+        let pending = entries.length;
+        const next = () => { if (--pending === 0) batch(); };
+        for (const en of entries) {
+          if (en.isFile) {
+            en.file((file) => {
+              const p = api.tdGetPathForFile(file);
+              if (p) out.push({ path: p, rel: (en.fullPath || '').startsWith(base) ? en.fullPath.slice(base.length) : (en.fullPath || '') });
+              next();
+            }, next);
+          } else if (en.isDirectory) {
+            readDir(en, base, out).then(next);
+          } else next();
+        }
+      });
+      batch();
+    });
+    for (const item of e.dataTransfer.items) {
+      const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+      if (!entry) continue;
+      if (entry.isFile) {
+        entry.file((file) => {
+          const p = api.tdGetPathForFile(file);
+          if (p) groups.push({ name: '', files: [{ path: p, rel: '' }] });
+        });
+      } else if (entry.isDirectory) {
+        const files = [];
+        await readDir(entry, entry.fullPath, files);
+        if (files.length) groups.push({ name: entry.name, files });
+      }
     }
-    if (!paths.length) { alert('Não foi possível ler os itens soltos.'); return; }
-    const res = await api.telegramUploadDropped(paths);
+    if (!groups.length) {
+      for (const f of e.dataTransfer.files) {
+        const p = api.tdGetPathForFile(f);
+        if (p) groups.push({ name: '', files: [{ path: p, rel: '' }] });
+      }
+    }
+    if (!groups.length) { alert('Não foi possível ler os itens soltos.'); return; }
+    const res = await api.telegramUploadDropped(groups);
     if (res && res.message && !res.success) alert(res.message);
     else if (res) alert(`Upload concluído: ${res.ok} enviado(s), ${res.fail} falha(s)`);
     renderTelegramFiles();
