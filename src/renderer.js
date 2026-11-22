@@ -99,6 +99,17 @@ const setTelegramDeleteAfterUpload = document.getElementById('set-telegram-delet
 const telegramConnectionStatus = document.getElementById('telegram-connection-status');
 const btnTelegramLogin = document.getElementById('btn-telegram-login');
 const btnTelegramCancel = document.getElementById('btn-telegram-cancel');
+const telegramCloud = document.getElementById('telegram-cloud');
+const telegramCloudFill = document.getElementById('telegram-cloud-fill');
+const telegramCloudPct = document.getElementById('telegram-cloud-pct');
+const telegramCloudLabel = document.getElementById('telegram-cloud-label');
+const btnTelegramUploadFile = document.getElementById('btn-telegram-upload-file');
+const btnTelegramUploadFolder = document.getElementById('btn-telegram-upload-folder');
+const btnTelegramWatchFolder = document.getElementById('btn-telegram-watch-folder');
+const telegramWatchFolderRow = document.getElementById('telegram-watch-folder-row');
+const telegramWatchFolderPath = document.getElementById('telegram-watch-folder-path');
+const btnTelegramRefreshFiles = document.getElementById('btn-telegram-refresh-files');
+const telegramFilesList = document.getElementById('telegram-files-list');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -467,6 +478,7 @@ function switchTab(tabId) {
 
   if (tabId === 'settings') {
     refreshGoogleAccountStatus();
+    refreshTelegramCloud();
   }
 }
 
@@ -2480,6 +2492,183 @@ ipcRenderer.on('telegram-login-timeout', () => {
   btnTelegramCancel.classList.add('hidden');
   alert('Tempo esgotado. Tente novamente.');
 });
+
+// ─── Nuvem Telegram (estilo Drive) ───────────────────────────────────────────
+const tgCloud = {
+  bytesTotal: 0,
+  bytesDone: 0,
+  filesTotal: 0,
+  filesDone: 0,
+  idleTimer: null
+};
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function telegramFileIcon(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (['mp3', 'm4a', 'ogg', 'opus', 'wav', 'flac', 'aac'].includes(ext)) return '🎵';
+  if (['mp4', 'mkv', 'webm', 'mov', 'avi', 'm4v'].includes(ext)) return '🎬';
+  if (['zip', 'rar', '7z'].includes(ext)) return '🗜️';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return '🖼️';
+  return '📄';
+}
+
+function updateTelegramCloudUI() {
+  if (!telegramCloud || !telegramCloudFill) return;
+  const pct = tgCloud.bytesTotal > 0
+    ? Math.min(100, Math.round((tgCloud.bytesDone / tgCloud.bytesTotal) * 100))
+    : (tgCloud.filesTotal > 0 ? Math.round((tgCloud.filesDone / tgCloud.filesTotal) * 100) : 0);
+  telegramCloudFill.style.width = `${pct}%`;
+  // Gradiente muda de cor conforme o progresso (azul → roxo → verde → dourado)
+  const hue = 210 - (pct / 100) * 190;
+  telegramCloudFill.style.background = `linear-gradient(90deg, hsl(${hue},85%,55%), hsl(${hue + 40},90%,60%))`;
+  telegramCloud.style.setProperty('--cloud-hue', hue);
+  telegramCloudPct.textContent = `${pct}%`;
+  if (tgCloud.filesTotal > 0) {
+    telegramCloudLabel.textContent = tgCloud.filesDone >= tgCloud.filesTotal
+      ? `Concluído — ${tgCloud.filesDone} arquivo(s)`
+      : `Enviando ${tgCloud.filesDone + 1}/${tgCloud.filesTotal} — ${formatBytes(tgCloud.bytesDone)} de ${formatBytes(tgCloud.bytesTotal)}`;
+  } else {
+    telegramCloudLabel.textContent = 'Nuvem Telegram';
+  }
+}
+
+function resetTelegramCloud() {
+  if (tgCloud.idleTimer) clearTimeout(tgCloud.idleTimer);
+  tgCloud.idleTimer = setTimeout(() => {
+    tgCloud.bytesTotal = tgCloud.bytesDone = tgCloud.filesTotal = tgCloud.filesDone = 0;
+    telegramCloudFill.style.width = '0%';
+    telegramCloudPct.textContent = '0%';
+    telegramCloudLabel.textContent = 'Nuvem Telegram';
+    renderTelegramFiles();
+  }, 4000);
+}
+
+api.on('telegram-upload-event', (data) => {
+  if (!data) return;
+  if (data.type === 'start') {
+    tgCloud.filesTotal++;
+    tgCloud.bytesTotal += data.size || 0;
+  } else if (data.type === 'done' || data.type === 'error') {
+    tgCloud.filesDone++;
+    tgCloud.bytesDone += data.size || 0;
+    if (tgCloud.filesDone >= tgCloud.filesTotal) resetTelegramCloud();
+  }
+  updateTelegramCloudUI();
+});
+
+async function renderTelegramFiles() {
+  if (!telegramFilesList) return;
+  try {
+    const files = await api.telegramGetFiles();
+    telegramFilesList.replaceChildren();
+    if (!files.length) {
+      const empty = document.createElement('p');
+      empty.className = 'maintenance-message';
+      empty.style.margin = '0';
+      empty.textContent = 'Nenhum arquivo enviado ainda.';
+      telegramFilesList.appendChild(empty);
+      return;
+    }
+    let totalSize = 0;
+    files.forEach(f => {
+      totalSize += f.size || 0;
+      const row = document.createElement('div');
+      row.className = 'telegram-file-row';
+      const icon = document.createElement('span');
+      icon.className = 'telegram-file-icon';
+      icon.textContent = telegramFileIcon(f.fileName);
+      const info = document.createElement('div');
+      info.className = 'telegram-file-info';
+      const name = document.createElement('div');
+      name.className = 'telegram-file-name';
+      name.textContent = f.fileName;
+      name.title = f.title || f.fileName;
+      const meta = document.createElement('div');
+      meta.className = 'telegram-file-meta';
+      const srcLabel = f.source === 'download' ? 'Download' : f.source === 'watch' ? 'Pasta vigiada' : 'Manual';
+      meta.textContent = `${formatBytes(f.size)} • ${new Date(f.date).toLocaleDateString('pt-BR')} • ${srcLabel}`;
+      info.append(name, meta);
+      const del = document.createElement('button');
+      del.className = 'btn-ghost btn-xs telegram-file-del';
+      del.textContent = '🗑';
+      del.title = 'Deletar da nuvem';
+      del.addEventListener('click', async () => {
+        del.disabled = true;
+        const res = await api.telegramDeleteFile(f.id);
+        if (res && res.success) renderTelegramFiles();
+        else { del.disabled = false; alert(res && res.message || 'Falha ao deletar'); }
+      });
+      row.append(icon, info, del);
+      telegramFilesList.appendChild(row);
+    });
+    telegramCloudLabel.textContent = `${files.length} arquivo(s) • ${formatBytes(totalSize)} na nuvem`;
+  } catch (e) {}
+}
+
+if (btnTelegramUploadFile) {
+  btnTelegramUploadFile.addEventListener('click', async () => {
+    btnTelegramUploadFile.disabled = true;
+    try {
+      const res = await api.telegramPickUploadFile();
+      if (res && res.message) alert(res.message);
+      else if (res && res.success) renderTelegramFiles();
+    } finally {
+      btnTelegramUploadFile.disabled = false;
+    }
+  });
+}
+
+if (btnTelegramUploadFolder) {
+  btnTelegramUploadFolder.addEventListener('click', async () => {
+    btnTelegramUploadFolder.disabled = true;
+    btnTelegramUploadFolder.textContent = '⏳ Enviando...';
+    try {
+      const res = await api.telegramPickUploadFolder();
+      if (res && res.success && res.total !== undefined) {
+        alert(`${res.uploaded} enviado(s), ${res.failed} falha(s) de ${res.total} arquivo(s).`);
+        renderTelegramFiles();
+      } else if (res && res.message) {
+        alert(res.message);
+      }
+    } finally {
+      btnTelegramUploadFolder.disabled = false;
+      btnTelegramUploadFolder.textContent = '📁 Enviar pasta';
+    }
+  });
+}
+
+if (btnTelegramWatchFolder) {
+  btnTelegramWatchFolder.addEventListener('click', async () => {
+    const res = await api.telegramPickWatchFolder();
+    if (res && res.success && res.path) {
+      telegramWatchFolderRow.style.display = '';
+      telegramWatchFolderPath.textContent = res.path;
+    } else if (res && res.message) {
+      alert(res.message);
+    }
+  });
+}
+
+if (btnTelegramRefreshFiles) {
+  btnTelegramRefreshFiles.addEventListener('click', renderTelegramFiles);
+}
+
+async function refreshTelegramCloud() {
+  try {
+    const watch = await api.telegramGetWatchFolder();
+    if (watch) {
+      telegramWatchFolderRow.style.display = '';
+      telegramWatchFolderPath.textContent = watch;
+    }
+  } catch (e) {}
+  renderTelegramFiles();
+}
 
 // Backup de configurações
 if (btnExportSettings) {

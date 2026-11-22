@@ -1924,9 +1924,43 @@
                         Deletar arquivo local após upload (modo nuvem)
                       </label>
                     </div>
+
+                    <!-- Painel da nuvem -->
+                    <div class="telegram-cloud" id="telegram-cloud">
+                      <div class="telegram-cloud-fill" id="telegram-cloud-fill"></div>
+                      <div class="telegram-cloud-content">
+                        <div class="telegram-cloud-pct" id="telegram-cloud-pct">0%</div>
+                        <div class="telegram-cloud-label" id="telegram-cloud-label">Nuvem vazia</div>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <button id="btn-telegram-upload-file" class="btn-secondary">📄 Enviar arquivo</button>
+                      <button id="btn-telegram-upload-folder" class="btn-secondary">📁 Enviar pasta</button>
+                    </div>
+                    <div class="setting-row">
+                      <label>Pasta vigiada (solta arquivo → sobe)</label>
+                      <button id="btn-telegram-watch-folder" class="btn-ghost">Escolher pasta</button>
+                    </div>
+                    <div class="setting-row" id="telegram-watch-folder-row" style="display:none;">
+                      <span id="telegram-watch-folder-path" class="maintenance-message" style="margin:0;"></span>
+                    </div>
+
+                    <div class="setting-row" style="align-items:flex-start;">
+                      <div class="telegram-files-panel">
+                        <div class="telegram-files-header">
+                          <span>☁️ Arquivos na nuvem</span>
+                          <button id="btn-telegram-refresh-files" class="btn-ghost btn-xs">↻</button>
+                        </div>
+                        <div id="telegram-files-list" class="telegram-files-list">
+                          <p class="maintenance-message" style="margin:0;">Nenhum arquivo enviado ainda.</p>
+                        </div>
+                      </div>
+                    </div>
+
                     <p class="maintenance-message" style="grid-column: 1 / -1;">
                       Para conectar: 1) Crie um bot no @BotFather (/newbot) e copie o token. 2) Cole o token acima e clique em "Conectar".
-                      3) Envie /start para o bot: na conversa privada OU em um grupo onde o bot foi adicionado. 
+                      3) Envie /start para o bot: na conversa privada OU em um grupo onde o bot foi adicionado.
                       Arquivos serão salvos onde o /start foi enviado.
                     </p>
                   </div>

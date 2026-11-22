@@ -173,6 +173,196 @@ function ensureTelegramBot() {
   }
 }
 
+// ─── Telegram cloud index & management ───────────────────────────────────────
+function getTelegramFiles() {
+  return store.get('telegramFiles') || [];
+}
+
+function recordTelegramFile(entry) {
+  const list = getTelegramFiles();
+  list.unshift(entry);
+  store.set('telegramFiles', list.slice(0, 500));
+}
+
+function detectTelegramMediaType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (['.mp3', '.m4a', '.ogg', '.opus', '.wav', '.flac', '.aac'].includes(ext)) return 'audio';
+  if (['.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v'].includes(ext)) return 'video';
+  return 'document';
+}
+
+ipcMain.handle('telegram-get-files', () => getTelegramFiles().slice(0, 200));
+
+ipcMain.handle('telegram-delete-file', async (_event, id) => {
+  const list = getTelegramFiles();
+  const entry = list.find(f => f.id === id);
+  if (!entry) return { success: false, message: 'Arquivo não encontrado no índice' };
+  const bot = ensureTelegramBot();
+  if (bot && telegramChatId && entry.messageId) {
+    try {
+      await bot.deleteMessage(telegramChatId, entry.messageId);
+    } catch (e) {
+      console.warn('Falha ao deletar mensagem no Telegram:', e.message);
+    }
+  }
+  store.set('telegramFiles', list.filter(f => f.id !== id));
+  return { success: true };
+});
+
+ipcMain.handle('telegram-upload-path', async (_event, filePath) => {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado' };
+  const p = String(filePath || '').trim();
+  if (!p || !fs.existsSync(p) || !fs.statSync(p).isFile()) {
+    return { success: false, message: 'Arquivo inválido' };
+  }
+  const size = fs.statSync(p).size;
+  if (size > 2 * 1024 * 1024 * 1024) {
+    return { success: false, message: 'Arquivo maior que 2GB (limite do Telegram)' };
+  }
+  mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(p), size });
+  const result = await uploadToTelegram(p, path.basename(p), detectTelegramMediaType(p));
+  mainWindow?.webContents.send('telegram-upload-event', {
+    type: result.success ? 'done' : 'error',
+    fileName: path.basename(p),
+    size,
+    message: result.reason || ''
+  });
+  return result.success ? { success: true } : { success: false, message: result.reason || 'Falha no envio' };
+});
+
+ipcMain.handle('telegram-pick-upload-file', async () => {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado', canceled: false };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Enviar arquivo para o Telegram',
+    properties: ['openFile'],
+    filters: [{ name: 'Todos os arquivos', extensions: ['*'] }]
+  });
+  if (result.canceled || !result.filePaths.length) return { success: false, canceled: true };
+  const p = result.filePaths[0];
+  const size = fs.statSync(p).size;
+  if (size > 2 * 1024 * 1024 * 1024) {
+    return { success: false, message: 'Arquivo maior que 2GB (limite do Telegram)' };
+  }
+  mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(p), size });
+  const res = await uploadToTelegram(p, path.basename(p), detectTelegramMediaType(p));
+  mainWindow?.webContents.send('telegram-upload-event', {
+    type: res.success ? 'done' : 'error',
+    fileName: path.basename(p),
+    size,
+    message: res.reason || ''
+  });
+  return res.success ? { success: true } : { success: false, message: res.reason || 'Falha no envio' };
+});
+
+ipcMain.handle('telegram-pick-upload-folder', async () => {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado', canceled: false };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Enviar pasta para o Telegram',
+    properties: ['openDirectory']
+  });
+  if (result.canceled || !result.filePaths.length) return { success: false, canceled: true };
+  const dir = result.filePaths[0];
+  const files = [];
+  const walk = (d) => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) files.push(full);
+    }
+  };
+  walk(dir);
+  let ok = 0, fail = 0;
+  for (const f of files) {
+    const st = fs.statSync(f);
+    if (st.size > 2 * 1024 * 1024 * 1024) { fail++; continue; }
+    mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(f), size: st.size });
+    const res = await uploadToTelegram(f, path.basename(f), detectTelegramMediaType(f));
+    if (res.success) ok++;
+    else fail++;
+    mainWindow?.webContents.send('telegram-upload-event', {
+      type: res.success ? 'done' : 'error',
+      fileName: path.basename(f),
+      size: st.size,
+      message: res.reason || ''
+    });
+  }
+  return { success: true, uploaded: ok, failed: fail, total: files.length };
+});
+
+// ─── Pasta vigiada: arquivos soltos nela sobem pro Telegram ──────────────────
+let telegramWatchFolder = null;
+let telegramWatcher = null;
+const pendingWatchFiles = new Map();
+
+function startTelegramWatcher() {
+  if (telegramWatcher) {
+    try { telegramWatcher.close(); } catch (e) {}
+    telegramWatcher = null;
+  }
+  const folder = store.get('telegram.watchFolder');
+  if (!folder || !fs.existsSync(folder)) return;
+  telegramWatchFolder = folder;
+  try {
+    telegramWatcher = fs.watch(folder, { recursive: true }, (_event, filename) => {
+      if (!filename) return;
+      const full = path.join(folder, filename);
+      const prev = pendingWatchFiles.get(full);
+      if (prev) clearTimeout(prev);
+      pendingWatchFiles.set(full, setTimeout(() => handleWatchedFile(full), 2500));
+    });
+  } catch (e) {
+    telegramWatcher = null;
+  }
+}
+
+async function handleWatchedFile(full) {
+  try {
+    const st = fs.statSync(full);
+    if (!st.isFile() || st.size === 0 || st.size > 2 * 1024 * 1024 * 1024) return;
+    const bot = ensureTelegramBot();
+    if (!bot || !telegramChatId) return;
+    mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(full), size: st.size, source: 'watch' });
+    const res = await uploadToTelegram(full, path.basename(full), detectTelegramMediaType(full));
+    mainWindow?.webContents.send('telegram-upload-event', {
+      type: res.success ? 'done' : 'error',
+      fileName: path.basename(full),
+      size: st.size,
+      message: res.reason || '',
+      source: 'watch'
+    });
+    if (res.success && telegramDeleteAfterUpload) {
+      try { fs.unlinkSync(full); } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+ipcMain.handle('telegram-get-watch-folder', () => store.get('telegram.watchFolder') || '');
+
+ipcMain.handle('telegram-set-watch-folder', async (_event, folderPath) => {
+  const p = String(folderPath || '').trim();
+  if (p && (!fs.existsSync(p) || !fs.statSync(p).isDirectory())) {
+    return { success: false, message: 'Pasta inválida' };
+  }
+  store.set('telegram.watchFolder', p || null);
+  startTelegramWatcher();
+  return { success: true };
+});
+
+ipcMain.handle('telegram-pick-watch-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Escolher pasta vigiada',
+    properties: ['openDirectory']
+  });
+  if (result.canceled || !result.filePaths.length) return { success: false, canceled: true };
+  const p = result.filePaths[0];
+  store.set('telegram.watchFolder', p);
+  startTelegramWatcher();
+  return { success: true, path: p };
+});
+
 async function uploadToTelegram(filePath, title, mediaType = 'document', downloadId = null) {
   const bot = ensureTelegramBot();
   if (!bot || !telegramChatId) return { success: false, reason: 'not_configured' };
@@ -203,13 +393,26 @@ async function uploadToTelegram(filePath, title, mediaType = 'document', downloa
       caption: title || path.basename(filePath),
       filename: path.basename(filePath)
     };
+    let sent;
     if (mediaType === 'video') {
-      await bot.sendVideo(telegramChatId, filePath, options);
+      sent = await bot.sendVideo(telegramChatId, filePath, options);
     } else if (mediaType === 'audio') {
-      await bot.sendAudio(telegramChatId, filePath, options);
+      sent = await bot.sendAudio(telegramChatId, filePath, options);
     } else {
-      await bot.sendDocument(telegramChatId, filePath, options);
+      sent = await bot.sendDocument(telegramChatId, filePath, options);
     }
+
+    // Registra no índice local da nuvem (permite listar/deletar depois)
+    recordTelegramFile({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fileName: path.basename(filePath),
+      title: title || path.basename(filePath),
+      size: stats.size,
+      messageId: sent && sent.message_id,
+      chatType: store.get('telegram.chatType', ''),
+      source: downloadId ? 'download' : 'manual',
+      date: Date.now()
+    });
 
     if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
       mainWindow.webContents.send('telegram-upload-status', {
@@ -591,6 +794,9 @@ app.whenReady().then(() => {
     'persist:wallpapers',
     'persist:gemini'
   ].forEach(configureBrowserSession);
+
+  // Inicia watcher da pasta vigiada do Telegram (se configurada)
+  startTelegramWatcher();
 
   // Modo anônimo: limpa cookies/dados do YouTube a cada abertura para
   // evitar que o Google acumule flags de "bot" na sessão persistente.

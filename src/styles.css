@@ -1587,6 +1587,128 @@ body.has-bg-image {
   background: rgba(248, 113, 113, 0.12);
 }
 
+/* ─── Nuvem Telegram (estilo Drive) ────────────────────────────────────────── */
+.telegram-cloud {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 88px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.15), rgba(25, 135, 84, 0.15));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 8px 0;
+}
+
+.telegram-cloud-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, hsl(210, 85%, 55%), hsl(250, 90%, 60%));
+  opacity: 0.35;
+}
+
+.telegram-cloud-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  animation: cloud-shimmer 1.6s linear infinite;
+}
+
+@keyframes cloud-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.telegram-cloud-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.telegram-cloud-pct {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.telegram-cloud-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Lista de arquivos da nuvem */
+.telegram-files-panel {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.telegram-files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.telegram-files-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.telegram-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.telegram-file-row:last-child {
+  border-bottom: none;
+}
+
+.telegram-file-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.telegram-file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.telegram-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.telegram-file-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.btn-xs {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .setting-row {
   display: flex;
   align-items: center;

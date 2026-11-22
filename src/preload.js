@@ -85,6 +85,13 @@ window.api = {
   startTelegramWait: () => ipcRenderer.invoke('start-telegram-wait'),
   cancelTelegramWait: () => ipcRenderer.invoke('cancel-telegram-wait'),
   uploadFileTelegram: (opts) => ipcRenderer.invoke('upload-file-telegram', opts),
+  telegramGetFiles: () => ipcRenderer.invoke('telegram-get-files'),
+  telegramDeleteFile: (id) => ipcRenderer.invoke('telegram-delete-file', id),
+  telegramUploadPath: (filePath) => ipcRenderer.invoke('telegram-upload-path', filePath),
+  telegramPickUploadFile: () => ipcRenderer.invoke('telegram-pick-upload-file'),
+  telegramPickUploadFolder: () => ipcRenderer.invoke('telegram-pick-upload-folder'),
+  telegramGetWatchFolder: () => ipcRenderer.invoke('telegram-get-watch-folder'),
+  telegramPickWatchFolder: () => ipcRenderer.invoke('telegram-pick-watch-folder'),
   resolveNavigationTarget,
 
   // IPC event listeners
@@ -96,7 +103,8 @@ window.api = {
       'window-maximized',
       'telegram-upload-status',
       'telegram-login-success',
-      'telegram-login-timeout'
+      'telegram-login-timeout',
+      'telegram-upload-event'
     ];
     if (allowedChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));

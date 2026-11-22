@@ -48,6 +48,17 @@ class TelegramClient {
     return this._sendFile('sendDocument', 'document', chatId, filePath, options);
   }
 
+  async deleteMessage(chatId, messageId) {
+    const res = await fetch(`${this.baseUrl}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: String(chatId), message_id: Number(messageId) })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.description || 'Falha ao deletar mensagem');
+    return data.result;
+  }
+
   async _sendFile(endpoint, fieldName, chatId, filePath, options = {}) {
     const fileName = options.filename || path.basename(filePath);
     let blob;
