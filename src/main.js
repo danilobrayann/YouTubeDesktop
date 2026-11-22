@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const { isTrackerRequest } = require('./browser-utils');
+const { DiscordRPC } = require('./discord-rpc');
 const {
   AUDIO_FORMATS,
   VIDEO_FORMATS,
@@ -49,7 +50,9 @@ const store = new Store({
     customUserAgent: null,
     speedLimit: '5M',
     proxyUrl: null,
-    cookiesFromBrowser: null
+    cookiesFromBrowser: null,
+    discordPresence: false,
+    discordClientId: null
   }
 });
 
@@ -60,6 +63,98 @@ const configuredBrowserSessions = new WeakSet();
 // ─── Active downloads registry ───────────────────────────────────────────────
 const activeDownloads = new Map(); // downloadId → child process
 const downloadJobs = new Map();
+
+// ─── Discord Rich Presence ───────────────────────────────────────────────────
+let discordRpc = null;
+let discordEnabled = store.get('discordPresence', false);
+let discordClientId = store.get('discordClientId', null);
+let discordDownloadActivity = null; // { details, state }
+let discordMusicActivity = null;    // { details, state, timestamps }
+
+function ensureDiscordRpc() {
+  if (!discordRpc && discordEnabled && discordClientId) {
+    discordRpc = new DiscordRPC(discordClientId);
+    discordRpc.connect();
+  }
+  return discordRpc;
+}
+
+function pushDiscordActivity() {
+  const rpc = ensureDiscordRpc();
+  if (!rpc) return;
+  const activity = discordDownloadActivity || discordMusicActivity;
+  if (!activity) {
+    rpc.clearActivity();
+    return;
+  }
+  rpc.setActivity({
+    details: activity.details,
+    state: activity.state,
+    timestamps: activity.timestamps,
+    assets: { large_image: 'turbodown', large_text: 'TurboDown' },
+    instance: false
+  });
+}
+
+function updateDiscordForJob(job, data = {}) {
+  if (!discordEnabled) return;
+  const status = data.status || job.status;
+  if (status === 'downloading' || status === 'processing' || status === 'pausing') {
+    const title = job.detectedTitle || 'mídia';
+    const pct = Math.round(job.lastProgress || data.percent || 0);
+    discordDownloadActivity = {
+      details: `Baixando: ${title}`,
+      state: pct > 0 ? `${pct}%${job.totalItems > 1 ? ` · ${job.currentItem}/${job.totalItems}` : ''}` : 'Iniciando...'
+    };
+    pushDiscordActivity();
+  } else if (['complete', 'error', 'cancelled', 'paused'].includes(status)) {
+    discordDownloadActivity = null;
+    pushDiscordActivity();
+  }
+}
+
+ipcMain.handle('set-discord-music-state', (_event, state = {}) => {
+  if (!discordEnabled) return false;
+  if (state.playing && state.title) {
+    const duration = Number(state.duration) || 0;
+    const position = Number(state.position) || 0;
+    discordMusicActivity = {
+      details: `Ouvindo ${state.title}`,
+      state: state.artist || 'YouTube Music',
+      timestamps: duration > 0
+        ? { start: Math.floor(Date.now() / 1000) - Math.floor(position), end: Math.floor(Date.now() / 1000) + Math.floor(duration - position) }
+        : undefined
+    };
+  } else {
+    discordMusicActivity = null;
+  }
+  pushDiscordActivity();
+  return true;
+});
+
+ipcMain.handle('get-discord-settings', () => ({
+  enabled: discordEnabled,
+  clientId: discordClientId || ''
+}));
+
+ipcMain.handle('save-discord-settings', (_event, options = {}) => {
+  discordEnabled = Boolean(options.enabled);
+  discordClientId = (options.clientId || '').trim() || null;
+  store.set('discordPresence', discordEnabled);
+  store.set('discordClientId', discordClientId);
+  if (discordRpc) {
+    discordRpc.destroy();
+    discordRpc = null;
+  }
+  if (discordEnabled) {
+    discordDownloadActivity = null;
+    discordMusicActivity = null;
+    pushDiscordActivity();
+  } else if (discordRpc) {
+    discordRpc.clearActivity();
+  }
+  return true;
+});
 
 // ─── Main window & Tray ─────────────────────────────────────────────────────
 let mainWindow = null;
@@ -460,6 +555,7 @@ ipcMain.handle('inspect-playlist', async (event, url) => {
 
 // ─── Download queue and process control ──────────────────────────────────────
 function sendDownloadProgress(job, data) {
+  updateDiscordForJob(job, data);
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send('download-progress', {
     downloadId: job.request.downloadId,
@@ -950,7 +1046,8 @@ ipcMain.handle('get-ytdlp-path', () => getYtDlpPath());
 const BACKUP_KEYS = [
   'theme', 'downloadPath', 'defaultFormat', 'videoFormat', 'audioFormat',
   'googleShieldsEnabled', 'customUserAgent',
-  'speedLimit', 'proxyUrl', 'cookiesFromBrowser'
+  'speedLimit', 'proxyUrl', 'cookiesFromBrowser',
+  'discordPresence', 'discordClientId'
 ];
 
 ipcMain.handle('export-settings', async () => {

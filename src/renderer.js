@@ -83,6 +83,8 @@ const setCustomUserAgent = document.getElementById('set-custom-user-agent');
 const setSpeedLimit     = document.getElementById('set-speed-limit');
 const setProxy          = document.getElementById('set-proxy');
 const setCookiesBrowser = document.getElementById('set-cookies-browser');
+const setDiscordEnabled  = document.getElementById('set-discord-enabled');
+const setDiscordClientId = document.getElementById('set-discord-client-id');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -464,6 +466,38 @@ musicPlayer.addEventListener('did-start-loading', () => {
 
 musicPlayer.addEventListener('dom-ready', () => {
   musicLoading.classList.add('hidden');
+});
+
+// ── Discord Rich Presence: poll YouTube Music player ────────────────────────
+let discordPresenceEnabled = false;
+
+function pollDiscordMusicState() {
+  if (!discordPresenceEnabled || currentTab !== 'music') {
+    api.setDiscordMusicState({ playing: false }).catch(() => {});
+    return;
+  }
+  musicPlayer.executeJavaScript(`(() => {
+    const v = document.querySelector('video');
+    const bar = document.querySelector('ytmusic-player-bar');
+    const titleEl = bar && bar.querySelector('.title');
+    const subEl = bar && bar.querySelector('.subtitle');
+    const title = titleEl ? titleEl.innerText.trim() : '';
+    const artist = subEl ? subEl.innerText.trim() : '';
+    if (!v || !title) return { playing: false };
+    return {
+      playing: !v.paused && !v.ended && v.readyState > 1,
+      title, artist,
+      position: v.currentTime || 0,
+      duration: isFinite(v.duration) ? v.duration : 0
+    };
+  })()`, true)
+    .then(state => api.setDiscordMusicState(state || { playing: false }))
+    .catch(() => api.setDiscordMusicState({ playing: false }).catch(() => {}));
+}
+
+setInterval(pollDiscordMusicState, 15000);
+window.addEventListener('beforeunload', () => {
+  api.setDiscordMusicState({ playing: false }).catch(() => {});
 });
 
 musicPlayer.addEventListener('did-fail-load', (event) => {
@@ -1747,6 +1781,17 @@ setSpeedLimit.addEventListener('change', saveAdvancedOptions);
 setCookiesBrowser.addEventListener('change', saveAdvancedOptions);
 setProxy.addEventListener('change', saveAdvancedOptions);
 
+// Discord Rich Presence
+const saveDiscordSettings = async () => {
+  discordPresenceEnabled = setDiscordEnabled.checked;
+  await api.saveDiscordSettings({
+    enabled: discordPresenceEnabled,
+    clientId: setDiscordClientId.value.trim()
+  });
+};
+setDiscordEnabled.addEventListener('change', saveDiscordSettings);
+setDiscordClientId.addEventListener('change', saveDiscordSettings);
+
 // Backup de configurações
 if (btnExportSettings) {
   btnExportSettings.addEventListener('click', async () => {
@@ -2370,6 +2415,13 @@ async function init() {
     setCookiesBrowser.value = advanced.cookiesFromBrowser || '';
   }
   renderHistory();
+
+  const discordSettings = await api.getDiscordSettings();
+  if (discordSettings) {
+    discordPresenceEnabled = Boolean(discordSettings.enabled);
+    setDiscordEnabled.checked = discordPresenceEnabled;
+    setDiscordClientId.value = discordSettings.clientId || '';
+  }
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),
