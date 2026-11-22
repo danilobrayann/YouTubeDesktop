@@ -172,8 +172,24 @@ function isAdRequest(requestUrl) {
   return AD_PATH_PATTERNS.some(pattern => pattern.test(path) || pattern.test(requestUrl));
 }
 
+// YouTube serve anúncios de vídeo pelo mesmo domínio do conteúdo (googlevideo.com).
+// A diferença é que requests de ad carregam os parâmetros 'oad' ou 'adformat'.
+function isYouTubeAdStream(requestUrl) {
+  let parsed;
+  try {
+    parsed = new URL(requestUrl);
+  } catch {
+    return false;
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  if (!hostname.endsWith('googlevideo.com')) return false;
+  if (!parsed.pathname.includes('videoplayback')) return false;
+  return /[?&](oad|adformat|oadb)=/.test(requestUrl);
+}
+
 module.exports = {
   isAdRequest,
   isTrackerRequest,
+  isYouTubeAdStream,
   resolveNavigationTarget
 };

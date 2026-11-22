@@ -7,7 +7,7 @@ const https = require('https');
 const { spawn } = require('child_process');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
-const { isAdRequest, isTrackerRequest } = require('./browser-utils');
+const { isAdRequest, isTrackerRequest, isYouTubeAdStream } = require('./browser-utils');
 const { DiscordRPC } = require('./discord-rpc');
 const {
   AUDIO_FORMATS,
@@ -206,7 +206,7 @@ function configureBrowserSession(partition) {
     { urls: ['http://*/*', 'https://*/*'] },
     (details, callback) => {
       if ((googleShieldsEnabled && isTrackerRequest(details.url)) ||
-          (adBlockEnabled && isAdRequest(details.url))) {
+          (adBlockEnabled && (isAdRequest(details.url) || isYouTubeAdStream(details.url)))) {
         googleBlockedRequestCount++;
         queueGoogleShieldStatus();
         callback({ cancel: true });
@@ -635,7 +635,7 @@ function stopDownloadProcess(child, { graceful = false } = {}) {
   child.kill(graceful ? 'SIGINT' : 'SIGTERM');
 }
 
-function createDownloadPlan(request) {
+function createDownloadPlan(request, { noCookies = false } = {}) {
   const isAudio = AUDIO_FORMATS.includes(request.format);
   const isPlaylist = request.downloadPlaylist &&
     (request.url.includes('list=') || request.url.includes('/playlist'));
@@ -662,7 +662,7 @@ function createDownloadPlan(request) {
   const proxyUrl = store.get('proxyUrl');
   if (proxyUrl) args.push('--proxy', proxyUrl);
 
-  const cookiesBrowser = store.get('cookiesFromBrowser');
+  const cookiesBrowser = noCookies ? null : store.get('cookiesFromBrowser');
   if (cookiesBrowser) args.push('--cookies-from-browser', cookiesBrowser);
 
   const ffmpegPath = getFfmpegPath();
@@ -743,7 +743,7 @@ function runDownloadJob(job) {
   const { request } = job;
   let plan;
   try {
-    plan = createDownloadPlan(request);
+    plan = createDownloadPlan(request, { noCookies: Boolean(job.cookiesRetried) });
   } catch (error) {
     job.status = 'error';
     job.errorMessage = `Não foi possível preparar a pasta de destino: ${error.message}`;
@@ -881,6 +881,17 @@ function runDownloadJob(job) {
         sendDownloadProgress(job, { status: 'cancelled', percent: job.lastProgress });
         settled = true;
         resolve({ cancelled: true });
+        return;
+      }
+
+      // Retry automático: se falhou descriptografando cookies do navegador,
+      // tenta de novo sem cookies (maioria dos vídeos não precisa).
+      if (code !== 0 && !job.cookiesRetried && store.get('cookiesFromBrowser') &&
+          /decrypt|dpapi|cookies/i.test(job.stderr)) {
+        job.cookiesRetried = true;
+        job.stderr = '';
+        job.lastProgress = 0;
+        runDownloadJob(job).then(resolve, reject);
         return;
       }
 

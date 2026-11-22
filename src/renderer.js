@@ -869,13 +869,41 @@ const COSMETIC_AD_CSS = `
   .ytp-ad-overlay-container, .ytp-ad-text-overlay { display: none !important; }
 `;
 
+const YT_AD_SKIP_JS = `(() => {
+  if (window.__tdAdSkip) return;
+  window.__tdAdSkip = true;
+  const skipSelectors = '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button, .ytp-ad-text-overlay-close-button, .ytp-ad-image-overlay-close-button';
+  const clickSkips = () => {
+    try {
+      document.querySelectorAll(skipSelectors).forEach(el => { try { el.click(); } catch(e){} });
+    } catch(e) {}
+  };
+  setInterval(() => {
+    try {
+      clickSkips();
+      const player = document.getElementById('movie_player');
+      if (player && player.classList.contains('ad-showing')) {
+        const v = document.querySelector('video.html5-main-video') || document.querySelector('video');
+        if (v && isFinite(v.duration) && v.duration > 1 && v.currentTime < v.duration - 0.3) {
+          v.currentTime = v.duration - 0.2;
+        }
+      }
+    } catch(e) {}
+  }, 400);
+  try {
+    new MutationObserver(clickSkips).observe(document.documentElement, { childList: true, subtree: true });
+  } catch(e) {}
+})()`;
+
 function injectWebviewEnhancements(wv) {
   if (!wv) return;
   const inject = () => {
     try { wv.insertCSS(COSMETIC_AD_CSS); } catch (e) {}
+    try { wv.executeJavaScript(YT_AD_SKIP_JS); } catch (e) {}
   };
   wv.addEventListener('dom-ready', inject);
   wv.addEventListener('did-navigate', inject);
+  wv.addEventListener('did-navigate-in-page', inject);
 }
 
 injectWebviewEnhancements(webview);

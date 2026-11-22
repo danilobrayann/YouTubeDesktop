@@ -117,6 +117,9 @@ function formatDownloadError(stderr, code) {
   if (/ffmpeg.*(not found|not installed|missing)|ffmpeg não encontrado/.test(normalized)) {
     return 'O FFmpeg não foi encontrado. Instale-o e tente novamente.';
   }
+  if (/failed to decrypt with dpapi|cookies.*decrypt|could not decrypt/.test(normalized)) {
+    return 'Não foi possível ler os cookies do navegador. Use Firefox nas configurações ou um arquivo cookies.txt.';
+  }
   if (/private|unavailable|has been removed|video unavailable/.test(normalized)) {
     return 'Este vídeo está privado, indisponível ou foi removido.';
   }

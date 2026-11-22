@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { isAdRequest, isTrackerRequest, resolveNavigationTarget } = require('../src/browser-utils');
+const { isAdRequest, isTrackerRequest, isYouTubeAdStream, resolveNavigationTarget } = require('../src/browser-utils');
 
 test('resolves addresses and search terms safely', () => {
   assert.equal(resolveNavigationTarget('example.com'), 'https://example.com/');
@@ -37,4 +37,12 @@ test('blocks ad domains and ad paths without matching lookalikes', () => {
   assert.equal(isAdRequest('https://myblog.com/reading-list'), false);
   assert.equal(isAdRequest('https://youtube.com/watch?v=abc123'), false);
   assert.equal(isAdRequest('not a url'), false);
+});
+
+test('detects YouTube ad streams by oad/adformat params', () => {
+  assert.equal(isYouTubeAdStream('https://rr1---sn.googlevideo.com/videoplayback?oad=1&expire=123'), true);
+  assert.equal(isYouTubeAdStream('https://rr1---sn.googlevideo.com/videoplayback?foo=bar&adformat=2'), true);
+  assert.equal(isYouTubeAdStream('https://rr1---sn.googlevideo.com/videoplayback?expire=123&ip=1.2.3.4'), false);
+  assert.equal(isYouTubeAdStream('https://example.com/videoplayback?oad=1'), false);
+  assert.equal(isYouTubeAdStream('not a url'), false);
 });
