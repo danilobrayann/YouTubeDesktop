@@ -78,6 +78,15 @@
                 <span class="nav-icon">🌐</span>
                 <span class="nav-label">Google Web</span>
               </button>
+              <button
+                type="button"
+                class="nav-item"
+                data-tab="music"
+                title="YouTube Music nativo"
+              >
+                <span class="nav-icon">♫</span>
+                <span class="nav-label">Música</span>
+              </button>
             </div>
 
             <div class="nav-group">
@@ -898,6 +907,24 @@
             </div>
           </div>
 
+          <!-- ════ TAB: YOUTUBE MUSIC ════ -->
+          <div class="tab" id="tab-music">
+            <webview
+              id="music-player"
+              class="transparent-bg"
+              partition="persist:music"
+              allowpopups
+              aria-label="YouTube Music"
+            ></webview>
+            <div class="music-loading" id="music-loading" role="status" aria-live="polite">
+              <div class="loader-ring"></div>
+              <span id="music-loading-text">Carregando YouTube Music...</span>
+              <button type="button" class="btn-primary hidden" id="music-retry">
+                Tentar novamente
+              </button>
+            </div>
+          </div>
+
           <!-- ════ TAB: HOME ════ -->
           <div class="tab active" id="tab-home">
             <div id="url-bar">
@@ -1610,6 +1637,15 @@
                         <option value="opus">Opus</option>
                       </select>
                     </div>
+                    <div class="setting-row">
+                      <label>User-Agent personalizado</label>
+                      <input
+                        type="text"
+                        id="set-custom-user-agent"
+                        class="glass-input glass-input-sm"
+                        placeholder="Chrome 130 (padrão)"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1712,6 +1748,24 @@
               <option value="m4a">🎵 M4A</option>
               <option value="opus">🎵 Opus</option>
               </optgroup>
+            </select>
+          </div>
+          <div class="modal-options-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="modal-subs" />
+              📥 Baixar legendas
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="modal-thumbnail" />
+              🖼️ Baixar thumbnail
+            </label>
+          </div>
+          <div class="modal-format-row" id="mp3-quality-row" style="display: none;">
+            <label>Qualidade MP3:</label>
+            <select id="modal-mp3-quality" class="glass-select">
+              <option value="128k">128 kbps</option>
+              <option value="192k">192 kbps</option>
+              <option value="320k" selected>320 kbps (melhor)</option>
             </select>
           </div>
         </div>

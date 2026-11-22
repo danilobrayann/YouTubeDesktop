@@ -65,21 +65,41 @@ function validateDownloadRequest(input) {
     format,
     downloadId,
     downloadPlaylist: input.downloadPlaylist !== false,
-    outputPath: input.outputPath
+    outputPath: input.outputPath,
+    subs: input.subs === true,
+    thumbnail: input.thumbnail === true,
+    mp3Quality: input.mp3Quality || '320k'
   };
 }
 
-function getFormatArgs(format) {
+function getFormatArgs(format, options = {}) {
+  const { subs = false, thumbnail = false, mp3Quality = '320k' } = options;
+  const args = [];
+
+  if (subs) {
+    args.push('--write-subs', '--write-auto-subs');
+  }
+
+  if (thumbnail) {
+    args.push('--write-thumbnail');
+  }
+
   if (AUDIO_FORMATS.includes(format)) {
-    return ['--extract-audio', '--audio-format', format, '--audio-quality', '0'];
+    if (format === 'mp3') {
+      args.push('--extract-audio', '--audio-format', format, '--audio-quality', mp3Quality);
+    } else {
+      args.push('--extract-audio', '--audio-format', format, '--audio-quality', '0');
+    }
+  } else {
+    if (!Object.prototype.hasOwnProperty.call(HEIGHTS, format)) {
+      throw new Error('Formato de download não suportado.');
+    }
+
+    const height = HEIGHTS[format];
+    args.push('-f', `bestvideo[height<=${height}]+bestaudio/best[height<=${height}]`, '--merge-output-format', 'mp4');
   }
 
-  if (!Object.prototype.hasOwnProperty.call(HEIGHTS, format)) {
-    throw new Error('Formato de download não suportado.');
-  }
-
-  const height = HEIGHTS[format];
-  return ['-f', `bestvideo[height<=${height}]+bestaudio/best[height<=${height}]`, '--merge-output-format', 'mp4'];
+  return args;
 }
 
 function formatDownloadError(stderr, code) {

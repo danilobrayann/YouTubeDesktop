@@ -45,7 +45,8 @@ const store = new Store({
     },
     downloadPath: null,
     defaultFormat: '720p',
-    googleShieldsEnabled: true
+    googleShieldsEnabled: true,
+    customUserAgent: null
   }
 });
 
@@ -84,8 +85,10 @@ function configureBrowserSession(partition) {
   if (configuredBrowserSessions.has(browserSession)) return;
   configuredBrowserSessions.add(browserSession);
 
-  // Set modern userAgent for sites like WhatsApp Web
-  browserSession.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+  // Use custom User-Agent if set, otherwise default Chrome 130
+  const customUA = store.get('customUserAgent');
+  const userAgent = customUA || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+  browserSession.setUserAgent(userAgent);
 
   browserSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*'] },
@@ -483,7 +486,11 @@ function createDownloadPlan(request) {
   const categoryDir = path.join(baseDir, isPlaylist ? 'Playlists' : (isAudio ? 'Músicas' : 'Vídeos'));
   fs.mkdirSync(categoryDir, { recursive: true });
 
-  const args = getFormatArgs(request.format);
+  const args = getFormatArgs(request.format, {
+    subs: request.subs,
+    thumbnail: request.thumbnail,
+    mp3Quality: request.mp3Quality
+  });
   const ffmpegPath = getFfmpegPath();
   if (fs.existsSync(ffmpegPath)) {
     args.push('--ffmpeg-location', path.dirname(ffmpegPath));
@@ -542,6 +549,15 @@ function runDownloadJob(job) {
         message: job.errorMessage,
         details: job.stderr.trim()
       });
+
+      // Enviar notificação de erro
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Download Falhou',
+          body: job.detectedTitle ? `${job.detectedTitle}: ${job.errorMessage}` : job.errorMessage
+        }).show();
+      }
+
       reject(new Error(job.errorMessage));
     };
 
@@ -647,6 +663,15 @@ function runDownloadJob(job) {
           filePath: job.lastSavedFilePath,
           status: 'complete'
         });
+
+        // Enviar notificação de sucesso
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Download Concluído',
+            body: job.detectedTitle || 'Download finalizado com sucesso!'
+          }).show();
+        }
+
         settled = true;
         resolve({ success: true, folder: targetFolder, file: job.lastSavedFilePath });
         return;
@@ -801,6 +826,14 @@ ipcMain.handle('check-download-tools', async () => {
 
 ipcMain.handle('get-ffmpeg-path', () => getFfmpegPath());
 ipcMain.handle('get-ytdlp-path', () => getYtDlpPath());
+
+ipcMain.handle('get-custom-user-agent', () => store.get('customUserAgent'));
+ipcMain.handle('set-custom-user-agent', (_event, userAgent) => {
+  store.set('customUserAgent', userAgent || null);
+  // Reconfigurar sessões existentes com o novo User-Agent
+  session.defaultSession.setUserAgent(userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+  return true;
+});
 
 ipcMain.handle('update-ytdlp', async () => {
   if (activeDownloads.size > 0) {

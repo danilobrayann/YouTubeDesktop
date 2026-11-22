@@ -49,6 +49,10 @@ const modalFormat    = document.getElementById('modal-format');
 const modalClosBtn   = document.getElementById('modal-close-btn');
 const modalCancelBtn = document.getElementById('modal-cancel-btn');
 const modalDlBtn     = document.getElementById('modal-download-btn');
+const modalSubs      = document.getElementById('modal-subs');
+const modalThumbnail = document.getElementById('modal-thumbnail');
+const modalMp3Quality = document.getElementById('modal-mp3-quality');
+const mp3QualityRow  = document.getElementById('mp3-quality-row');
 
 // Playlist modal refs
 const modalPlaylist          = document.getElementById('modal-playlist');
@@ -72,6 +76,7 @@ const setOpacity         = document.getElementById('set-opacity');
 const setTransparency    = document.getElementById('set-transparency');
 const setDefaultVideoFormat = document.getElementById('set-default-video-format');
 const setDefaultAudioFormat = document.getElementById('set-default-audio-format');
+const setCustomUserAgent = document.getElementById('set-custom-user-agent');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -536,6 +541,21 @@ urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') loadUrl(urlInput.value);
 });
 
+// ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  // Ctrl+D para abrir download rápido
+  if (e.ctrlKey && e.key === 'd') {
+    e.preventDefault();
+    openQuickDownloadModal();
+  }
+
+  // Ctrl+K para focar na barra de URL
+  if (e.ctrlKey && e.key === 'k') {
+    e.preventDefault();
+    urlInput.focus();
+  }
+});
+
 // ── NAVIGATION CONTROLS ────────────────────────────────────────────────────
 if (btnNavBack) {
   btnNavBack.addEventListener('click', () => {
@@ -734,15 +754,25 @@ if (modalPlaylistSingleBtn) {
 modalDlBtn.addEventListener('click', async () => {
   const url    = urlInput.value.trim() || webview.src || '';
   const format = modalFormat.value;
+  const subs = modalSubs ? modalSubs.checked : false;
+  const thumbnail = modalThumbnail ? modalThumbnail.checked : false;
+  const mp3Quality = modalMp3Quality ? modalMp3Quality.value : '320k';
   closeModal();
   if (url) {
     dlUrl.value    = url;
     dlFormat.value = format;
-    await triggerDownloadCheck(url, format);
+    await triggerDownloadCheck(url, format, subs, thumbnail, mp3Quality);
   }
 });
 
-async function triggerDownloadCheck(url, format) {
+// Mostrar/esconder opção de qualidade MP3
+modalFormat.addEventListener('change', () => {
+  if (mp3QualityRow) {
+    mp3QualityRow.style.display = modalFormat.value === 'mp3' ? 'flex' : 'none';
+  }
+});
+
+async function triggerDownloadCheck(url, format, subs = false, thumbnail = false, mp3Quality = '320k') {
   if (!url || !url.trim()) return;
 
   // Se contém parâmetro de playlist, avisar e perguntar antes!
@@ -750,7 +780,7 @@ async function triggerDownloadCheck(url, format) {
     openPlaylistModal(url, format);
   } else {
     switchTab('downloads');
-    await startDownload(url, format, false);
+    await startDownload(url, format, false, '', subs, thumbnail, mp3Quality);
   }
 }
 
@@ -874,7 +904,7 @@ function generateId() {
   return `dl-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 }
 
-async function startDownload(url, format, downloadPlaylist = true, playlistTitle = '') {
+async function startDownload(url, format, downloadPlaylist = true, playlistTitle = '', subs = false, thumbnail = false, mp3Quality = '320k') {
   if (!url || !url.trim()) {
     alert('Por favor, insira uma URL válida.');
     return;
@@ -890,6 +920,9 @@ async function startDownload(url, format, downloadPlaylist = true, playlistTitle
     format,
     isPlaylist,
     playlistTitle,
+    subs,
+    thumbnail,
+    mp3Quality,
     status: 'pending',
     percent: 0,
     speed: '',
@@ -921,7 +954,10 @@ async function processDownloadQueue() {
           format: download.format,
           outputPath: downloadPath,
           downloadId: id,
-          downloadPlaylist: download.isPlaylist
+          downloadPlaylist: download.isPlaylist,
+          subs: download.subs,
+          thumbnail: download.thumbnail,
+          mp3Quality: download.mp3Quality
         });
         if (result && result.paused) {
           updateDownloadCard(id, { status: 'paused', message: 'Download pausado. O progresso parcial foi mantido.' });
@@ -1578,6 +1614,11 @@ btnSaveTheme.addEventListener('click', async () => {
   setTimeout(() => saveStatus.classList.add('hidden'), 2500);
 });
 
+// Custom User-Agent
+setCustomUserAgent.addEventListener('change', async () => {
+  await api.setCustomUserAgent(setCustomUserAgent.value.trim());
+});
+
 const GOOGLE_HOME_URL = 'https://www.google.com/';
 const GOOGLE_HISTORY_KEY = 'turbodown-google-history';
 const GOOGLE_BOOKMARKS_KEY = 'turbodown-google-bookmarks';
@@ -2163,6 +2204,9 @@ async function init() {
   dlFormat.value = 'default-video';
   modalFormat.value = 'default-video';
   modalPlaylistFormat.value = downloadPreferences.videoFormat;
+
+  const customUA = await api.getCustomUserAgent();
+  if (customUA) setCustomUserAgent.value = customUA;
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),

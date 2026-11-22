@@ -714,6 +714,43 @@ body.has-bg-image {
   pointer-events: all;
 }
 
+#tab-music {
+  padding: 0;
+  background: transparent;
+}
+
+#music-player {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+#music-player.transparent-bg {
+  background: transparent;
+  /* Remove background from webview content */
+  --app-bg-color: transparent;
+}
+
+.music-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.music-loading.hidden {
+  display: none;
+}
+
 /* ── Home Tab ─────────────────────────────────────────────────────────────── */
 #tab-home {
   display: flex;
@@ -1525,6 +1562,11 @@ body.has-bg-image {
   flex-shrink: 0;
 }
 
+.setting-row .glass-input {
+  max-width: 250px;
+  flex: 1;
+}
+
 /* ── Theme Presets ────────────────────────────────────────────────────────── */
 #theme-presets {
   display: flex;
@@ -1596,6 +1638,27 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: 3px;
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  width: 100%;
+  transition: border-color var(--transition-fast);
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.glass-input-sm {
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
 .color-label {
@@ -2011,6 +2074,27 @@ button {
 .modal-format-row label {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.modal-options-row {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .modal-footer {

@@ -43,6 +43,8 @@ window.api = {
   updateYtDlp: () => ipcRenderer.invoke('update-ytdlp'),
   getFfmpegPath: () => ipcRenderer.invoke('get-ffmpeg-path'),
   getYtDlpPath: () => ipcRenderer.invoke('get-ytdlp-path'),
+  getCustomUserAgent: () => ipcRenderer.invoke('get-custom-user-agent'),
+  setCustomUserAgent: (userAgent) => ipcRenderer.invoke('set-custom-user-agent', userAgent),
 
   // Application updates
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
