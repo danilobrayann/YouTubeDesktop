@@ -51,8 +51,8 @@ const store = new Store({
     speedLimit: '5M',
     proxyUrl: null,
     cookiesFromBrowser: null,
-    discordPresence: false,
-    discordClientId: null
+    discordPresence: true,
+    discordClientId: '1574051479168487525'
   }
 });
 
