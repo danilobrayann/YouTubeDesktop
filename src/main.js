@@ -863,7 +863,8 @@ function sendAppUpdateStatus(status, details = {}) {
 
 function initializeAutoUpdater() {
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowDowngrade = false;
 
   autoUpdater.on('checking-for-update', () => {
     sendAppUpdateStatus('checking', { message: 'Verificando atualizações...', error: null });
@@ -912,15 +913,21 @@ function initializeAutoUpdater() {
 
   const isPortableBuild = process.platform === 'win32' && !!process.env.PORTABLE_EXECUTABLE_DIR;
   if (app.isPackaged && !isPortableBuild) {
-    autoUpdater.checkForUpdates().catch(error => {
-      const noRelease = /404|latest\.yml/i.test(error.message);
-      sendAppUpdateStatus('error', {
-        message: noRelease
-          ? 'Ainda não há uma versão publicada para atualização.'
-          : 'Não foi possível verificar atualizações. Confira se há uma versão publicada.',
-        error: error.message
+    const checkUpdates = () => {
+      autoUpdater.checkForUpdates().catch(error => {
+        const noRelease = /404|latest\.yml/i.test(error.message);
+        sendAppUpdateStatus('error', {
+          message: noRelease
+            ? 'Ainda não há uma versão publicada para atualização.'
+            : 'Não foi possível verificar atualizações. Confira se há uma versão publicada.',
+          error: error.message
+        });
       });
-    });
+    };
+    checkUpdates();
+    // Verificar novamente a cada 4 horas enquanto o app estiver aberto
+    const updateInterval = setInterval(checkUpdates, 4 * 60 * 60 * 1000);
+    app.on('will-quit', () => clearInterval(updateInterval));
   } else if (isPortableBuild) {
     sendAppUpdateStatus('portable', {
       message: 'A atualização automática está disponível apenas na versão instalada pelo Setup.'
