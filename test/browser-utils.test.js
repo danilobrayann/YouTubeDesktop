@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { isTrackerRequest, resolveNavigationTarget } = require('../src/browser-utils');
+const { isAdRequest, isTrackerRequest, resolveNavigationTarget } = require('../src/browser-utils');
 
 test('resolves addresses and search terms safely', () => {
   assert.equal(resolveNavigationTarget('example.com'), 'https://example.com/');
@@ -17,6 +17,24 @@ test('resolves addresses and search terms safely', () => {
 test('blocks known ad and tracking hosts without matching lookalikes', () => {
   assert.equal(isTrackerRequest('https://www.google-analytics.com/collect'), true);
   assert.equal(isTrackerRequest('https://sub.doubleclick.net/ad.js'), true);
+  assert.equal(isTrackerRequest('https://visitor-px.omnitagjs.com/visitor/bsync'), true);
+  assert.equal(isTrackerRequest('https://sync.programmaticx.ai/api/cookie'), true);
+  assert.equal(isTrackerRequest('https://sync.go.sonobi.com/uc.html'), true);
+  assert.equal(isTrackerRequest('https://tracker.ssp.balance-x.com/'), true);
   assert.equal(isTrackerRequest('https://notdoubleclick.net/ad.js'), false);
+  assert.equal(isTrackerRequest('https://notomnitagjs.com/ad.js'), false);
   assert.equal(isTrackerRequest('not a url'), false);
+});
+
+test('blocks ad domains and ad paths without matching lookalikes', () => {
+  assert.equal(isAdRequest('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js'), true);
+  assert.equal(isAdRequest('https://ad.doubleclick.net/ddm/trackimp.js'), true);
+  assert.equal(isAdRequest('https://servedby.adnxs.com/seg?add=1'), true);
+  assert.equal(isAdRequest('https://ads.pubmatic.com/AdServer/js/user_sync.html'), true);
+  assert.equal(isAdRequest('https://example.com/pagead/advertisement.js'), true);
+  assert.equal(isAdRequest('https://example.com/?adunit=123&adslot=top'), true);
+  assert.equal(isAdRequest('https://normal-site.com/article/123'), false);
+  assert.equal(isAdRequest('https://myblog.com/reading-list'), false);
+  assert.equal(isAdRequest('https://youtube.com/watch?v=abc123'), false);
+  assert.equal(isAdRequest('not a url'), false);
 });

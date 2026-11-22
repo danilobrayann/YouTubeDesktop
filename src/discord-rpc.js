@@ -6,6 +6,25 @@ const net = require('net');
 
 const OPS = { HANDSHAKE: 0, FRAME: 1, CLOSE: 2, PING: 3, PONG: 4 };
 
+const fs = require('fs');
+const path = require('path');
+
+function discordLogPath() {
+  try {
+    const dir = path.join(process.env.APPDATA || '', 'YouTube Desktop', 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, 'discord-rpc.log');
+  } catch { return null; }
+}
+
+function discordLog(msg) {
+  const file = discordLogPath();
+  if (!file) return;
+  try {
+    fs.appendFileSync(file, `${new Date().toISOString()} ${msg}\n`);
+  } catch {}
+}
+
 function pipePaths() {
   // Discord tries discord-ipc-0 first, then -1..-9
   const paths = ['\\\\.\\pipe\\discord-ipc-0'];
@@ -54,6 +73,7 @@ class DiscordRPC {
     const path = paths[index];
     const socket = net.connect(path);
     let settled = false;
+    discordLog(`trying pipe ${path}`);
 
     const fail = () => {
       if (settled) return;
@@ -64,6 +84,7 @@ class DiscordRPC {
 
     socket.once('connect', () => {
       settled = true;
+      discordLog(`connected to ${path}`);
       this.socket = socket;
       this.buffer = Buffer.alloc(0);
       socket.write(encode(OPS.HANDSHAKE, { v: 1, client_id: this.clientId }));
@@ -81,6 +102,7 @@ class DiscordRPC {
     socket.once('error', fail);
     socket.once('close', () => {
       if (this.socket === socket) {
+        discordLog('socket closed');
         this.socket = null;
         this.connected = false;
         if (!this._intentionalClose) this._scheduleReconnect();
@@ -98,6 +120,7 @@ class DiscordRPC {
       return;
     }
     if (opcode === OPS.FRAME && payload.evt === 'READY') {
+      discordLog('READY received');
       this.connected = true;
       // Re-send last activity if any
       if (this.lastActivity !== null) {

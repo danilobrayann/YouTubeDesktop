@@ -43,7 +43,8 @@ test('validates download format and identifier', () => {
 });
 
 test('builds format arguments only for supported formats', () => {
-  assert.deepEqual(getFormatArgs('mp3'), ['--extract-audio', '--audio-format', 'mp3', '--audio-quality', '0']);
+  assert.deepEqual(getFormatArgs('mp3'), ['--extract-audio', '--audio-format', 'mp3', '--audio-quality', '320k']);
+  assert.deepEqual(getFormatArgs('mp3', { mp3Quality: '128k' }), ['--extract-audio', '--audio-format', 'mp3', '--audio-quality', '128k']);
   assert.deepEqual(getFormatArgs('1080p'), ['-f', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]', '--merge-output-format', 'mp4']);
   assert.throws(() => getFormatArgs('invalid'), /Formato/);
   assert.throws(() => getFormatArgs('__proto__'), /Formato/);

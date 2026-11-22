@@ -118,6 +118,7 @@ function updateDiscordForJob(job, data = {}) {
   } else if (['complete', 'error', 'cancelled', 'paused'].includes(status)) {
     discordDownloadActivity = null;
     pushDiscordActivity();
+    if (activeDownloads.size === 0 && tray) tray.setToolTip('TurboDown');
   }
 }
 
@@ -586,6 +587,12 @@ ipcMain.handle('inspect-playlist', async (event, url) => {
 // ─── Download queue and process control ──────────────────────────────────────
 function sendDownloadProgress(job, data) {
   updateDiscordForJob(job, data);
+  // Atualiza tooltip da tray com progresso do download ativo
+  if (tray) {
+    const pct = Math.round(job.lastProgress || data.percent || 0);
+    const title = job.detectedTitle ? ` — ${job.detectedTitle}` : '';
+    tray.setToolTip(`TurboDown${pct > 0 ? ` — ${pct}%${title}` : title}`);
+  }
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send('download-progress', {
     downloadId: job.request.downloadId,
@@ -643,7 +650,13 @@ function createDownloadPlan(request) {
   });
 
   // Opções avançadas de download (velocidade, proxy, cookies)
-  const speedLimit = store.get('speedLimit');
+  // Limite de velocidade: 'unlimited' desativa; valor explícito tem prioridade sobre o global
+  let speedLimit = store.get('speedLimit');
+  if (request.speedLimit === 'unlimited') {
+    speedLimit = null;
+  } else if (request.speedLimit) {
+    speedLimit = request.speedLimit;
+  }
   if (speedLimit) args.push('--limit-rate', speedLimit);
 
   const proxyUrl = store.get('proxyUrl');
@@ -703,6 +716,27 @@ ipcMain.handle('open-logs-folder', async () => {
   const error = await shell.openPath(dir);
   if (error) throw new Error(`Não foi possível abrir a pasta de logs: ${error}`);
   return true;
+});
+
+ipcMain.handle('get-recent-logs', () => {
+  try {
+    const dir = getLogsDir();
+    const files = fs.readdirSync(dir)
+      .filter(f => f.endsWith('.log'))
+      .map(f => ({ name: f, path: path.join(dir, f), mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(0, 10);
+    return files.map(f => {
+      const content = fs.readFileSync(f.path, 'utf8');
+      const lines = content.split(/\r?\n/);
+      return {
+        name: f.name,
+        date: new Date(f.mtime).toLocaleString('pt-BR'),
+        preview: lines.slice(0, 12).join('\n'),
+        error: lines.find(l => /ERROR|error|falha/i.test(l)) || ''
+      };
+    });
+  } catch { return []; }
 });
 
 function runDownloadJob(job) {

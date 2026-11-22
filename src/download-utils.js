@@ -68,7 +68,10 @@ function validateDownloadRequest(input) {
     outputPath: input.outputPath,
     subs: input.subs === true,
     thumbnail: input.thumbnail === true,
-    mp3Quality: input.mp3Quality || '320k'
+    mp3Quality: input.mp3Quality || '320k',
+    speedLimit: typeof input.speedLimit === 'string' && input.speedLimit.trim()
+      ? input.speedLimit.trim()
+      : null
   };
 }
 

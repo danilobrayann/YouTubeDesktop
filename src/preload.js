@@ -51,6 +51,7 @@ window.api = {
   exportSettings: () => ipcRenderer.invoke('export-settings'),
   importSettings: () => ipcRenderer.invoke('import-settings'),
   openLogsFolder: () => ipcRenderer.invoke('open-logs-folder'),
+  getRecentLogs: () => ipcRenderer.invoke('get-recent-logs'),
   getDiscordSettings: () => ipcRenderer.invoke('get-discord-settings'),
   saveDiscordSettings: (options) => ipcRenderer.invoke('save-discord-settings', options),
   setDiscordMusicState: (state) => ipcRenderer.invoke('set-discord-music-state', state),

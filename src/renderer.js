@@ -55,6 +55,7 @@ const modalDlBtn     = document.getElementById('modal-download-btn');
 const modalSubs      = document.getElementById('modal-subs');
 const modalThumbnail = document.getElementById('modal-thumbnail');
 const modalMp3Quality = document.getElementById('modal-mp3-quality');
+const modalSpeedLimit = document.getElementById('modal-speed-limit');
 const mp3QualityRow  = document.getElementById('mp3-quality-row');
 
 // Playlist modal refs
@@ -662,6 +663,42 @@ if (btnOnboardingClose) {
   });
 }
 
+// ── Sleep timer (YouTube Music) ─────────────────────────────────────────────
+const sleepTimerSelect = document.getElementById('sleep-timer-select');
+const sleepTimerStatus = document.getElementById('sleep-timer-status');
+let sleepTimerTimeout = null;
+let sleepTimerEndAt = 0;
+
+function updateSleepTimerStatus() {
+  if (!sleepTimerEndAt) {
+    sleepTimerStatus.classList.add('hidden');
+    return;
+  }
+  const remaining = Math.max(0, Math.round((sleepTimerEndAt - Date.now()) / 60000));
+  sleepTimerStatus.textContent = `Para em ~${remaining} min`;
+  sleepTimerStatus.classList.remove('hidden');
+}
+
+if (sleepTimerSelect) {
+  sleepTimerSelect.addEventListener('change', () => {
+    clearTimeout(sleepTimerTimeout);
+    sleepTimerEndAt = 0;
+    const mins = parseInt(sleepTimerSelect.value, 10);
+    if (!mins) { updateSleepTimerStatus(); return; }
+    sleepTimerEndAt = Date.now() + mins * 60000;
+    sleepTimerTimeout = setTimeout(() => {
+      musicPlayer.executeJavaScript(
+        `(() => { const v = document.querySelector('video'); if (v) v.pause(); })()`
+      ).catch(() => {});
+      sleepTimerEndAt = 0;
+      sleepTimerSelect.value = '0';
+      updateSleepTimerStatus();
+    }, mins * 60000);
+    updateSleepTimerStatus();
+  });
+}
+setInterval(updateSleepTimerStatus, 30000);
+
 musicPlayer.addEventListener('did-fail-load', (event) => {
   if (event.errorCode === -3 || !event.isMainFrame) return;
   musicLoading.classList.remove('hidden');
@@ -817,6 +854,53 @@ document.addEventListener('click', (e) => {
   if (!urlSuggestions.contains(e.target) && e.target !== urlInput) hideSuggestions();
 });
 
+// ── Filtro cosmético de anúncios + botão Baixar flutuante ──────────────────
+// Esconde containers de ad no DOM e injeta botão "Baixar" em páginas com vídeo.
+const COSMETIC_AD_CSS = `
+  ytd-display-ad-renderer, ytd-compact-promoted-video-renderer,
+  ytd-promoted-sparkles-web-renderer, #player-ads, .ytp-ad-module,
+  .video-ads, ytd-in-feed-ad-layout-renderer, ytd-banner-promo-renderer,
+  .ytd-watch-flexy #below #related ytd-display-ad-renderer,
+  [id^="ad-"], [class*="ad-slot"], [class*="adsbygoogle"],
+  ins.adsbygoogle, div[id^="google_ads"], iframe[id^="aswift"],
+  .adsbox, .ad-banner, .ad-container, .advertisement,
+  [data-google-query-id]:not(video), ytd-merch-shelf-renderer
+  { display: none !important; visibility: hidden !important; height: 0 !important; }
+  .ytp-ad-overlay-container, .ytp-ad-text-overlay { display: none !important; }
+`;
+
+const FLOATING_DOWNLOAD_JS = `(() => {
+  if (window.__tdInjected) return;
+  window.__tdInjected = true;
+  const btn = document.createElement('button');
+  btn.id = 'td-float-download';
+  btn.textContent = '⬇ Baixar';
+  btn.style.cssText = 'position:fixed;bottom:90px;right:20px;z-index:99999;padding:10px 18px;border-radius:24px;border:none;background:#ff4444;color:#fff;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);font-family:sans-serif;';
+  btn.onclick = () => {
+    window.open('turbodown-download://video?url=' + encodeURIComponent(location.href), '_blank');
+  };
+  document.documentElement.appendChild(btn);
+  // Remove botão quando não há vídeo tocando
+  const check = setInterval(() => {
+    const v = document.querySelector('video');
+    const playing = v && !v.paused && !v.ended;
+    btn.style.display = playing ? 'block' : 'none';
+  }, 1000);
+})()`;
+
+function injectWebviewEnhancements(wv) {
+  if (!wv) return;
+  const inject = () => {
+    try { wv.insertCSS(COSMETIC_AD_CSS); } catch (e) {}
+    try { wv.executeJavaScript(FLOATING_DOWNLOAD_JS); } catch (e) {}
+  };
+  wv.addEventListener('dom-ready', inject);
+  wv.addEventListener('did-navigate', inject);
+}
+
+injectWebviewEnhancements(webview);
+injectWebviewEnhancements(musicPlayer);
+
 // ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   // Ctrl+D para abrir download rápido
@@ -917,6 +1001,30 @@ webview.addEventListener('did-navigate-in-page', (e) => {
 
 webview.addEventListener('page-title-updated', (e) => {
   if (e.title) updateNowPlaying(e.title);
+});
+
+// Intercepta o botão "Baixar" injetado no webview (window.open com protocolo custom)
+webview.addEventListener('new-window', (e) => {
+  const targetUrl = e.url || (e.frame && e.frame.url) || '';
+  if (targetUrl.startsWith('turbodown-download://')) {
+    e.preventDefault();
+    try {
+      const realUrl = new URL(targetUrl.replace('turbodown-download://video?url=', 'https://'));
+      const downloadUrl = decodeURIComponent(realUrl.searchParams.get('url') || '');
+      if (downloadUrl) {
+        switchTab('downloads');
+        startDownload(downloadUrl, 'default-video', false);
+      }
+    } catch (err) {
+      // Fallback: extrai url= diretamente
+      const m = targetUrl.match(/[?&]url=([^&]+)/);
+      if (m) {
+        const downloadUrl = decodeURIComponent(m[1]);
+        switchTab('downloads');
+        startDownload(downloadUrl, 'default-video', false);
+      }
+    }
+  }
 });
 
 function updateNowPlaying(title) {
@@ -1033,11 +1141,12 @@ modalDlBtn.addEventListener('click', async () => {
   const subs = modalSubs ? modalSubs.checked : false;
   const thumbnail = modalThumbnail ? modalThumbnail.checked : false;
   const mp3Quality = modalMp3Quality ? modalMp3Quality.value : '320k';
+  const speedLimit = modalSpeedLimit ? modalSpeedLimit.value : '';
   closeModal();
   if (url) {
     dlUrl.value    = url;
     dlFormat.value = format;
-    await triggerDownloadCheck(url, format, subs, thumbnail, mp3Quality);
+    await triggerDownloadCheck(url, format, subs, thumbnail, mp3Quality, speedLimit);
   }
 });
 
@@ -1048,7 +1157,7 @@ modalFormat.addEventListener('change', () => {
   }
 });
 
-async function triggerDownloadCheck(url, format, subs = false, thumbnail = false, mp3Quality = '320k') {
+async function triggerDownloadCheck(url, format, subs = false, thumbnail = false, mp3Quality = '320k', speedLimit = '') {
   if (!url || !url.trim()) return;
 
   // Se contém parâmetro de playlist, avisar e perguntar antes!
@@ -1056,7 +1165,7 @@ async function triggerDownloadCheck(url, format, subs = false, thumbnail = false
     openPlaylistModal(url, format);
   } else {
     switchTab('downloads');
-    await startDownload(url, format, false, '', subs, thumbnail, mp3Quality);
+    await startDownload(url, format, false, '', subs, thumbnail, mp3Quality, speedLimit);
   }
 }
 
@@ -1180,7 +1289,7 @@ function generateId() {
   return `dl-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 }
 
-async function startDownload(url, format, downloadPlaylist = true, playlistTitle = '', subs = false, thumbnail = false, mp3Quality = '320k') {
+async function startDownload(url, format, downloadPlaylist = true, playlistTitle = '', subs = false, thumbnail = false, mp3Quality = '320k', speedLimit = '') {
   if (!url || !url.trim()) {
     alert('Por favor, insira uma URL válida.');
     return;
@@ -1199,6 +1308,7 @@ async function startDownload(url, format, downloadPlaylist = true, playlistTitle
     subs,
     thumbnail,
     mp3Quality,
+    speedLimit: speedLimit || null,
     status: 'pending',
     percent: 0,
     speed: '',
@@ -1233,7 +1343,8 @@ async function processDownloadQueue() {
           downloadPlaylist: download.isPlaylist,
           subs: download.subs,
           thumbnail: download.thumbnail,
-          mp3Quality: download.mp3Quality
+          mp3Quality: download.mp3Quality,
+          speedLimit: download.speedLimit
         });
         if (result && result.paused) {
           updateDownloadCard(id, { status: 'paused', message: 'Download pausado. O progresso parcial foi mantido.' });
@@ -1813,6 +1924,22 @@ if (btnOpenLogs) {
   btnOpenLogs.addEventListener('click', () => {
     api.openLogsFolder().catch(err => alert(err.message));
   });
+}
+
+// Logs recentes na UI
+const recentLogsEl = document.getElementById('recent-logs');
+if (recentLogsEl) {
+  api.getRecentLogs().then(logs => {
+    if (!logs.length) {
+      recentLogsEl.innerHTML = '<p class="schedule-empty">Nenhum log ainda</p>';
+      return;
+    }
+    recentLogsEl.innerHTML = logs.map(l => `
+      <details class="log-item">
+        <summary>${l.name} <small>(${l.date})</small></summary>
+        <pre>${l.preview.replace(/</g, '&lt;')}</pre>
+      </details>`).join('');
+  }).catch(() => {});
 }
 
 btnUpdateYtDlp.addEventListener('click', async () => {
