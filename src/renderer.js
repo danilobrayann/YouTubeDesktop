@@ -468,31 +468,90 @@ musicPlayer.addEventListener('dom-ready', () => {
   musicLoading.classList.add('hidden');
 });
 
-// ── Discord Rich Presence: poll YouTube Music player ────────────────────────
+// ── Discord Rich Presence: poll media players (Music + navegador) ───────────
 let discordPresenceEnabled = false;
 
-function pollDiscordMusicState() {
-  if (!discordPresenceEnabled || currentTab !== 'music') {
-    api.setDiscordMusicState({ playing: false }).catch(() => {});
+const DISCORD_YOUTUBE_EXTRACT = `(() => {
+  const v = document.querySelector('video.html5-main-video') || document.querySelector('video');
+  if (!v) return { playing: false };
+  const isWatch = location.pathname === '/watch' || location.pathname.startsWith('/shorts/');
+  const titleEl = document.querySelector('h1.ytd-watch-metadata h1 yt-formatted-string, #title h1 yt-formatted-string, h1 yt-formatted-string');
+  const channelEl = document.querySelector('#channel-name a, ytd-channel-name a, .ytd-channel-name a');
+  let title = titleEl ? titleEl.innerText.trim() : '';
+  if (!title) title = (document.title || '').replace(/ - YouTube$/, '').trim();
+  if (!title || !isWatch) return { playing: false };
+  return {
+    playing: !v.paused && !v.ended && v.readyState > 1,
+    title,
+    artist: channelEl ? channelEl.innerText.trim() : 'YouTube',
+    label: 'Vendo',
+    position: v.currentTime || 0,
+    duration: isFinite(v.duration) ? v.duration : 0
+  };
+})()`;
+
+const DISCORD_MUSIC_EXTRACT = `(() => {
+  const v = document.querySelector('video');
+  const bar = document.querySelector('ytmusic-player-bar');
+  const titleEl = bar && bar.querySelector('.title');
+  const subEl = bar && bar.querySelector('.subtitle');
+  const title = titleEl ? titleEl.innerText.trim() : '';
+  const artist = subEl ? subEl.innerText.trim() : '';
+  if (!v || !title) return { playing: false };
+  return {
+    playing: !v.paused && !v.ended && v.readyState > 1,
+    title, artist, label: 'Ouvindo',
+    position: v.currentTime || 0,
+    duration: isFinite(v.duration) ? v.duration : 0
+  };
+})()`;
+
+const DISCORD_GENERIC_EXTRACT = `(() => {
+  const media = document.querySelector('video, audio');
+  if (!media) return { playing: false };
+  const playing = !media.paused && !media.ended && media.readyState > 1;
+  if (!playing) return { playing: false };
+  const title = (document.title || '').trim();
+  return {
+    playing: true,
+    title: title || location.hostname,
+    artist: location.hostname,
+    label: 'Reproduzindo',
+    position: media.currentTime || 0,
+    duration: isFinite(media.duration) ? media.duration : 0
+  };
+})()`;
+
+function sendDiscordState(state) {
+  api.setDiscordMusicState(state || { playing: false }).catch(() => {});
+}
+
+async function pollDiscordMusicState() {
+  if (!discordPresenceEnabled) {
+    sendDiscordState({ playing: false });
     return;
   }
-  musicPlayer.executeJavaScript(`(() => {
-    const v = document.querySelector('video');
-    const bar = document.querySelector('ytmusic-player-bar');
-    const titleEl = bar && bar.querySelector('.title');
-    const subEl = bar && bar.querySelector('.subtitle');
-    const title = titleEl ? titleEl.innerText.trim() : '';
-    const artist = subEl ? subEl.innerText.trim() : '';
-    if (!v || !title) return { playing: false };
-    return {
-      playing: !v.paused && !v.ended && v.readyState > 1,
-      title, artist,
-      position: v.currentTime || 0,
-      duration: isFinite(v.duration) ? v.duration : 0
-    };
-  })()`, true)
-    .then(state => api.setDiscordMusicState(state || { playing: false }))
-    .catch(() => api.setDiscordMusicState({ playing: false }).catch(() => {}));
+
+  // 1) YouTube Music tem prioridade
+  try {
+    if (musicPlayer && musicPlayer.getAttribute('src')) {
+      const state = await musicPlayer.executeJavaScript(DISCORD_MUSIC_EXTRACT, true);
+      if (state && state.playing) { sendDiscordState(state); return; }
+    }
+  } catch (e) { /* webview ainda não carregou */ }
+
+  // 2) YouTube normal (aba navegador) — vídeos e lives
+  try {
+    if (webview && webview.getAttribute('src')) {
+      const state = await webview.executeJavaScript(DISCORD_YOUTUBE_EXTRACT, true);
+      if (state && state.playing) { sendDiscordState(state); return; }
+      // 3) Qualquer outra mídia tocando no navegador (SoundCloud, etc.)
+      const generic = await webview.executeJavaScript(DISCORD_GENERIC_EXTRACT, true);
+      if (generic && generic.playing) { sendDiscordState(generic); return; }
+    }
+  } catch (e) { /* webview ainda não carregou */ }
+
+  sendDiscordState({ playing: false });
 }
 
 setInterval(pollDiscordMusicState, 15000);

@@ -118,9 +118,10 @@ ipcMain.handle('set-discord-music-state', (_event, state = {}) => {
   if (state.playing && state.title) {
     const duration = Number(state.duration) || 0;
     const position = Number(state.position) || 0;
+    const label = state.label || 'Ouvindo';
     discordMusicActivity = {
-      details: `Ouvindo ${state.title}`,
-      state: state.artist || 'YouTube Music',
+      details: `${label} ${state.title}`,
+      state: state.artist || 'YouTube',
       timestamps: duration > 0
         ? { start: Math.floor(Date.now() / 1000) - Math.floor(position), end: Math.floor(Date.now() / 1000) + Math.floor(duration - position) }
         : undefined
