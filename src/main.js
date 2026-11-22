@@ -204,18 +204,29 @@ ipcMain.handle('get-telegram-config', () => {
   return store.get('telegram') || { enabled: false, botToken: '', chatId: '', botUsername: '', autoUpload: false, deleteAfterUpload: false };
 });
 
-ipcMain.handle('save-telegram-config', (_event, config) => {
+ipcMain.handle('save-telegram-config', async (_event, config) => {
   if (!config || typeof config !== 'object') throw new Error('Configuração inválida');
+  const token = String(config.botToken || '').trim();
+  let botUsername = '';
+  if (token) {
+    try {
+      const tempBot = new TelegramBot(token, { polling: false });
+      const botInfo = await tempBot.getMe();
+      botUsername = botInfo.username || '';
+    } catch (e) {
+      console.warn('Failed to get bot info:', e);
+    }
+  }
   store.set('telegram', {
     enabled: Boolean(config.enabled),
-    botToken: String(config.botToken || '').trim(),
+    botToken: token,
     chatId: String(config.chatId || '').trim(),
-    botUsername: String(config.botUsername || '').trim(),
+    botUsername,
     autoUpload: Boolean(config.autoUpload),
     deleteAfterUpload: Boolean(config.deleteAfterUpload)
   });
   ensureTelegramBot();
-  return true;
+  return { botUsername };
 });
 
 ipcMain.handle('test-telegram-connection', async () => {
