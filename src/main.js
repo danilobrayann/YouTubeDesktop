@@ -645,40 +645,44 @@ ipcMain.handle('inspect-playlist', async (event, url) => {
       return resolve({ isPlaylist: false });
     }
 
-    const ytDlpCmd = getYtDlpPath();
-    const args = ['--flat-playlist', '--dump-single-json', '--no-warnings', url];
-    const child = spawn(ytDlpCmd, args, { shell: false });
-    let stdoutData = '';
+    exportGoogleCookiesFile().then(cookiesFile => {
+      const ytDlpCmd = getYtDlpPath();
+      const args = ['--flat-playlist', '--dump-single-json', '--no-warnings'];
+      if (cookiesFile) args.push('--cookies', cookiesFile);
+      args.push(url);
+      const child = spawn(ytDlpCmd, args, { shell: false });
+      let stdoutData = '';
 
-    child.stdout.on('data', (d) => { stdoutData += d.toString(); });
+      child.stdout.on('data', (d) => { stdoutData += d.toString(); });
 
-    child.on('close', (code) => {
-      if (code === 0 && stdoutData) {
-        try {
-          const info = JSON.parse(stdoutData);
-          if (info._type === 'playlist' || (info.entries && info.entries.length > 1)) {
-            const count = info.entries ? info.entries.length : (info.playlist_count || 1);
-            const title = info.title || 'Playlist';
-            return resolve({
-              isPlaylist: true,
-              title: title,
-              count: count
-            });
-          }
-        } catch (e) {}
-      }
-      resolve({ isPlaylist: false });
-    });
+      child.on('close', (code) => {
+        if (code === 0 && stdoutData) {
+          try {
+            const info = JSON.parse(stdoutData);
+            if (info._type === 'playlist' || (info.entries && info.entries.length > 1)) {
+              const count = info.entries ? info.entries.length : (info.playlist_count || 1);
+              const title = info.title || 'Playlist';
+              return resolve({
+                isPlaylist: true,
+                title: title,
+                count: count
+              });
+            }
+          } catch (e) {}
+        }
+        resolve({ isPlaylist: false });
+      });
 
-    child.on('error', () => {
-      resolve({ isPlaylist: false });
-    });
+      child.on('error', () => {
+        resolve({ isPlaylist: false });
+      });
 
-    // Timeout de 7 segundos
-    setTimeout(() => {
-      try { child.kill(); } catch (e) {}
-      resolve({ isPlaylist: false });
-    }, 7000);
+      // Timeout de 7 segundos
+      setTimeout(() => {
+        try { child.kill(); } catch (e) {}
+        resolve({ isPlaylist: false });
+      }, 7000);
+    }).catch(() => resolve({ isPlaylist: false }));
   });
 });
 
@@ -733,7 +737,46 @@ function stopDownloadProcess(child, { graceful = false } = {}) {
   child.kill(graceful ? 'SIGINT' : 'SIGTERM');
 }
 
-function createDownloadPlan(request, { noCookies = false } = {}) {
+// ─── Exporta cookies da sessão Google para yt-dlp ────────────────────────────
+// O yt-dlp é um processo separado e não enxerga a sessão do webview.
+// Exportamos os cookies do persist:google em formato Netscape (cookies.txt)
+// para que downloads usem a mesma conta logada (evita "not a bot" do YouTube).
+const GOOGLE_COOKIE_DOMAINS = [
+  'youtube.com', 'googlevideo.com', 'ggpht.com', 'ytimg.com',
+  'youtube-nocookie.com', 'google.com'
+];
+
+async function exportGoogleCookiesFile() {
+  try {
+    const googleSession = session.fromPartition('persist:google');
+    const allCookies = await googleSession.cookies.get({});
+    const relevant = allCookies.filter(c =>
+      GOOGLE_COOKIE_DOMAINS.some(d => String(c.domain || '').includes(d))
+    );
+    if (!relevant.length) return null;
+
+    const lines = ['# Netscape HTTP Cookie File', '# TurboDown exported session'];
+    for (const c of relevant) {
+      const domain = String(c.domain || '');
+      if (!domain || !c.name) continue;
+      const flag = domain.startsWith('.') ? 'TRUE' : 'FALSE';
+      const secure = c.secure ? 'TRUE' : 'FALSE';
+      const expires = c.expirationDate ? Math.floor(c.expirationDate) : 0;
+      const httpOnlyPrefix = c.httpOnly ? '#HttpOnly_' : '';
+      const value = String(c.value || '').replace(/[\r\n\t]/g, '');
+      lines.push(`${httpOnlyPrefix}${domain}\t${flag}\t${c.path || '/'}\t${secure}\t${expires}\t${c.name}\t${value}`);
+    }
+    if (lines.length <= 2) return null;
+
+    const file = path.join(app.getPath('userData'), 'google-cookies.txt');
+    fs.writeFileSync(file, lines.join('\n') + '\n', 'utf8');
+    return file;
+  } catch (e) {
+    return null;
+  }
+}
+
+function createDownloadPlan(request, { noCookies = false, cookiesFile = null } = {}) {
   const isAudio = AUDIO_FORMATS.includes(request.format);
   const isPlaylist = request.downloadPlaylist &&
     (request.url.includes('list=') || request.url.includes('/playlist'));
@@ -762,6 +805,7 @@ function createDownloadPlan(request, { noCookies = false } = {}) {
 
   const cookiesBrowser = noCookies ? null : store.get('cookiesFromBrowser');
   if (cookiesBrowser) args.push('--cookies-from-browser', cookiesBrowser);
+  if (cookiesFile) args.push('--cookies', cookiesFile);
 
   const ffmpegPath = getFfmpegPath();
   if (fs.existsSync(ffmpegPath)) {
@@ -843,11 +887,18 @@ ipcMain.handle('get-recent-logs', () => {
   } catch { return []; }
 });
 
-function runDownloadJob(job) {
+async function runDownloadJob(job) {
   const { request } = job;
+  let cookiesFile = null;
+  try {
+    cookiesFile = await exportGoogleCookiesFile();
+  } catch (e) {}
   let plan;
   try {
-    plan = createDownloadPlan(request, { noCookies: Boolean(job.cookiesRetried) });
+    plan = createDownloadPlan(request, {
+      noCookies: Boolean(job.cookiesRetried),
+      cookiesFile
+    });
   } catch (error) {
     job.status = 'error';
     job.errorMessage = `Não foi possível preparar a pasta de destino: ${error.message}`;

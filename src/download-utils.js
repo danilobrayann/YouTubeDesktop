@@ -123,6 +123,9 @@ function formatDownloadError(stderr, code) {
   if (/failed to decrypt with dpapi|cookies.*decrypt|could not decrypt/.test(normalized)) {
     return 'Não foi possível ler os cookies do navegador. Use Firefox nas configurações ou um arquivo cookies.txt.';
   }
+  if (/sign in to confirm|not a bot|confirm you.?re not a bot/.test(normalized)) {
+    return 'O YouTube pediu login para confirmar que não é um bot. Entre com sua conta Google em Configurações → Conta Google e tente novamente.';
+  }
   if (/private|unavailable|has been removed|video unavailable/.test(normalized)) {
     return 'Este vídeo está privado, indisponível ou foi removido.';
   }
