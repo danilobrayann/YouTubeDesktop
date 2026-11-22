@@ -3858,3 +3858,70 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
   background-clip: text;
   color: transparent;
 }
+
+/* ===== Cards de pasta estilo Google Drive ===== */
+.tg-folders-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tg-folder-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 10px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tg-folder-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.tg-folder-card.active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.tg-fc-icon {
+  font-size: 34px;
+  margin-bottom: 6px;
+}
+
+.tg-fc-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tg-fc-sub {
+  font-size: 10px;
+  color: var(--text-muted, #888);
+  margin-top: 2px;
+}
+
+.tg-fc-actions {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tg-folder-card:hover .tg-fc-actions {
+  opacity: 1;
+}
+
+.tg-folder-new {
+  border-style: dashed;
+  opacity: 0.75;
+}

@@ -2575,35 +2575,37 @@ async function renderTelegramFiles() {
       foldersBar.replaceChildren();
       const counts = {};
       files.forEach(f => { const k = f.folder || ''; counts[k] = (counts[k] || 0) + 1; });
-      const mkChip = (label, value, title, extra) => {
-        const chip = document.createElement('button');
-        chip.className = 'tg-folder-chip' + (tgFolderFilter === value ? ' active' : '');
-        chip.textContent = label;
-        chip.title = title || label;
-        chip.addEventListener('click', (e) => {
-          if (e.target.classList.contains('tg-folder-zip')) return;
+      const mkCard = (icon, name, sub, value, title, actions) => {
+        const card = document.createElement('div');
+        card.className = 'tg-folder-card' + (tgFolderFilter === value ? ' active' : '');
+        card.innerHTML = `<div class="tg-fc-icon">${icon}</div><div class="tg-fc-name" title="${title || name}">${name}</div><div class="tg-fc-sub">${sub}</div>`;
+        card.title = title || name;
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.tg-folder-zip')) return;
           tgFolderFilter = value;
           renderTelegramFiles();
         });
-        if (extra) chip.appendChild(extra);
-        return chip;
+        if (actions) card.appendChild(actions);
+        return card;
       };
-      foldersBar.appendChild(mkChip(`Todas (${files.length})`, '', 'Mostrar todos os arquivos'));
+      foldersBar.appendChild(mkCard('🗂️', 'Todos os arquivos', `${files.length} itens`, '', 'Mostrar todos'));
       folders.forEach(fn => {
+        const acts = document.createElement('div');
+        acts.className = 'tg-fc-actions';
         const zipBtn = document.createElement('span');
         zipBtn.className = 'tg-folder-zip';
-        zipBtn.textContent = ' ⬇';
+        zipBtn.textContent = '⬇';
         zipBtn.title = 'Baixar pasta como .zip';
         zipBtn.addEventListener('click', async () => {
-          zipBtn.textContent = ' ⏳';
+          zipBtn.textContent = '⏳';
           const res = await api.telegramDownloadFolder(fn);
-          zipBtn.textContent = ' ⬇';
+          zipBtn.textContent = '⬇';
           if (res && res.success) alert(`Pasta salva em:\n${res.path}`);
           else if (!(res && res.canceled)) alert(res && res.message || 'Falha ao baixar pasta');
         });
         const renBtn = document.createElement('span');
         renBtn.className = 'tg-folder-zip';
-        renBtn.textContent = ' ✎';
+        renBtn.textContent = '✎';
         renBtn.title = 'Renomear pasta';
         renBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
@@ -2613,22 +2615,20 @@ async function renderTelegramFiles() {
             renderTelegramFiles();
           }
         });
-        const wrap = document.createElement('span');
-        wrap.append(zipBtn, renBtn);
-        foldersBar.appendChild(mkChip(`📁 ${fn} (${counts[fn] || 0})`, fn, `Pasta: ${fn}`, wrap));
+        acts.append(zipBtn, renBtn);
+        foldersBar.appendChild(mkCard('📁', fn, `${counts[fn] || 0} itens`, fn, `Pasta: ${fn}`, acts));
       });
-      const addBtn = document.createElement('button');
-      addBtn.className = 'tg-folder-chip tg-folder-new';
-      addBtn.textContent = '＋ Pasta';
-      addBtn.title = 'Criar pasta virtual';
-      addBtn.addEventListener('click', async () => {
+      const addCard = document.createElement('div');
+      addCard.className = 'tg-folder-card tg-folder-new';
+      addCard.innerHTML = '<div class="tg-fc-icon">＋</div><div class="tg-fc-name">Nova pasta</div><div class="tg-fc-sub">criar</div>';
+      addCard.addEventListener('click', async () => {
         const name = prompt('Nome da nova pasta:');
         if (!name || !name.trim()) return;
         const res = await api.telegramCreateFolder(name.trim());
         if (res && res.success) renderTelegramFiles();
         else alert(res && res.message || 'Falha ao criar pasta');
       });
-      foldersBar.appendChild(addBtn);
+      foldersBar.appendChild(addCard);
     }
     // Filtro por pasta
     if (tgFolderFilter) files = files.filter(f => (f.folder || '') === tgFolderFilter);
