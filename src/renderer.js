@@ -2401,13 +2401,14 @@ if (btnTelegramCancel) {
 
 // Listeners para sucesso/timeout do login
 ipcRenderer.on('telegram-login-success', (event, data) => {
-  telegramConnectionStatus.textContent = 'Conectado';
+  const isGroup = data.chatType === 'group' || data.chatType === 'supergroup';
+  telegramConnectionStatus.textContent = isGroup ? 'Conectado (Grupo)' : 'Conectado';
   telegramConnectionStatus.classList.add('logged-in');
   telegramConnectionStatus.classList.remove('logged-out');
   btnTelegramLogin.disabled = false;
   btnTelegramLogin.textContent = 'Conectado';
   btnTelegramCancel.classList.add('hidden');
-  alert('Conectado com sucesso! Seus downloads serão salvos no Telegram.');
+  alert(`Conectado com sucesso! Arquivos serão salvos no ${isGroup ? 'grupo' : 'chat privado'}.`);
 });
 
 ipcRenderer.on('telegram-login-timeout', () => {
@@ -3065,7 +3066,8 @@ async function init() {
     setTelegramAutoUpload.checked = Boolean(telegramConfig.autoUpload);
     setTelegramDeleteAfterUpload.checked = Boolean(telegramConfig.deleteAfterUpload);
     if (telegramConfig.chatId) {
-      telegramConnectionStatus.textContent = 'Conectado';
+      const isGroup = telegramConfig.chatType === 'group' || telegramConfig.chatType === 'supergroup';
+      telegramConnectionStatus.textContent = isGroup ? 'Conectado (Grupo)' : 'Conectado';
       telegramConnectionStatus.classList.add('logged-in');
     }
   }

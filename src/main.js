@@ -201,7 +201,7 @@ async function uploadToTelegram(filePath, title, mediaType = 'document') {
 }
 
 ipcMain.handle('get-telegram-config', () => {
-  return store.get('telegram') || { enabled: false, botToken: '', chatId: '', botUsername: '', autoUpload: false, deleteAfterUpload: false };
+  return store.get('telegram') || { enabled: false, botToken: '', chatId: '', chatType: '', botUsername: '', autoUpload: false, deleteAfterUpload: false };
 });
 
 ipcMain.handle('save-telegram-config', async (_event, config) => {
@@ -220,7 +220,8 @@ ipcMain.handle('save-telegram-config', async (_event, config) => {
   store.set('telegram', {
     enabled: Boolean(config.enabled),
     botToken: token,
-    chatId: String(config.chatId || '').trim(),
+    chatId: String(config.chatId || store.get('telegram.chatId') || '').trim(),
+    chatType: String(config.chatType || store.get('telegram.chatType') || '').trim(),
     botUsername,
     autoUpload: Boolean(config.autoUpload),
     deleteAfterUpload: Boolean(config.deleteAfterUpload)
@@ -249,9 +250,11 @@ ipcMain.handle('start-telegram-wait', async () => {
   telegramWaitingForStart = true;
   telegramChatId = null;
 
-  // Escuta /start do usuário
+  // Escuta /start do usuário (em chat privado ou grupo)
   bot.onText(/\/start/, (msg) => {
     if (!telegramWaitingForStart) return;
+    const chatType = msg.chat.type || 'private';
+    const isGroup = chatType === 'group' || chatType === 'supergroup';
     telegramChatId = String(msg.chat.id);
     telegramWaitingForStart = false;
     if (telegramPollingTimeout) {
@@ -259,9 +262,11 @@ ipcMain.handle('start-telegram-wait', async () => {
       telegramPollingTimeout = null;
     }
     store.set('telegram.chatId', telegramChatId);
-    bot.sendMessage(telegramChatId, '✅ TurboDown conectado! Seus downloads serão salvos aqui automaticamente.');
+    store.set('telegram.chatType', chatType);
+    const locationText = isGroup ? 'grupo' : 'conversa privada';
+    bot.sendMessage(telegramChatId, `✅ TurboDown conectado! Seus downloads serão salvos nesta ${locationText} automaticamente.`);
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('telegram-login-success', { chatId: telegramChatId });
+      mainWindow.webContents.send('telegram-login-success', { chatId: telegramChatId, chatType });
     }
   });
 
