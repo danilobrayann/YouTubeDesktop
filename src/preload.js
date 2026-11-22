@@ -54,6 +54,13 @@ window.api = {
   getDiscordSettings: () => ipcRenderer.invoke('get-discord-settings'),
   saveDiscordSettings: (options) => ipcRenderer.invoke('save-discord-settings', options),
   setDiscordMusicState: (state) => ipcRenderer.invoke('set-discord-music-state', state),
+  toggleMiniPlayer: () => ipcRenderer.invoke('toggle-miniplayer'),
+  getSuggestions: (query) => ipcRenderer.invoke('youtube-suggestions', query),
+  getSchedules: () => ipcRenderer.invoke('get-schedules'),
+  addSchedule: (data) => ipcRenderer.invoke('add-schedule', data),
+  removeSchedule: (id) => ipcRenderer.invoke('remove-schedule', id),
+  getOnboardingDone: () => ipcRenderer.invoke('get-onboarding-done'),
+  setOnboardingDone: () => ipcRenderer.invoke('set-onboarding-done'),
 
   // Application updates
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
@@ -64,6 +71,8 @@ window.api = {
   // Google Web privacy controls
   getGoogleShieldStatus: () => ipcRenderer.invoke('get-google-shield-status'),
   setGoogleShields: (enabled) => ipcRenderer.invoke('set-google-shields', enabled),
+  getAdblockStatus: () => ipcRenderer.invoke('get-adblock-status'),
+  setAdblock: (enabled) => ipcRenderer.invoke('set-adblock', enabled),
   clearGooglePrivateData: () => ipcRenderer.invoke('clear-google-private-data'),
   resolveNavigationTarget,
 

@@ -3277,3 +3277,191 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
   gap: 4px;
   flex-shrink: 0;
 }
+
+/* ── URL Suggestions ─────────────────────────────────────────────────────── */
+.url-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 500;
+  background: var(--glass-bg, rgba(20,20,30,0.92));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+#url-bar-inner { position: relative; }
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: var(--accent-dim, rgba(255,68,68,0.15));
+}
+
+.suggestion-item .icon { width: 15px; height: 15px; color: var(--text-muted); flex-shrink: 0; }
+
+/* ── Miniplayer button ───────────────────────────────────────────────────── */
+.miniplayer-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 50;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.12));
+  background: var(--glass-bg, rgba(20,20,30,0.6));
+  backdrop-filter: blur(10px);
+  color: var(--accent, #ff4444);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.miniplayer-btn:hover { transform: scale(1.1); background: var(--accent-dim, rgba(255,68,68,0.2)); }
+.miniplayer-btn .icon { width: 18px; height: 18px; }
+#tab-music { position: relative; }
+
+/* ── Schedule card ───────────────────────────────────────────────────────── */
+.schedule-card {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.schedule-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.schedule-header .icon { width: 16px; height: 16px; color: var(--accent); }
+
+.schedule-form {
+  display: grid;
+  grid-template-columns: 1fr 140px 180px auto;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.schedule-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid transparent;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.schedule-item:hover { border-color: var(--glass-border); }
+.schedule-item-info { flex: 1; min-width: 0; }
+.schedule-item-title { color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.schedule-item-time { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+
+/* ── Onboarding ──────────────────────────────────────────────────────────── */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.onboarding-card {
+  width: min(480px, 90vw);
+  padding: 32px;
+  text-align: center;
+  animation: onboarding-in 0.3s ease;
+}
+
+@keyframes onboarding-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.onboarding-icon { color: var(--accent); margin-bottom: 12px; }
+.onboarding-icon .icon { width: 40px; height: 40px; }
+
+.onboarding-card h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.onboarding-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.onboarding-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+}
+
+.onboarding-step .icon {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.onboarding-step strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.onboarding-step span {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}

@@ -3,10 +3,11 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const { spawn } = require('child_process');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
-const { isTrackerRequest } = require('./browser-utils');
+const { isAdRequest, isTrackerRequest } = require('./browser-utils');
 const { DiscordRPC } = require('./discord-rpc');
 const {
   AUDIO_FORMATS,
@@ -52,11 +53,14 @@ const store = new Store({
     proxyUrl: null,
     cookiesFromBrowser: null,
     discordPresence: true,
-    discordClientId: '1574051479168487525'
+    discordClientId: '1574051479168487525',
+    scheduledDownloads: [],
+    onboardingDone: false
   }
 });
 
 let googleShieldsEnabled = store.get('googleShieldsEnabled', true);
+let adBlockEnabled = store.get('adBlockEnabled', true);
 let googleBlockedRequestCount = 0;
 const configuredBrowserSessions = new WeakSet();
 
@@ -90,8 +94,12 @@ function pushDiscordActivity() {
   rpc.setActivity({
     details: activity.details,
     state: activity.state,
+    type: activity.type || 0,
     timestamps: activity.timestamps,
-    assets: { large_image: 'turbodown', large_text: 'TurboDown' },
+    assets: {
+      large_image: activity.image || 'turbodown',
+      large_text: activity.details || 'TurboDown'
+    },
     instance: false
   });
 }
@@ -119,9 +127,13 @@ ipcMain.handle('set-discord-music-state', (_event, state = {}) => {
     const duration = Number(state.duration) || 0;
     const position = Number(state.position) || 0;
     const label = state.label || 'Ouvindo';
+    // Discord activity types: 0=Playing, 2=Listening, 3=Watching
+    const type = label === 'Ouvindo' ? 2 : label === 'Vendo' ? 3 : 0;
     discordMusicActivity = {
       details: `${label} ${state.title}`,
       state: state.artist || 'YouTube',
+      type,
+      image: state.image || null,
       timestamps: duration > 0
         ? { start: Math.floor(Date.now() / 1000) - Math.floor(position), end: Math.floor(Date.now() / 1000) + Math.floor(duration - position) }
         : undefined
@@ -192,7 +204,8 @@ function configureBrowserSession(partition) {
   browserSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*'] },
     (details, callback) => {
-      if (googleShieldsEnabled && isTrackerRequest(details.url)) {
+      if ((googleShieldsEnabled && isTrackerRequest(details.url)) ||
+          (adBlockEnabled && isAdRequest(details.url))) {
         googleBlockedRequestCount++;
         queueGoogleShieldStatus();
         callback({ cancel: true });
@@ -400,6 +413,7 @@ ipcMain.handle('get-google-shield-status', () => ({
 }));
 
 ipcMain.handle('set-google-shields', (_event, enabled) => {
+
   if (typeof enabled !== 'boolean') {
     throw new Error('Estado da proteção de navegação inválido.');
   }
@@ -407,6 +421,21 @@ ipcMain.handle('set-google-shields', (_event, enabled) => {
   store.set('googleShieldsEnabled', enabled);
   sendGoogleShieldStatus();
   return { enabled: googleShieldsEnabled, blockedCount: googleBlockedRequestCount };
+});
+
+ipcMain.handle('get-adblock-status', () => ({
+  enabled: adBlockEnabled,
+  blockedCount: googleBlockedRequestCount
+}));
+
+ipcMain.handle('set-adblock', (_event, enabled) => {
+  if (typeof enabled !== 'boolean') {
+    throw new Error('Estado do bloqueador de anúncios inválido.');
+  }
+  adBlockEnabled = enabled;
+  store.set('adBlockEnabled', enabled);
+  sendGoogleShieldStatus();
+  return { enabled: adBlockEnabled, blockedCount: googleBlockedRequestCount };
 });
 
 ipcMain.handle('clear-google-private-data', async () => {
@@ -1046,7 +1075,7 @@ ipcMain.handle('get-ytdlp-path', () => getYtDlpPath());
 // ─── Settings backup / restore ───────────────────────────────────────────────
 const BACKUP_KEYS = [
   'theme', 'downloadPath', 'defaultFormat', 'videoFormat', 'audioFormat',
-  'googleShieldsEnabled', 'customUserAgent',
+  'googleShieldsEnabled', 'customUserAgent', 'adBlockEnabled',
   'speedLimit', 'proxyUrl', 'cookiesFromBrowser',
   'discordPresence', 'discordClientId'
 ];
@@ -1114,6 +1143,138 @@ ipcMain.handle('save-download-advanced', (_event, options = {}) => {
   store.set('cookiesFromBrowser', options.cookiesFromBrowser || null);
   return true;
 });
+
+ipcMain.handle('get-onboarding-done', () => Boolean(store.get('onboardingDone')));
+ipcMain.handle('set-onboarding-done', () => {
+  store.set('onboardingDone', true);
+  return true;
+});
+
+// ─── Miniplayer flutuante (YouTube Music) ────────────────────────────────────
+let miniPlayerWindow = null;
+
+ipcMain.handle('toggle-miniplayer', () => {
+  if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
+    miniPlayerWindow.close();
+    return { open: false };
+  }
+  miniPlayerWindow = new BrowserWindow({
+    width: 420,
+    height: 110,
+    minWidth: 380,
+    minHeight: 100,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: false,
+    webPreferences: {
+      partition: 'persist:music',
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  miniPlayerWindow.setAlwaysOnTop(true, 'floating');
+  miniPlayerWindow.loadURL('https://music.youtube.com/');
+  miniPlayerWindow.on('closed', () => { miniPlayerWindow = null; });
+  return { open: true };
+});
+
+// ─── Sugestões de busca do YouTube ───────────────────────────────────────────
+ipcMain.handle('youtube-suggestions', (_event, query) => {
+  return new Promise((resolve) => {
+    const q = String(query || '').trim();
+    if (q.length < 2) return resolve([]);
+    const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&hl=pt&gl=BR&q=${encodeURIComponent(q)}`;
+    const req = https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+      let body = '';
+      res.on('data', d => { body += d; });
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          resolve(Array.isArray(data[1]) ? data[1].slice(0, 8) : []);
+        } catch { resolve([]); }
+      });
+    });
+    req.on('error', () => resolve([]));
+    req.setTimeout(5000, () => { req.destroy(); resolve([]); });
+  });
+});
+
+// ─── Downloads agendados ─────────────────────────────────────────────────────
+function getSchedules() {
+  return store.get('scheduledDownloads') || [];
+}
+
+function saveSchedules(list) {
+  store.set('scheduledDownloads', list);
+}
+
+ipcMain.handle('get-schedules', () => getSchedules());
+
+ipcMain.handle('add-schedule', (_event, { url, format, runAt, label }) => {
+  const schedules = getSchedules();
+  const item = {
+    id: `sched-${Date.now()}`,
+    url: String(url).trim(),
+    format: format || 'default-video',
+    runAt: new Date(runAt).toISOString(),
+    label: label || String(url).trim(),
+    createdAt: new Date().toISOString()
+  };
+  schedules.push(item);
+  saveSchedules(schedules);
+  return item;
+});
+
+ipcMain.handle('remove-schedule', (_event, id) => {
+  saveSchedules(getSchedules().filter(s => s.id !== id));
+  return true;
+});
+
+// Verifica agendamentos a cada 30s
+setInterval(() => {
+  const schedules = getSchedules();
+  const now = Date.now();
+  const due = schedules.filter(s => new Date(s.runAt).getTime() <= now);
+  if (!due.length) return;
+  saveSchedules(schedules.filter(s => new Date(s.runAt).getTime() > now));
+  for (const s of due) {
+    const fmt = s.format === 'default-video'
+      ? (store.get('videoFormat') || '720p')
+      : s.format === 'default-audio'
+        ? (store.get('audioFormat') || 'mp3')
+        : s.format;
+    const request = {
+      url: s.url,
+      format: fmt,
+      downloadId: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      downloadPlaylist: true,
+      subs: false,
+      thumbnail: false,
+      mp3Quality: '320k'
+    };
+    try {
+      const validated = validateDownloadRequest(request);
+      validated.outputPath = store.get('downloadPath') || app.getPath('downloads');
+      runDownloadJob({
+        request: validated,
+        status: 'pending',
+        child: null,
+        pauseRequested: false,
+        cancelRequested: false
+      }).catch(() => {});
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Download agendado iniciado',
+          body: s.label
+        }).show();
+      }
+    } catch (e) {
+      console.warn('Scheduled download failed:', e.message);
+    }
+  }
+}, 30000);
 
 ipcMain.handle('update-ytdlp', async () => {
   if (activeDownloads.size > 0) {

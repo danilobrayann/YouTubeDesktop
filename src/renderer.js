@@ -85,6 +85,7 @@ const setProxy          = document.getElementById('set-proxy');
 const setCookiesBrowser = document.getElementById('set-cookies-browser');
 const setDiscordEnabled  = document.getElementById('set-discord-enabled');
 const setDiscordClientId = document.getElementById('set-discord-client-id');
+const setAdblockEnabled  = document.getElementById('set-adblock-enabled');
 const btnPickBg          = document.getElementById('btn-pick-bg');
 const btnClearBg         = document.getElementById('btn-clear-bg');
 const bgPreviewImg       = document.getElementById('bg-preview-img');
@@ -480,11 +481,15 @@ const DISCORD_YOUTUBE_EXTRACT = `(() => {
   let title = titleEl ? titleEl.innerText.trim() : '';
   if (!title) title = (document.title || '').replace(/ - YouTube$/, '').trim();
   if (!title || !isWatch) return { playing: false };
+  const videoId = new URLSearchParams(location.search).get('v')
+    || location.pathname.match(/\\/(?:shorts|live)\\/([\\w-]{11})/)?.[1]
+    || '';
   return {
     playing: !v.paused && !v.ended && v.readyState > 1,
     title,
     artist: channelEl ? channelEl.innerText.trim() : 'YouTube',
     label: 'Vendo',
+    image: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : null,
     position: v.currentTime || 0,
     duration: isFinite(v.duration) ? v.duration : 0
   };
@@ -498,9 +503,11 @@ const DISCORD_MUSIC_EXTRACT = `(() => {
   const title = titleEl ? titleEl.innerText.trim() : '';
   const artist = subEl ? subEl.innerText.trim() : '';
   if (!v || !title) return { playing: false };
+  const videoId = new URLSearchParams(location.search).get('v') || '';
   return {
     playing: !v.paused && !v.ended && v.readyState > 1,
     title, artist, label: 'Ouvindo',
+    image: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : null,
     position: v.currentTime || 0,
     duration: isFinite(v.duration) ? v.duration : 0
   };
@@ -558,6 +565,102 @@ setInterval(pollDiscordMusicState, 15000);
 window.addEventListener('beforeunload', () => {
   api.setDiscordMusicState({ playing: false }).catch(() => {});
 });
+
+// ── Miniplayer flutuante ────────────────────────────────────────────────────
+const btnMiniPlayer = document.getElementById('btn-miniplayer');
+if (btnMiniPlayer) {
+  btnMiniPlayer.addEventListener('click', async () => {
+    try { await api.toggleMiniPlayer(); } catch (e) { console.warn(e); }
+  });
+}
+
+// ── Downloads agendados ─────────────────────────────────────────────────────
+const btnToggleSchedule = document.getElementById('btn-toggle-schedule');
+const scheduleForm      = document.getElementById('schedule-form');
+const schedUrl          = document.getElementById('sched-url');
+const schedFormat       = document.getElementById('sched-format');
+const schedTime         = document.getElementById('sched-time');
+const btnAddSchedule    = document.getElementById('btn-add-schedule');
+const scheduleList      = document.getElementById('schedule-list');
+
+function fmtScheduleDate(iso) {
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
+async function renderSchedules() {
+  if (!scheduleList) return;
+  const schedules = await api.getSchedules();
+  scheduleList.innerHTML = '';
+  if (!schedules.length) {
+    scheduleList.innerHTML = '<p class="schedule-empty">Nenhum download agendado</p>';
+    return;
+  }
+  schedules.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'schedule-item';
+    row.innerHTML = `
+      <div class="schedule-item-info">
+        <div class="schedule-item-title"></div>
+        <div class="schedule-item-time"></div>
+      </div>
+      <button class="btn-ghost btn-sm schedule-remove" title="Remover">
+        <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+      </button>`;
+    row.querySelector('.schedule-item-title').textContent = s.label;
+    row.querySelector('.schedule-item-time').textContent = `⏰ ${fmtScheduleDate(s.runAt)} · ${s.format}`;
+    row.querySelector('.schedule-remove').addEventListener('click', async () => {
+      await api.removeSchedule(s.id);
+      renderSchedules();
+    });
+    scheduleList.appendChild(row);
+  });
+}
+
+if (btnToggleSchedule && scheduleForm) {
+  btnToggleSchedule.addEventListener('click', () => {
+    scheduleForm.classList.toggle('hidden');
+    if (!scheduleForm.classList.contains('hidden') && !schedTime.value) {
+      const d = new Date(Date.now() + 3600000);
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      schedTime.value = d.toISOString().slice(0, 16);
+    }
+  });
+}
+
+if (btnAddSchedule) {
+  btnAddSchedule.addEventListener('click', async () => {
+    const url = schedUrl.value.trim();
+    const runAt = schedTime.value;
+    if (!url || !runAt) { alert('Informe a URL e a data/hora.'); return; }
+    try {
+      await api.addSchedule({ url, format: schedFormat.value, runAt });
+      schedUrl.value = '';
+      renderSchedules();
+    } catch (e) { alert(`Falha ao agendar: ${e.message}`); }
+  });
+}
+renderSchedules();
+
+// ── Onboarding ──────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const done = await api.getOnboardingDone();
+    if (!done) {
+      document.getElementById('onboarding-overlay').classList.remove('hidden');
+    }
+  } catch { /* ignore */ }
+})();
+
+const btnOnboardingClose = document.getElementById('btn-onboarding-close');
+if (btnOnboardingClose) {
+  btnOnboardingClose.addEventListener('click', async () => {
+    document.getElementById('onboarding-overlay').classList.add('hidden');
+    await api.setOnboardingDone().catch(() => {});
+  });
+}
 
 musicPlayer.addEventListener('did-fail-load', (event) => {
   if (event.errorCode === -3 || !event.isMainFrame) return;
@@ -639,7 +742,79 @@ btnLoad.addEventListener('click', () => {
 });
 
 urlInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') loadUrl(urlInput.value);
+  if (e.key === 'Enter') {
+    const active = document.querySelector('.suggestion-item.active');
+    if (active && !urlSuggestions.classList.contains('hidden')) {
+      urlInput.value = active.dataset.value;
+      hideSuggestions();
+    }
+    loadUrl(urlInput.value);
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const items = [...document.querySelectorAll('.suggestion-item')];
+    if (!items.length) return;
+    e.preventDefault();
+    const idx = items.findIndex(i => i.classList.contains('active'));
+    items.forEach(i => i.classList.remove('active'));
+    const next = e.key === 'ArrowDown'
+      ? (idx + 1) % items.length
+      : (idx - 1 + items.length) % items.length;
+    items[next].classList.add('active');
+    items[next].scrollIntoView({ block: 'nearest' });
+  }
+  if (e.key === 'Escape') hideSuggestions();
+});
+
+// ── Sugestões de busca do YouTube ───────────────────────────────────────────
+const urlSuggestions = document.getElementById('url-suggestions');
+let suggestionTimer = null;
+let suggestionItems = [];
+
+function hideSuggestions() {
+  urlSuggestions.classList.add('hidden');
+  urlSuggestions.innerHTML = '';
+  suggestionItems = [];
+}
+
+function showSuggestions(items) {
+  suggestionItems = items;
+  urlSuggestions.innerHTML = '';
+  if (!items.length) { hideSuggestions(); return; }
+  items.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'suggestion-item';
+    div.dataset.value = s;
+    div.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span></span>`;
+    div.querySelector('span').textContent = s;
+    div.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      urlInput.value = s;
+      hideSuggestions();
+      loadUrl(s);
+    });
+    urlSuggestions.appendChild(div);
+  });
+  urlSuggestions.classList.remove('hidden');
+}
+
+urlInput.addEventListener('input', () => {
+  clearTimeout(suggestionTimer);
+  const q = urlInput.value.trim();
+  // Não sugere se parecer URL completa
+  if (!q || /^https?:\/\//i.test(q) || q.includes('youtube.com') || q.includes('youtu.be')) {
+    hideSuggestions();
+    return;
+  }
+  suggestionTimer = setTimeout(async () => {
+    try {
+      const items = await api.getSuggestions(q);
+      if (urlInput.value.trim() === q) showSuggestions(items);
+    } catch { /* ignore */ }
+  }, 300);
+});
+
+document.addEventListener('click', (e) => {
+  if (!urlSuggestions.contains(e.target) && e.target !== urlInput) hideSuggestions();
 });
 
 // ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────────
@@ -1851,6 +2026,11 @@ const saveDiscordSettings = async () => {
 setDiscordEnabled.addEventListener('change', saveDiscordSettings);
 setDiscordClientId.addEventListener('change', saveDiscordSettings);
 
+// Ad blocker
+setAdblockEnabled.addEventListener('change', async () => {
+  await api.setAdblock(setAdblockEnabled.checked);
+});
+
 // Backup de configurações
 if (btnExportSettings) {
   btnExportSettings.addEventListener('click', async () => {
@@ -2481,6 +2661,9 @@ async function init() {
     setDiscordEnabled.checked = discordPresenceEnabled;
     setDiscordClientId.value = discordSettings.clientId || '';
   }
+
+  const adblockStatus = await api.getAdblockStatus();
+  if (adblockStatus) setAdblockEnabled.checked = Boolean(adblockStatus.enabled);
 
   const [version, updateStatus] = await Promise.all([
     api.getAppVersion(),

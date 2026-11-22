@@ -959,6 +959,13 @@
 
           <!-- ════ TAB: YOUTUBE MUSIC ════ -->
           <div class="tab" id="tab-music">
+            <button
+              id="btn-miniplayer"
+              class="miniplayer-btn"
+              title="Mini player flutuante"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg>
+            </button>
             <webview
               id="music-player"
               class="transparent-bg"
@@ -1018,6 +1025,7 @@
                   autocomplete="off"
                   spellcheck="false"
                 />
+                <div id="url-suggestions" class="url-suggestions hidden"></div>
                 <button
                   id="btn-load"
                   class="btn-primary"
@@ -1394,6 +1402,28 @@
                 </div>
               </div>
 
+              <!-- Downloads agendados -->
+              <div class="glass-card schedule-card">
+                <div class="schedule-header">
+                  <h3><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg> Downloads agendados</h3>
+                  <button id="btn-toggle-schedule" class="btn-ghost btn-sm">+ Agendar</button>
+                </div>
+                <div id="schedule-form" class="schedule-form hidden">
+                  <input type="url" id="sched-url" class="glass-input" placeholder="URL do vídeo/playlist" />
+                  <select id="sched-format" class="glass-select">
+                    <option value="default-video">🎬 Vídeo (padrão)</option>
+                    <option value="default-audio">🎵 Áudio (padrão)</option>
+                    <option value="1080p">🎬 1080p</option>
+                    <option value="720p">🎬 720p</option>
+                    <option value="mp3">🎵 MP3</option>
+                    <option value="m4a">🎵 M4A</option>
+                  </select>
+                  <input type="datetime-local" id="sched-time" class="glass-input" />
+                  <button id="btn-add-schedule" class="btn-primary btn-sm">Agendar</button>
+                </div>
+                <div id="schedule-list"></div>
+              </div>
+
               <div id="download-list">
                 <div id="dl-empty-state" class="empty-state">
                   <div class="empty-icon"><svg class="icon icon-xl" aria-hidden="true"><use href="#i-download"/></svg></div>
@@ -1739,6 +1769,24 @@
                   </div>
                 </div>
 
+                <!-- Ad blocker -->
+                <div class="settings-section glass-card">
+                  <h3 class="section-title">🛡️ Bloqueador de anúncios</h3>
+                  <div class="settings-grid">
+                    <div class="setting-row">
+                      <label>
+                        <input type="checkbox" id="set-adblock-enabled" />
+                        Bloquear anúncios e trackers
+                      </label>
+                    </div>
+                    <p class="maintenance-message" style="grid-column: 1 / -1;">
+                      Remove banners, pop-ups e trackers de todos os sites.
+                      No YouTube, bloqueia a maioria dos anúncios display;
+                      anúncios em vídeo podem variar.
+                    </p>
+                  </div>
+                </div>
+
                 <!-- Discord Rich Presence -->
                 <div class="settings-section glass-card">
                   <h3 class="section-title">💬 Discord Rich Presence</h3>
@@ -1856,6 +1904,34 @@
         <!-- /#content -->
       </div>
       <!-- /#main-layout -->
+
+      <!-- ══════════ ONBOARDING ══════════ -->
+      <div id="onboarding-overlay" class="onboarding-overlay hidden">
+        <div class="onboarding-card glass-card">
+          <div class="onboarding-icon"><svg class="icon icon-xl" aria-hidden="true"><use href="#i-download"/></svg></div>
+          <h2>Bem-vindo ao TurboDown</h2>
+          <p class="onboarding-sub">Seu downloader de mídia completo</p>
+          <div class="onboarding-steps">
+            <div class="onboarding-step">
+              <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg>
+              <div><strong>Início</strong><span>Busca e assiste vídeos do YouTube</span></div>
+            </div>
+            <div class="onboarding-step">
+              <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg>
+              <div><strong>Música</strong><span>YouTube Music com mini player flutuante</span></div>
+            </div>
+            <div class="onboarding-step">
+              <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+              <div><strong>Downloads</strong><span>Baixe em MP4, MP3, M4A com legendas e thumbnail</span></div>
+            </div>
+            <div class="onboarding-step">
+              <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>
+              <div><strong>Configurações</strong><span>Temas, proxy, Discord e backup</span></div>
+            </div>
+          </div>
+          <button id="btn-onboarding-close" class="btn-primary btn-save">Começar a usar</button>
+        </div>
+      </div>
 
       <!-- ══════════ QUICK DOWNLOAD MODAL ══════════ -->
       <div id="modal-backdrop" class="hidden"></div>

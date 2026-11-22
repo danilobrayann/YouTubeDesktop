@@ -27,6 +27,85 @@ const TRACKER_DOMAINS = Object.freeze([
   'balance-x.com'
 ]);
 
+const AD_DOMAINS = Object.freeze([
+  'doubleclick.net',
+  'googlesyndication.com',
+  'googleadservices.com',
+  'adservice.google.com',
+  'adnxs.com',
+  'adsrvr.org',
+  'amazon-adsystem.com',
+  'criteo.com',
+  'criteo.net',
+  'taboola.com',
+  'outbrain.com',
+  'revcontent.com',
+  'mgid.com',
+  'zedo.com',
+  'adform.net',
+  'adroll.com',
+  'pubmatic.com',
+  'rubiconproject.com',
+  'openx.net',
+  'smartadserver.com',
+  '33across.com',
+  'sharethrough.com',
+  'teads.tv',
+  'advertising.com',
+  'admanmedia.com',
+  'moatads.com',
+  'doubleverify.com',
+  'adsafeprotected.com',
+  'serving-sys.com',
+  'adcolony.com',
+  'applovin.com',
+  'inmobi.com',
+  'vungle.com',
+  'pokkt.com',
+  'startapp.com',
+  'adfurikun.com',
+  'mopub.com',
+  'chartboost.com',
+  'fyber.com',
+  'ironsrc.com',
+  'supersonicads.com',
+  'tapjoy.com',
+  'yahoo.com/ads',
+  'ads.yahoo.com',
+  'advertising.com',
+  'adtech',
+  'adserver',
+  'adserver2',
+  'adxpansion',
+  'admotion',
+  'adskeeper',
+  'adtechus',
+  'adswizz',
+  'adup-tech',
+  'aerserv',
+  'adman',
+  'admanmedia',
+  'admarket',
+  'admatrix',
+  'admixer',
+  'adnxs-simple',
+  'adotmob',
+  'adroll',
+  'adswizz'
+]);
+
+const AD_PATH_PATTERNS = Object.freeze([
+  /\/pagead\//i,
+  /\/ads\//i,
+  /\/adserver\//i,
+  /\/advertisement\//i,
+  /\/banner\//i,
+  /\/popunder\//i,
+  /\/sponsor\//i,
+  /\/tracking\/ad/i,
+  /[?&](ad|ads|adunit|adunitid|adslot|adtest)=/i
+]);
+
 function resolveNavigationTarget(input) {
   const value = typeof input === 'string' ? input.trim() : '';
   if (!value) return 'https://www.google.com/';
@@ -74,7 +153,27 @@ function isTrackerRequest(requestUrl) {
   return TRACKER_DOMAINS.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
 }
 
+function isAdRequest(requestUrl) {
+  let parsed;
+  try {
+    parsed = new URL(requestUrl);
+  } catch {
+    return false;
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  const path = parsed.pathname.toLowerCase();
+
+  // Bloqueia domínios de ads conhecidos
+  if (AD_DOMAINS.some(domain => hostname === domain || hostname.endsWith(`.${domain}`) || hostname.includes(domain))) {
+    return true;
+  }
+
+  // Bloqueia padrões de caminho comuns de ads
+  return AD_PATH_PATTERNS.some(pattern => pattern.test(path) || pattern.test(requestUrl));
+}
+
 module.exports = {
+  isAdRequest,
   isTrackerRequest,
   resolveNavigationTarget
 };

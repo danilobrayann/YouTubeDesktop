@@ -5,7 +5,6 @@
 const net = require('net');
 
 const OPS = { HANDSHAKE: 0, FRAME: 1, CLOSE: 2, PING: 3, PONG: 4 };
-const CMD = { DISPATCH: 1, SET_ACTIVITY: 2 };
 
 function pipePaths() {
   // Discord tries discord-ipc-0 first, then -1..-9
@@ -117,7 +116,7 @@ class DiscordRPC {
     this.lastActivity = activity;
     if (!this.socket || !this.connected) return;
     this.socket.write(encode(OPS.FRAME, {
-      cmd: CMD.SET_ACTIVITY,
+      cmd: 'SET_ACTIVITY',
       args: { pid: process.pid, activity },
       nonce: `${Date.now()}`
     }));
