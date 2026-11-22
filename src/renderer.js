@@ -1600,16 +1600,18 @@ api.on('download-progress', (data) => {
 api.on('telegram-upload-status', (data) => {
   const { downloadId, status, message } = data;
   const card = document.getElementById(`card-${downloadId}`);
-  if (!card) return;
-  let tgBadge = document.getElementById(`tg-status-${downloadId}`);
-  if (!tgBadge) {
-    tgBadge = document.createElement('div');
-    tgBadge.id = `tg-status-${downloadId}`;
-    const info = card.querySelector('.dl-card-info');
-    if (info) info.appendChild(tgBadge);
+  if (card) {
+    let tgBadge = document.getElementById(`tg-status-${downloadId}`);
+    if (!tgBadge) {
+      tgBadge = document.createElement('div');
+      tgBadge.id = `tg-status-${downloadId}`;
+      const info = card.querySelector('.dl-card-info');
+      if (info) info.appendChild(tgBadge);
+    }
+    tgBadge.className = `dl-telegram-badge ${status}`;
+    const prefix = status === 'uploading' ? '🔵 ' : status === 'success' ? '🟢 ' : '🔴 ';
+    tgBadge.textContent = `${prefix}${message}`;
   }
-  tgBadge.className = `dl-telegram-badge ${status}`;
-  tgBadge.textContent = message;
 });
 
 // ── RENDER DOWNLOAD CARD ───────────────────────────────────────────────────
@@ -1935,7 +1937,8 @@ function renderHistory() {
       btnTg.title = 'Enviar para o Telegram';
       btnTg.addEventListener('click', () => {
         btnTg.disabled = true;
-        btnTg.textContent = '⏳ Enviando...';
+        btnTg.textContent = '🔵 📤 Enviando para o Telegram...';
+        btnTg.style.color = '#00b4d8';
         api.uploadFileTelegram({
           filePath: item.filePath,
           title: item.title,
@@ -1943,15 +1946,19 @@ function renderHistory() {
           downloadId: 'hist-' + (item.date || Date.now())
         }).then(res => {
           if (res && res.ok) {
-            btnTg.textContent = '✅ Enviado!';
+            btnTg.textContent = '🟢 ✅ Enviado para o Telegram!';
+            btnTg.style.color = '#00f5a0';
           } else {
             btnTg.disabled = false;
-            btnTg.textContent = '❌ Falhou';
-            alert('Falha ao enviar para o Telegram: ' + ((res && res.error) || 'Verifique se o Bot está configurado e iniciado.'));
+            const reason = (res && res.error) || 'Verifique se o Bot está configurado';
+            btnTg.textContent = `🔴 ⚠️ Falha no envio: ${reason}`;
+            btnTg.style.color = '#ff6666';
+            btnTg.title = `Falha: ${reason}. Clique para tentar novamente.`;
           }
         }).catch(err => {
           btnTg.disabled = false;
-          btnTg.textContent = '❌ Erro';
+          btnTg.textContent = `🔴 ⚠️ Falha no envio: ${err.message || err}`;
+          btnTg.style.color = '#ff6666';
         });
       });
       actions.append(btnTg);

@@ -194,10 +194,10 @@ async function uploadToTelegram(filePath, title, mediaType = 'document', downloa
         mainWindow.webContents.send('telegram-upload-status', {
           downloadId,
           status: 'error',
-          message: `⚠️ ${msg}`
+          message: `⚠️ Falha no envio: ${msg}`
         });
       }
-      return { success: false, reason: 'file_too_large' };
+      return { success: false, reason: msg };
     }
     const options = {
       caption: title || path.basename(filePath),
