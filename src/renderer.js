@@ -890,6 +890,16 @@ btnLoad.addEventListener('click', () => {
   loadUrl(urlInput.value);
 });
 
+// Botão de login Google/YouTube
+const btnYtLogin = document.getElementById('btn-yt-login');
+if (btnYtLogin) {
+  btnYtLogin.addEventListener('click', () => {
+    webview.src = 'https://accounts.google.com/ServiceLogin?continue=' +
+      encodeURIComponent('https://www.youtube.com');
+    urlInput.value = 'https://accounts.google.com/';
+  });
+}
+
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const active = document.querySelector('.suggestion-item.active');
