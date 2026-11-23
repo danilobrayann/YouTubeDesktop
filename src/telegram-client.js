@@ -72,25 +72,71 @@ class TelegramClient {
 
   async _sendFile(endpoint, fieldName, chatId, filePath, options = {}) {
     const fileName = options.filename || path.basename(filePath);
-    let blob;
-    if (typeof fs.openAsBlob === 'function') {
-      blob = await fs.openAsBlob(filePath);
-    } else {
-      blob = new Blob([fs.readFileSync(filePath)]);
+    const fileSize = fs.statSync(filePath).size;
+    const boundary = `----TD${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+    const caption = options.caption ? String(options.caption).slice(0, 1024) : '';
+
+    // Multipart manual — permite contar bytes reais para progresso de upload
+    const headParts = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="chat_id"',
+      '',
+      String(chatId),
+      `--${boundary}`,
+      `Content-Disposition: form-data; name="${fieldName}"; filename="${fileName.replace(/["\r\n]/g, '')}"`,
+      'Content-Type: application/octet-stream',
+      ''
+    ];
+    if (caption) {
+      headParts.push(`--${boundary}`, 'Content-Disposition: form-data; name="caption"', '', caption);
     }
-    const formData = new FormData();
-    formData.append('chat_id', String(chatId));
-    formData.append(fieldName, blob, fileName);
-    if (options.caption) {
-      formData.append('caption', String(options.caption).slice(0, 1024));
-    }
-    const res = await fetch(`${this.baseUrl}/${endpoint}`, {
-      method: 'POST',
-      body: formData
+    headParts.push(`--${boundary}`, '');
+    const head = Buffer.from(headParts.join('\r\n') + '\r\n', 'utf8');
+    const tail = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
+    const total = head.length + fileSize + tail.length;
+
+    const url = new URL(`${this.baseUrl}/${endpoint}`);
+    const https = require('https');
+
+    return new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': total
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', (c) => { body += c; });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            if (!data.ok) return reject(new Error(data.description || `Falha ao enviar ${fieldName}`));
+            resolve(data.result);
+          } catch (e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(10 * 60 * 1000, () => { req.destroy(new Error('Timeout no upload')); });
+
+      let sent = head.length;
+      const report = () => {
+        if (options.onProgress) options.onProgress(Math.min(sent, total), total);
+      };
+      req.write(head);
+      report();
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => {
+        sent += chunk.length;
+        if (!req.write(chunk)) stream.pause();
+        report();
+      });
+      req.on('drain', () => stream.resume());
+      stream.on('end', () => { req.write(tail); req.end(); });
+      stream.on('error', reject);
     });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.description || `Falha ao enviar ${fieldName}`);
-    return data.result;
   }
 
   onText(regex, callback) {

@@ -697,7 +697,26 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     const captionBase = title || path.basename(filePath);
     const options = {
       caption: (opts.folder ? `[${opts.folder}] ` : '') + captionBase,
-      filename: uploadName
+      filename: uploadName,
+      onProgress: (loaded, totalBytes) => {
+        if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
+          mainWindow.webContents.send('telegram-upload-status', {
+            downloadId,
+            status: 'uploading',
+            progress: totalBytes ? Math.round((loaded / totalBytes) * 100) : 0,
+            loaded,
+            total: totalBytes
+          });
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('telegram-upload-event', {
+            type: 'progress',
+            fileName: uploadName,
+            loaded,
+            size: totalBytes
+          });
+        }
+      }
     };
     const sendByType = () => {
       if (mediaType === 'video') return bot.sendVideo(telegramChatId, uploadPath, options);
@@ -743,9 +762,15 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
       }).show();
     }
 
+    // Notifica no Telegram só em falhas (sucesso já aparece como a própria mensagem do arquivo)
     return { success: true };
   } catch (e) {
     console.warn('Telegram upload failed:', e);
+    try {
+      if (bot && telegramChatId) {
+        await bot.sendMessage(telegramChatId, `❌ Falha ao enviar para a nuvem:\n${title || path.basename(filePath)}\n${e.message}`.slice(0, 1000));
+      }
+    } catch (_) {}
     if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
       mainWindow.webContents.send('telegram-upload-status', {
         downloadId,

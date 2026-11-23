@@ -1609,8 +1609,9 @@ api.on('download-progress', (data) => {
   updateBadge();
 });
 
+const tgUploadStats = {};
 api.on('telegram-upload-status', (data) => {
-  const { downloadId, status, message } = data;
+  const { downloadId, status, message, progress, loaded } = data;
   const card = document.getElementById(`card-${downloadId}`);
   if (card) {
     let tgBadge = document.getElementById(`tg-status-${downloadId}`);
@@ -1622,7 +1623,16 @@ api.on('telegram-upload-status', (data) => {
     }
     tgBadge.className = `dl-telegram-badge ${status}`;
     const prefix = status === 'uploading' ? '🔵 ' : status === 'success' ? '🟢 ' : '🔴 ';
-    tgBadge.textContent = `${prefix}${message}`;
+    if (status === 'uploading' && typeof progress === 'number') {
+      const now = Date.now();
+      const st = tgUploadStats[downloadId] || (tgUploadStats[downloadId] = { lastLoaded: 0, lastTime: now });
+      const dt = (now - st.lastTime) / 1000;
+      const speed = dt > 0.3 && loaded > st.lastLoaded ? (loaded - st.lastLoaded) / dt : 0;
+      st.lastLoaded = loaded; st.lastTime = now;
+      tgBadge.textContent = `${prefix}${progress}%${speed > 0 ? ` • ${formatBytes(speed)}/s` : ''}`;
+    } else {
+      tgBadge.textContent = `${prefix}${message}`;
+    }
   }
 });
 
