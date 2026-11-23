@@ -405,19 +405,24 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
           : (path.basename(path.dirname(p)) || 'Enviados');
         const baseName = path.basename(p);
         const emit = (type, size, msg) => mainWindow?.webContents.send('telegram-upload-event', { type, fileName: baseName, size, message: msg || '' });
+        let attempts = 0, succeeded = 0;
+        const tryUpload = async (up, name, mType) => {
+          attempts++;
+          const r = await uploadToTelegram(up, name, mType, null, { source: 'manual', folder });
+          if (r.success) succeeded++;
+          return r;
+        };
         if (st.size <= MAX) {
           emit('start', st.size);
-          const res = await uploadToTelegram(p, baseName, detectTelegramMediaType(p), null, { source: 'manual', folder });
+          const res = await tryUpload(p, baseName, detectTelegramMediaType(p));
           emit(res.success ? 'done' : 'error', st.size, res.reason);
-          res.success ? ok++ : fail++;
         } else {
           const zp = await zipFileForUpload(p);
           const zsize = zp ? fs.statSync(zp).size : Infinity;
           if (zp && zsize <= MAX) {
             emit('start', zsize);
-            const res = await uploadToTelegram(zp, `${baseName}.zip`, 'document', null, { source: 'manual', folder });
+            const res = await tryUpload(zp, `${baseName}.zip`, 'document');
             emit(res.success ? 'done' : 'error', zsize, res.reason);
-            res.success ? ok++ : fail++;
             try { fs.unlinkSync(zp); } catch (e) {}
           } else {
             const parts = await splitFileForUpload(zp || p, MAX);
@@ -426,13 +431,18 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
               const psz = fs.statSync(part).size;
               const pn = `${baseName}.part${String(i + 1).padStart(3, '0')}.zip`;
               emit('start', psz);
-              const res = await uploadToTelegram(part, pn, 'document', null, { source: 'manual', folder });
+              const res = await tryUpload(part, pn, 'document');
               emit(res.success ? 'done' : 'error', psz, res.reason);
-              res.success ? ok++ : fail++;
               if (part !== (zp || p)) { try { fs.unlinkSync(part); } catch (e) {} }
             }
             if (zp) { try { fs.unlinkSync(zp); } catch (e) {} }
           }
+        }
+        // Modo nuvem: apaga o arquivo local só se TODAS as partes subiram
+        if (succeeded === attempts && attempts > 0) { ok += succeeded; }
+        else fail += attempts - succeeded;
+        if (succeeded === attempts && attempts > 0 && telegramDeleteAfterUpload) {
+          try { fs.unlinkSync(p); cleanupEmptyDirs(p); } catch (e) {}
         }
       } catch (e) { fail++; }
     }
@@ -611,14 +621,19 @@ ipcMain.handle('telegram-pick-upload-folder', async () => {
     }
   };
   walk(dir);
+  const folderName = path.basename(dir) || 'Enviados';
   let ok = 0, fail = 0;
   for (const f of files) {
     const st = fs.statSync(f);
     if (st.size > 2 * 1024 * 1024 * 1024) { fail++; continue; }
     mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(f), size: st.size });
-    const res = await uploadToTelegram(f, path.basename(f), detectTelegramMediaType(f), null, { source: 'manual', folder: 'Enviados' });
-    if (res.success) ok++;
-    else fail++;
+    const res = await uploadToTelegram(f, path.basename(f), detectTelegramMediaType(f), null, { source: 'manual', folder: folderName });
+    if (res.success) {
+      ok++;
+      if (telegramDeleteAfterUpload) {
+        try { fs.unlinkSync(f); cleanupEmptyDirs(f); } catch (e) {}
+      }
+    } else fail++;
     mainWindow?.webContents.send('telegram-upload-event', {
       type: res.success ? 'done' : 'error',
       fileName: path.basename(f),
@@ -717,6 +732,17 @@ function extractTelegramFileId(sent) {
   return sent.document?.file_id || sent.video?.file_id || sent.audio?.file_id ||
     sent.voice?.file_id || sent.video_note?.file_id ||
     (Array.isArray(sent.photo) && sent.photo.length ? sent.photo[sent.photo.length - 1].file_id : null) || null;
+}
+
+// Remove pastas vazias subindo na hierarquia (após delete local em modo nuvem)
+function cleanupEmptyDirs(filePath) {
+  let dir = path.dirname(filePath);
+  for (let i = 0; i < 12; i++) {
+    try {
+      if (fs.readdirSync(dir).length === 0) { fs.rmdirSync(dir); dir = path.dirname(dir); }
+      else break;
+    } catch (e) { break; }
+  }
 }
 
 // Compacta uma pasta inteira em .zip preservando a estrutura de subpastas
