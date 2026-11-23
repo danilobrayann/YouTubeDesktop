@@ -112,6 +112,9 @@ window.api = {
   telegramPickUploadFolder: () => ipcRenderer.invoke('telegram-pick-upload-folder'),
   telegramGetWatchFolder: () => ipcRenderer.invoke('telegram-get-watch-folder'),
   telegramPickWatchFolder: () => ipcRenderer.invoke('telegram-pick-watch-folder'),
+  telegramGetWatchFolders: () => ipcRenderer.invoke('telegram-get-watch-folders'),
+  telegramAddWatchFolder: (folderPath) => ipcRenderer.invoke('telegram-add-watch-folder', folderPath),
+  telegramRemoveWatchFolder: (folderPath) => ipcRenderer.invoke('telegram-remove-watch-folder', folderPath),
   resolveNavigationTarget,
 
   // IPC event listeners

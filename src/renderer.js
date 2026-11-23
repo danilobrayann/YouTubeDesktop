@@ -8,6 +8,10 @@
 const api = window.api;
 const { ipcRenderer } = require('electron');
 
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 let currentTab = 'home';
 let downloadPath = '';
@@ -106,8 +110,23 @@ const telegramCloudLabel = document.getElementById('telegram-cloud-label');
 const btnTelegramUploadFile = document.getElementById('btn-telegram-upload-file');
 const btnTelegramUploadFolder = document.getElementById('btn-telegram-upload-folder');
 const btnTelegramWatchFolder = document.getElementById('btn-telegram-watch-folder');
-const telegramWatchFolderRow = document.getElementById('telegram-watch-folder-row');
-const telegramWatchFolderPath = document.getElementById('telegram-watch-folder-path');
+const telegramWatchFoldersList = document.getElementById('telegram-watch-folders-list');
+
+function renderWatchFolders(folders) {
+  if (!telegramWatchFoldersList) return;
+  telegramWatchFoldersList.innerHTML = '';
+  for (const f of folders || []) {
+    const row = document.createElement('div');
+    row.className = 'watch-folder-row';
+    row.innerHTML = `<span class="watch-folder-path" title="${escapeHtml(f)}">📁 ${escapeHtml(f)}</span><button class="btn-ghost watch-folder-remove" title="Remover">✕</button>`;
+    row.querySelector('.watch-folder-remove').addEventListener('click', async () => {
+      await api.telegramRemoveWatchFolder(f);
+      const list = await api.telegramGetWatchFolders();
+      renderWatchFolders(list);
+    });
+    telegramWatchFoldersList.appendChild(row);
+  }
+}
 const btnTelegramRefreshFiles = document.getElementById('btn-telegram-refresh-files');
 const telegramFilesList = document.getElementById('telegram-files-list');
 const btnPickBg          = document.getElementById('btn-pick-bg');
@@ -2991,12 +3010,8 @@ if (btnTelegramUploadFolder) {
 if (btnTelegramWatchFolder) {
   btnTelegramWatchFolder.addEventListener('click', async () => {
     const res = await api.telegramPickWatchFolder();
-    if (res && res.success && res.path) {
-      telegramWatchFolderRow.style.display = '';
-      telegramWatchFolderPath.textContent = res.path;
-    } else if (res && res.message) {
-      alert(res.message);
-    }
+    if (res && res.folders) renderWatchFolders(res.folders);
+    else if (res && res.message) alert(res.message);
   });
 }
 
@@ -3084,11 +3099,8 @@ if (btnTelegramClearIndex) {
 
 async function refreshTelegramCloud() {
   try {
-    const watch = await api.telegramGetWatchFolder();
-    if (watch) {
-      telegramWatchFolderRow.style.display = '';
-      telegramWatchFolderPath.textContent = watch;
-    }
+    const folders = await api.telegramGetWatchFolders();
+    renderWatchFolders(folders);
   } catch (e) {}
   renderTelegramFiles();
 }

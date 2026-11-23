@@ -3,6 +3,7 @@
 // Remove a flag de automação do Chromium — sites como YouTube usam
 // navigator.webdriver / AutomationControlled para detectar webviews.
 const { app, BrowserWindow, ipcMain, dialog, shell, session, Tray, Menu, Notification } = require('electron');
+app.setName('TurboDown');
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 const path = require('path');
 const fs = require('fs');
@@ -644,40 +645,55 @@ ipcMain.handle('telegram-pick-upload-folder', async () => {
   return { success: true, uploaded: ok, failed: fail, total: files.length };
 });
 
-// ─── Pasta vigiada: arquivos soltos nela sobem pro Telegram ──────────────────
-let telegramWatchFolder = null;
-let telegramWatcher = null;
+// ─── Pastas vigiadas: arquivos novos sobem pro Telegram automaticamente ──────
+// Cada pasta vigiada vira uma pasta virtual na nuvem com o próprio nome.
+const telegramWatchers = new Map(); // folderPath -> fs.FSWatcher
 const pendingWatchFiles = new Map();
 
-function startTelegramWatcher() {
-  if (telegramWatcher) {
-    try { telegramWatcher.close(); } catch (e) {}
-    telegramWatcher = null;
+function getWatchFolders() {
+  let list = store.get('telegram.watchFolders');
+  if (!Array.isArray(list)) {
+    // migra a pasta única antiga
+    const old = store.get('telegram.watchFolder');
+    list = old ? [old] : [];
+    store.set('telegram.watchFolders', list);
   }
-  const folder = store.get('telegram.watchFolder');
-  if (!folder || !fs.existsSync(folder)) return;
-  telegramWatchFolder = folder;
-  try {
-    telegramWatcher = fs.watch(folder, { recursive: true }, (_event, filename) => {
-      if (!filename) return;
-      const full = path.join(folder, filename);
-      const prev = pendingWatchFiles.get(full);
-      if (prev) clearTimeout(prev);
-      pendingWatchFiles.set(full, setTimeout(() => handleWatchedFile(full), 2500));
-    });
-  } catch (e) {
-    telegramWatcher = null;
+  return list.filter(p => p && fs.existsSync(p));
+}
+
+function saveWatchFolders(list) {
+  store.set('telegram.watchFolders', list);
+}
+
+function startTelegramWatcher() {
+  for (const w of telegramWatchers.values()) {
+    try { w.close(); } catch (e) {}
+  }
+  telegramWatchers.clear();
+  for (const folder of getWatchFolders()) {
+    try {
+      const watcher = fs.watch(folder, { recursive: true }, (_event, filename) => {
+        if (!filename) return;
+        const full = path.join(folder, filename);
+        const prev = pendingWatchFiles.get(full);
+        if (prev) clearTimeout(prev);
+        pendingWatchFiles.set(full, setTimeout(() => handleWatchedFile(full, folder), 2500));
+      });
+      telegramWatchers.set(folder, watcher);
+    } catch (e) {}
   }
 }
 
-async function handleWatchedFile(full) {
+async function handleWatchedFile(full, rootFolder) {
   try {
     const st = fs.statSync(full);
     if (!st.isFile() || st.size === 0 || st.size > 2 * 1024 * 1024 * 1024) return;
     const bot = ensureTelegramBot();
     if (!bot || !telegramChatId) return;
+    // pasta virtual = nome da pasta vigiada
+    const cloudFolder = path.basename(rootFolder) || 'Pasta vigiada';
     mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(full), size: st.size, source: 'watch' });
-    const res = await uploadToTelegram(full, path.basename(full), detectTelegramMediaType(full), null, { source: 'watch', folder: 'Pasta vigiada' });
+    const res = await uploadToTelegram(full, path.basename(full), detectTelegramMediaType(full), null, { source: 'watch', folder: cloudFolder });
     mainWindow?.webContents.send('telegram-upload-event', {
       type: res.success ? 'done' : 'error',
       fileName: path.basename(full),
@@ -686,33 +702,62 @@ async function handleWatchedFile(full) {
       source: 'watch'
     });
     if (res.success && telegramDeleteAfterUpload) {
-      try { fs.unlinkSync(full); } catch (e) {}
+      try { fs.unlinkSync(full); cleanupEmptyDirs(full); } catch (e) {}
     }
   } catch (e) {}
 }
 
-ipcMain.handle('telegram-get-watch-folder', () => store.get('telegram.watchFolder') || '');
+// ===== IPCs: múltiplas pastas vigiadas =====
+ipcMain.handle('telegram-get-watch-folders', () => getWatchFolders());
 
+ipcMain.handle('telegram-add-watch-folder', async (_event, folderPath) => {
+  const p = path.resolve(String(folderPath || '').trim());
+  if (!p || !fs.existsSync(p) || !fs.statSync(p).isDirectory()) {
+    return { success: false, message: 'Pasta inválida' };
+  }
+  const list = getWatchFolders();
+  if (!list.includes(p)) {
+    list.push(p);
+    saveWatchFolders(list);
+    startTelegramWatcher();
+  }
+  return { success: true, folders: list };
+});
+
+ipcMain.handle('telegram-remove-watch-folder', async (_event, folderPath) => {
+  const p = path.resolve(String(folderPath || ''));
+  const list = getWatchFolders().filter(f => path.resolve(f) !== p);
+  saveWatchFolders(list);
+  startTelegramWatcher();
+  return { success: true, folders: list };
+});
+
+ipcMain.handle('telegram-pick-watch-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Escolher pasta para monitorar',
+    properties: ['openDirectory']
+  });
+  if (result.canceled || !result.filePaths.length) return { success: false, canceled: true };
+  const p = result.filePaths[0];
+  const list = getWatchFolders();
+  if (!list.includes(p)) {
+    list.push(p);
+    saveWatchFolders(list);
+    startTelegramWatcher();
+  }
+  return { success: true, path: p, folders: list };
+});
+
+// compatibilidade com a API antiga (pasta única)
+ipcMain.handle('telegram-get-watch-folder', () => getWatchFolders()[0] || '');
 ipcMain.handle('telegram-set-watch-folder', async (_event, folderPath) => {
   const p = String(folderPath || '').trim();
   if (p && (!fs.existsSync(p) || !fs.statSync(p).isDirectory())) {
     return { success: false, message: 'Pasta inválida' };
   }
-  store.set('telegram.watchFolder', p || null);
+  saveWatchFolders(p ? [p] : []);
   startTelegramWatcher();
   return { success: true };
-});
-
-ipcMain.handle('telegram-pick-watch-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Escolher pasta vigiada',
-    properties: ['openDirectory']
-  });
-  if (result.canceled || !result.filePaths.length) return { success: false, canceled: true };
-  const p = result.filePaths[0];
-  store.set('telegram.watchFolder', p);
-  startTelegramWatcher();
-  return { success: true, path: p };
 });
 
 // Fila sequencial de uploads — evita uploads paralelos sobrecarregando a rede

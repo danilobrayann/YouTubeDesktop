@@ -4070,3 +4070,14 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 }
 
 .tg-emoji-opt:hover, .tg-emoji-opt.active { background: rgba(255,255,255,0.12); }
+
+/* Pastas vigiadas (backup automático) */
+#telegram-watch-folders-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.watch-folder-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-elevated, rgba(255,255,255,.04));
+  border: 1px solid var(--border, rgba(255,255,255,.08));
+  border-radius: 8px; padding: 7px 10px;
+}
+.watch-folder-path { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watch-folder-remove { padding: 2px 8px; font-size: 11px; }
