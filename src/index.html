@@ -1565,15 +1565,30 @@
                               <option value="name">Nome</option>
                               <option value="size">Tamanho</option>
                             </select>
+                            <button id="btn-tg-settings" class="btn-ghost btn-xs" title="Configurações da nuvem">⚙️</button>
                             <button id="btn-telegram-refresh-files" class="btn-ghost btn-xs" title="Atualizar">↻</button>
                             <button id="btn-telegram-clear-index" class="btn-ghost btn-xs" title="Limpar índice">🧹</button>
                           </div>
                         </div>
-                        <div id="tg-breadcrumb" class="tg-breadcrumb"></div>
-                        <div id="tg-folders-bar" class="tg-folders-bar"></div>
-                        <div id="telegram-files-list" class="telegram-files-list">
-                          <p class="maintenance-message" style="margin:0;">Nenhum arquivo enviado ainda.</p>
+                        <div class="tg-drive-layout">
+                          <aside class="tg-sidebar">
+                            <div class="tg-side-item active" data-tgview="drive"><span class="tg-side-ico">🗂️</span> Meu Drive</div>
+                            <div class="tg-side-item" data-tgview="recent"><span class="tg-side-ico">🕐</span> Recentes</div>
+                            <div class="tg-side-item" data-tgview="starred"><span class="tg-side-ico">⭐</span> Estrelados</div>
+                            <div class="tg-side-item" data-tgview="archived"><span class="tg-side-ico">🗄️</span> Arquivados</div>
+                            <div class="tg-side-item" data-tgview="backups"><span class="tg-side-ico">💾</span> Backups</div>
+                            <div class="tg-side-sep"></div>
+                            <div class="tg-side-item" data-tgview="trash"><span class="tg-side-ico">🗑️</span> Lixeira</div>
+                          </aside>
+                          <div class="tg-drive-main">
+                            <div id="tg-breadcrumb" class="tg-breadcrumb"></div>
+                            <div id="tg-folders-bar" class="tg-folders-bar"></div>
+                            <div id="telegram-files-list" class="telegram-files-list">
+                              <p class="maintenance-message" style="margin:0;">Nenhum arquivo enviado ainda.</p>
+                            </div>
+                          </div>
                         </div>
+                        <div id="tg-storage-bar" class="tg-storage-bar"></div>
                       </div>
                     </div>
 

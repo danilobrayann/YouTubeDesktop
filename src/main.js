@@ -236,6 +236,21 @@ function detectTelegramMediaType(filePath) {
   return 'document';
 }
 
+// Tipos que já são compactados — zipar só desperdiça tempo/disco; vai direto pro split
+const NON_COMPRESS_EXT = new Set([
+  '.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v', '.mp3', '.m4a', '.ogg', '.opus',
+  '.wav', '.flac', '.aac', '.wma', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+  '.zip', '.rar', '.7z', '.tar', '.gz', '.iso', '.img', '.apk', '.pdf', '.docx',
+  '.xlsx', '.pptx', '.epub', '.mobi', '.psd', '.ai', '.sketch'
+]);
+
+// Reconhece nome de parte: "nome.part001.ext" -> { stem: 'nome', ext: '.ext', num: 1 }
+function parsePartName(fileName) {
+  const m = String(fileName || '').match(/^(.*)\.part(\d{3,})\.([^.]+)$/i);
+  if (!m) return null;
+  return { stem: m[1], num: parseInt(m[2], 10), ext: '.' + m[3] };
+}
+
 const TRASH_TTL = 30 * 24 * 60 * 60 * 1000; // 30 dias na lixeira
 
 ipcMain.handle('telegram-get-files', () => {
@@ -260,6 +275,40 @@ ipcMain.handle('telegram-download-file', async (_event, id) => {
   }
   const bot = ensureTelegramBot();
   if (!bot) return { success: false, message: 'Bot não conectado' };
+
+  // Se for uma parte (.partNNN), baixa TODAS as partes e remonta o arquivo original
+  const partInfo = parsePartName(entry.fileName);
+  if (partInfo) {
+    const siblings = getTelegramFiles()
+      .filter(f => f.fileId && (f.folder || '') === (entry.folder || ''))
+      .map(f => ({ f, p: parsePartName(f.fileName) }))
+      .filter(x => x.p && x.p.stem === partInfo.stem && x.p.ext === partInfo.ext)
+      .sort((a, b) => a.p.num - b.p.num);
+    if (siblings.length > 1) {
+      const chunks = [];
+      for (const s of siblings) {
+        try {
+          const info = await bot.getFile(s.f.fileId);
+          if (!info || !info.file_path) return { success: false, message: `Parte ${s.p.num} indisponível` };
+          const res = await fetch(bot.fileDownloadUrl(info.file_path));
+          if (!res.ok) return { success: false, message: `Falha ao baixar parte ${s.p.num}` };
+          chunks.push(Buffer.from(await res.arrayBuffer()));
+        } catch (e) {
+          return { success: false, message: `Erro na parte ${s.p.num}: ${e.message}` };
+        }
+      }
+      const merged = Buffer.concat(chunks);
+      const finalName = `${partInfo.stem}${partInfo.ext}`;
+      const save = await dialog.showSaveDialog(mainWindow, {
+        title: 'Salvar arquivo remontado',
+        defaultPath: path.join(app.getPath('downloads'), finalName)
+      });
+      if (save.canceled || !save.filePath) return { success: false, canceled: true };
+      fs.writeFileSync(save.filePath, merged);
+      return { success: true, path: save.filePath, parts: siblings.length };
+    }
+  }
+
   try {
     const info = await bot.getFile(entry.fileId);
     if (!info || !info.file_path) return { success: false, message: 'Arquivo indisponível no Telegram' };
@@ -2242,7 +2291,7 @@ const BACKUP_KEYS = [
   'theme', 'downloadPath', 'defaultFormat', 'videoFormat', 'audioFormat',
   'googleShieldsEnabled', 'customUserAgent', 'adBlockEnabled',
   'speedLimit', 'proxyUrl', 'cookiesFromBrowser',
-  'discordPresence', 'discordClientId'
+  'discordPresence', 'discordClientId', 'telegramFiles', 'telegramFolders', 'telegramFolderIcons', 'telegramFolderColors', 'telegramFavorites', 'telegram.watchFolders'
 ];
 
 ipcMain.handle('export-settings', async () => {

@@ -2613,8 +2613,14 @@ function tdPrompt(message, def = '') {
 }
 
 let tgFolderPath = '';
-let tgTrashView = false;
-let tgFavView = false;
+let tgView = 'drive'; // drive | recent | starred | archived | backups | trash
+function setTgView(v) {
+  tgView = v;
+  if (v !== 'drive') tgFolderPath = '';
+  if (v === 'trash' || v === 'backups') tgFolderPath = '';
+  document.querySelectorAll('.tg-side-item').forEach(el => el.classList.toggle('active', el.dataset.tgview === v));
+  renderTelegramFiles();
+}
 let tgTypeFilter = '';
 const tgSelected = new Set();
 const TG_FOLDER_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#64748b'];
@@ -2734,9 +2740,7 @@ async function renderTelegramFiles() {
         card.addEventListener('click', (e) => {
           if (e.target.closest('.tg-folder-zip')) return;
           tgFolderPath = pathVal;
-          tgTrashView = false;
-          tgFavView = false;
-          renderTelegramFiles();
+          setTgView('drive');
         });
         if (droppable && pathVal) {
           card.addEventListener('dragover', (e) => { e.preventDefault(); card.classList.add('tg-drop-target'); });
@@ -2771,14 +2775,14 @@ async function renderTelegramFiles() {
       // Favoritos
       const favCount = favs.folders.length + favs.files.length;
       const favCard = document.createElement('div');
-      favCard.className = 'tg-folder-card' + (tgFavView ? ' active' : '');
+      favCard.className = 'tg-folder-card' + (tgView === 'starred' ? ' active' : '');
       favCard.innerHTML = `<div class="tg-fc-icon">⭐</div><div class="tg-fc-name">Favoritos</div><div class="tg-fc-sub">${favCount} itens</div>`;
-      favCard.addEventListener('click', () => { tgFavView = !tgFavView; tgTrashView = false; renderTelegramFiles(); });
+      favCard.addEventListener('click', () => setTgView(tgView === 'starred' ? 'drive' : 'starred'));
       foldersBar.appendChild(favCard);
       const trashCard = document.createElement('div');
-      trashCard.className = 'tg-folder-card' + (tgTrashView ? ' active' : '');
+      trashCard.className = 'tg-folder-card' + (tgView === 'trash' ? ' active' : '');
       trashCard.innerHTML = `<div class="tg-fc-icon">🗑️</div><div class="tg-fc-name">Lixeira</div><div class="tg-fc-sub">${trashCount} itens</div>`;
-      trashCard.addEventListener('click', () => { tgTrashView = !tgTrashView; tgFolderPath = ''; renderTelegramFiles(); });
+      trashCard.addEventListener('click', () => setTgView(tgView === 'trash' ? 'drive' : 'trash'));
       foldersBar.appendChild(trashCard);
       const addCard = document.createElement('div');
       addCard.className = 'tg-folder-card tg-folder-new';
@@ -2802,7 +2806,7 @@ async function renderTelegramFiles() {
         const s = document.createElement('span');
         s.className = 'tg-bc-seg' + (pathVal === tgFolderPath ? ' active' : '');
         s.textContent = label;
-        s.onclick = () => { tgFolderPath = pathVal; tgTrashView = false; renderTelegramFiles(); };
+        s.onclick = () => { tgFolderPath = pathVal; setTgView('drive'); };
         return s;
       };
       bc.appendChild(mkSeg('🏠 Nuvem', ''));
@@ -2811,9 +2815,9 @@ async function renderTelegramFiles() {
     }
 
     let files;
-    if (tgTrashView) {
+    if (tgView === 'trash') {
       files = allFiles.filter(f => f.trashDate);
-    } else if (tgFavView) {
+    } else if (tgView === 'starred') {
       const favFileIds = new Set(favs.files);
       const favFolders = favs.folders;
       files = allFiles.filter(f => {
@@ -2822,13 +2826,22 @@ async function renderTelegramFiles() {
         const fo = f.folder || '';
         return favFolders.some(fp => fo === fp || fo.startsWith(fp + '/'));
       });
+    } else if (tgView === 'recent') {
+      files = allFiles.filter(f => !f.trashDate);
+    } else if (tgView === 'archived') {
+      // Arquivados: arquivos com +30 dias que não são favoritos
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const favFileIds = new Set(favs.files);
+      files = allFiles.filter(f => !f.trashDate && f.date && f.date < cutoff && !favFileIds.has(f.id));
+    } else if (tgView === 'backups') {
+      files = allFiles.filter(f => !f.trashDate && f.source === 'watch');
     } else if (q) {
       files = allFiles.filter(f => !f.trashDate && ((f.fileName || '').toLowerCase().includes(q) || (f.title || '').toLowerCase().includes(q)));
     } else {
       files = allFiles.filter(f => !f.trashDate && (f.folder || '') === tgFolderPath);
     }
     // Filtro por tipo
-    if (tgTypeFilter && !tgTrashView) {
+    if (tgTypeFilter && tgView !== 'trash') {
       const IMG = ['jpg','jpeg','png','webp','gif','bmp'];
       const VID = ['mp4','mkv','webm','mov','avi','m4v'];
       const AUD = ['mp3','m4a','ogg','opus','wav','flac','aac'];
@@ -2856,7 +2869,7 @@ async function renderTelegramFiles() {
       const empty = document.createElement('p');
       empty.className = 'maintenance-message';
       empty.style.margin = '0';
-      empty.textContent = tgTrashView ? 'Lixeira vazia.' : (q ? 'Nenhum arquivo encontrado.' : 'Nenhum arquivo nesta pasta.');
+      empty.textContent = tgView === 'trash' ? 'Lixeira vazia.' : (q ? 'Nenhum arquivo encontrado.' : 'Nenhum arquivo nesta pasta.');
       telegramFilesList.appendChild(empty);
     }
     let totalSize = 0;
@@ -2865,12 +2878,12 @@ async function renderTelegramFiles() {
       totalSize += f.size || 0;
       const row = document.createElement('div');
       row.className = 'telegram-file-row' + (tgSelected.has(f.id) ? ' selected' : '');
-      row.draggable = !tgTrashView;
+      row.draggable = tgView !== 'trash';
       row.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('application/x-tg-file', f.id);
         e.dataTransfer.effectAllowed = 'move';
       });
-      if (!tgTrashView) {
+      if (tgView !== 'trash') {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.className = 'tg-row-check';
@@ -2901,7 +2914,7 @@ async function renderTelegramFiles() {
       info.append(name, meta);
       const acts = document.createElement('div');
       acts.className = 'tg-row-acts';
-      if (tgTrashView) {
+      if (tgView === 'trash') {
         const res = document.createElement('button');
         res.className = 'btn-ghost btn-xs'; res.textContent = '↩'; res.title = 'Restaurar';
         res.onclick = async () => { await api.telegramRestoreFile(f.id); renderTelegramFiles(); };
@@ -2936,7 +2949,15 @@ async function renderTelegramFiles() {
       row.append(icon, info, acts);
       telegramFilesList.appendChild(row);
     });
-    telegramCloudLabel.textContent = `${files.length} arquivo(s) • ${formatBytes(totalSize)} ${tgTrashView ? 'na lixeira' : 'na nuvem'}`;
+    telegramCloudLabel.textContent = `${files.length} arquivo(s) • ${formatBytes(totalSize)} ${tgView === 'trash' ? 'na lixeira' : 'na nuvem'}`;
+    // Barra de armazenamento (uso estimado pela nuvem)
+    const storageBar = document.getElementById('tg-storage-bar');
+    if (storageBar) {
+      const usedAll = allFiles.filter(f => !f.trashDate).reduce((a, f) => a + (f.size || 0), 0);
+      const QUOTA = 4 * 1024 * 1024 * 1024;
+      const pct = Math.min(100, (usedAll / QUOTA) * 100);
+      storageBar.innerHTML = `<div class="tg-storage-head"><span>☁️ Armazenamento</span><span>${formatBytes(usedAll)} de ${formatBytes(QUOTA)}</span></div><div class="tg-storage-track"><div class="tg-storage-fill" style="width:${pct.toFixed(1)}%"></div></div><div class="tg-storage-sub">Uso estimado • referência 4 GB</div>`;
+    }
     updateTgBulkBar();
   } catch (e) {}
 }
@@ -3096,6 +3117,20 @@ if (btnTelegramClearIndex) {
     renderTelegramFiles();
   });
 }
+
+// Sidebar Drive + engrenagem de configuração
+document.querySelectorAll('.tg-side-item').forEach(el => {
+  el.addEventListener('click', () => setTgView(el.dataset.tgview));
+});
+document.getElementById('btn-tg-settings')?.addEventListener('click', () => {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const nav = document.querySelector('.nav-item[data-tab="settings"]') || document.querySelector('.nav-item[data-tab="nuvem"]');
+  const tab = document.getElementById('tab-nuvem');
+  if (nav) nav.classList.add('active');
+  if (tab) tab.classList.add('active');
+  document.getElementById('telegram-config-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 async function refreshTelegramCloud() {
   try {
