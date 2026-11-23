@@ -499,6 +499,32 @@ ipcMain.handle('telegram-set-folder-icon', (_event, { path: fp, icon }) => {
 
 ipcMain.handle('telegram-get-folder-icons', () => store.get('telegramFolderIcons', {}));
 
+// ===== Cor customizável por pasta =====
+ipcMain.handle('telegram-set-folder-color', (_event, { path: fp, color }) => {
+  const colors = store.get('telegramFolderColors', {});
+  const key = String(fp || '').slice(0, 120);
+  if (!key) return { success: false };
+  if (!color) delete colors[key];
+  else colors[key] = String(color).slice(0, 20);
+  store.set('telegramFolderColors', colors);
+  return { success: true };
+});
+
+ipcMain.handle('telegram-get-folder-colors', () => store.get('telegramFolderColors', {}));
+
+// ===== Favoritos =====
+ipcMain.handle('telegram-get-favorites', () => store.get('telegramFavorites', { folders: [], files: [] }));
+
+ipcMain.handle('telegram-toggle-favorite', (_event, { type, value }) => {
+  const favs = store.get('telegramFavorites', { folders: [], files: [] });
+  const key = type === 'folder' ? 'folders' : 'files';
+  const v = String(value || '');
+  const idx = favs[key].indexOf(v);
+  if (idx === -1) favs[key].push(v); else favs[key].splice(idx, 1);
+  store.set('telegramFavorites', favs);
+  return { success: true, favorited: idx === -1 };
+});
+
 // Preview: baixa o arquivo para temp e retorna o caminho local
 ipcMain.handle('telegram-preview-file', async (_event, id) => {
   const entry = getTelegramFiles().find(f => f.id === id);

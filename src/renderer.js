@@ -2595,9 +2595,50 @@ function tdPrompt(message, def = '') {
 
 let tgFolderPath = '';
 let tgTrashView = false;
+let tgFavView = false;
+let tgTypeFilter = '';
 const tgSelected = new Set();
+const TG_FOLDER_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#64748b'];
+const TG_FOLDER_EMOJIS = ['📁','🎵','🎬','🖼️','📄','🗜️','📚','💼','🎮','❤️','⭐','🗂️'];
 
 function tgFileUrl(p) { return 'file:///' + String(p).replace(/\\/g, '/'); }
+
+// Seletor de estilo da pasta: cores + emojis
+function showFolderStylePicker(folderPath, currentIcon) {
+  const ov = document.createElement('div');
+  ov.className = 'tg-style-overlay';
+  const box = document.createElement('div');
+  box.className = 'tg-style-box';
+  box.innerHTML = `<div class="tg-style-title">Estilo da pasta</div>`;
+  const colorsRow = document.createElement('div');
+  colorsRow.className = 'tg-style-colors';
+  TG_FOLDER_COLORS.forEach(c => {
+    const dot = document.createElement('span');
+    dot.className = 'tg-color-dot';
+    dot.style.background = c;
+    dot.onclick = async () => { await api.telegramSetFolderColor(folderPath, c); ov.remove(); renderTelegramFiles(); };
+    colorsRow.appendChild(dot);
+  });
+  const noneDot = document.createElement('span');
+  noneDot.className = 'tg-color-dot tg-color-none';
+  noneDot.textContent = '✕';
+  noneDot.title = 'Sem cor';
+  noneDot.onclick = async () => { await api.telegramSetFolderColor(folderPath, ''); ov.remove(); renderTelegramFiles(); };
+  colorsRow.appendChild(noneDot);
+  const emojisRow = document.createElement('div');
+  emojisRow.className = 'tg-style-emojis';
+  TG_FOLDER_EMOJIS.forEach(em => {
+    const s = document.createElement('span');
+    s.className = 'tg-emoji-opt' + (em === currentIcon ? ' active' : '');
+    s.textContent = em;
+    s.onclick = async () => { await api.telegramSetFolderIcon(folderPath, em); ov.remove(); renderTelegramFiles(); };
+    emojisRow.appendChild(s);
+  });
+  box.append(colorsRow, emojisRow);
+  ov.appendChild(box);
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
 
 function showTelegramPreview(f) {
   const ov = document.createElement('div');
@@ -2645,6 +2686,8 @@ async function renderTelegramFiles() {
     const foldersBar = document.getElementById('tg-folders-bar');
     const q = (document.getElementById('tg-search')?.value || '').trim().toLowerCase();
     const folderIcons = api.telegramGetFolderIcons ? await api.telegramGetFolderIcons() : {};
+    const folderColors = api.telegramGetFolderColors ? await api.telegramGetFolderColors() : {};
+    const favs = api.telegramGetFavorites ? await api.telegramGetFavorites() : { folders: [], files: [] };
     const allFolderStrings = new Set();
     allFiles.forEach(f => { if (f.folder) allFolderStrings.add(f.folder); });
     if (api.telegramGetFolders) (await api.telegramGetFolders()).forEach(cf => allFolderStrings.add(cf));
@@ -2668,10 +2711,12 @@ async function renderTelegramFiles() {
         card.dataset.folderPath = pathVal;
         card.innerHTML = `<div class="tg-fc-icon">${icon}</div><div class="tg-fc-name" title="${title || name}">${name}</div><div class="tg-fc-sub">${sub}</div>`;
         card.title = title || name;
+        if (pathVal && folderColors[pathVal]) card.style.setProperty('--fc-color', folderColors[pathVal]);
         card.addEventListener('click', (e) => {
           if (e.target.closest('.tg-folder-zip')) return;
           tgFolderPath = pathVal;
           tgTrashView = false;
+          tgFavView = false;
           renderTelegramFiles();
         });
         if (droppable && pathVal) {
@@ -2697,12 +2742,20 @@ async function renderTelegramFiles() {
         acts.append(
           mkAct('⬇', 'Baixar pasta como .zip', async () => { const r = await api.telegramDownloadFolder(cp); if (r && r.success) alert(`Pasta salva em:\n${r.path}`); else if (!(r && r.canceled)) alert(r && r.message || 'Falha'); }),
           mkAct('✎', 'Renomear', async () => { const nn = await tdPrompt('Novo nome:', seg); if (nn && nn.trim()) { await api.telegramRenameFolder(cp, cp.slice(0, cp.length - seg.length) + nn.trim()); renderTelegramFiles(); } }),
-          mkAct('🎨', 'Ícone', async () => { const ic = await tdPrompt('Emoji da pasta (ex: 🎵 🖼️ 📄):', icon); if (ic && ic.trim()) { await api.telegramSetFolderIcon(cp, ic.trim()); renderTelegramFiles(); } }),
+          mkAct('🎨', 'Estilo (cor/ícone)', () => showFolderStylePicker(cp, icon)),
+          mkAct(favs.folders.includes(cp) ? '★' : '☆', 'Favoritar', async () => { await api.telegramToggleFavorite('folder', cp); renderTelegramFiles(); }),
           mkAct('🗑', 'Excluir pasta', async () => { if (confirm(`Excluir "${cp}" e todos os arquivos?`)) { await api.telegramDeleteFolder(cp); if (tgFolderPath.startsWith(cp)) tgFolderPath = ''; renderTelegramFiles(); } })
         );
         foldersBar.appendChild(mkCard(icon, seg, `${countUnder(cp)} itens`, cp, `Pasta: ${cp}`, acts, true));
       });
       const trashCount = allFiles.filter(f => f.trashDate).length;
+      // Favoritos
+      const favCount = favs.folders.length + favs.files.length;
+      const favCard = document.createElement('div');
+      favCard.className = 'tg-folder-card' + (tgFavView ? ' active' : '');
+      favCard.innerHTML = `<div class="tg-fc-icon">⭐</div><div class="tg-fc-name">Favoritos</div><div class="tg-fc-sub">${favCount} itens</div>`;
+      favCard.addEventListener('click', () => { tgFavView = !tgFavView; tgTrashView = false; renderTelegramFiles(); });
+      foldersBar.appendChild(favCard);
       const trashCard = document.createElement('div');
       trashCard.className = 'tg-folder-card' + (tgTrashView ? ' active' : '');
       trashCard.innerHTML = `<div class="tg-fc-icon">🗑️</div><div class="tg-fc-name">Lixeira</div><div class="tg-fc-sub">${trashCount} itens</div>`;
@@ -2741,10 +2794,36 @@ async function renderTelegramFiles() {
     let files;
     if (tgTrashView) {
       files = allFiles.filter(f => f.trashDate);
+    } else if (tgFavView) {
+      const favFileIds = new Set(favs.files);
+      const favFolders = favs.folders;
+      files = allFiles.filter(f => {
+        if (f.trashDate) return false;
+        if (favFileIds.has(f.id)) return true;
+        const fo = f.folder || '';
+        return favFolders.some(fp => fo === fp || fo.startsWith(fp + '/'));
+      });
     } else if (q) {
       files = allFiles.filter(f => !f.trashDate && ((f.fileName || '').toLowerCase().includes(q) || (f.title || '').toLowerCase().includes(q)));
     } else {
       files = allFiles.filter(f => !f.trashDate && (f.folder || '') === tgFolderPath);
+    }
+    // Filtro por tipo
+    if (tgTypeFilter && !tgTrashView) {
+      const IMG = ['jpg','jpeg','png','webp','gif','bmp'];
+      const VID = ['mp4','mkv','webm','mov','avi','m4v'];
+      const AUD = ['mp3','m4a','ogg','opus','wav','flac','aac'];
+      const ZIP = ['zip','rar','7z','tar','tgz','gz'];
+      const ALL = [...IMG, ...VID, ...AUD, ...ZIP];
+      files = files.filter(f => {
+        const e = (f.fileName.split('.').pop() || '').toLowerCase();
+        if (tgTypeFilter === 'img') return IMG.includes(e);
+        if (tgTypeFilter === 'vid') return VID.includes(e);
+        if (tgTypeFilter === 'aud') return AUD.includes(e);
+        if (tgTypeFilter === 'zip') return ZIP.includes(e);
+        if (tgTypeFilter === 'doc') return !ALL.includes(e);
+        return true;
+      });
     }
     const sort = document.getElementById('tg-sort')?.value || 'date';
     files.sort((a, b) => {
@@ -2818,7 +2897,22 @@ async function renderTelegramFiles() {
         const del = document.createElement('button');
         del.className = 'btn-ghost btn-xs telegram-file-del'; del.textContent = '🗑'; del.title = 'Mover para lixeira';
         del.onclick = async () => { del.disabled = true; await api.telegramDeleteFile(f.id); tgSelected.delete(f.id); renderTelegramFiles(); };
-        acts.append(dl, del);
+        const fav = document.createElement('button');
+        fav.className = 'btn-ghost btn-xs'; fav.textContent = favs.files.includes(f.id) ? '★' : '☆'; fav.title = 'Favoritar';
+        fav.onclick = async () => { await api.telegramToggleFavorite('file', f.id); renderTelegramFiles(); };
+        const share = document.createElement('button');
+        share.className = 'btn-ghost btn-xs'; share.textContent = '🔗'; share.title = 'Copiar link do Telegram';
+        share.onclick = async () => {
+          const cfg = await api.getTelegramConfig();
+          if (cfg && cfg.chatType === 'group' || cfg && cfg.chatType === 'supergroup') {
+            const internal = String(cfg.chatId || '').replace(/^-100/, '');
+            const link = `https://t.me/c/${internal}/${f.messageId}`;
+            try { await navigator.clipboard.writeText(link); alert('Link copiado!'); } catch (e) { prompt('Copie o link:', link); }
+          } else {
+            alert('Links públicos só funcionam quando os arquivos estão em um GRUPO do Telegram.\nPara compartilhar, mova os arquivos para uma pasta e envie /start no grupo do bot.');
+          }
+        };
+        acts.append(dl, fav, share, del);
       }
       row.append(icon, info, acts);
       telegramFilesList.appendChild(row);
@@ -2978,6 +3072,8 @@ const tgSort = document.getElementById('tg-sort');
 const btnTelegramClearIndex = document.getElementById('btn-telegram-clear-index');
 if (tgSearch) tgSearch.addEventListener('input', renderTelegramFiles);
 if (tgSort) tgSort.addEventListener('change', renderTelegramFiles);
+const tgType = document.getElementById('tg-type');
+if (tgType) tgType.addEventListener('change', () => { tgTypeFilter = tgType.value; renderTelegramFiles(); });
 if (btnTelegramClearIndex) {
   btnTelegramClearIndex.addEventListener('click', async () => {
     if (!confirm('Limpar o índice local? Os arquivos continuam no Telegram, mas saem desta lista.')) return;

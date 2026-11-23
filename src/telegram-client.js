@@ -76,22 +76,29 @@ class TelegramClient {
     const boundary = `----TD${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
     const caption = options.caption ? String(options.caption).slice(0, 1024) : '';
 
-    // Multipart manual — permite contar bytes reais para progresso de upload
-    const headParts = [
+    // Multipart manual — ordem: chat_id, caption, arquivo por último
+    const headLines = [
       `--${boundary}`,
       'Content-Disposition: form-data; name="chat_id"',
       '',
-      String(chatId),
+      String(chatId)
+    ];
+    if (caption) {
+      headLines.push(
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="caption"',
+        '',
+        caption
+      );
+    }
+    headLines.push(
       `--${boundary}`,
       `Content-Disposition: form-data; name="${fieldName}"; filename="${fileName.replace(/["\r\n]/g, '')}"`,
       'Content-Type: application/octet-stream',
+      '',
       ''
-    ];
-    if (caption) {
-      headParts.push(`--${boundary}`, 'Content-Disposition: form-data; name="caption"', '', caption);
-    }
-    headParts.push(`--${boundary}`, '');
-    const head = Buffer.from(headParts.join('\r\n') + '\r\n', 'utf8');
+    );
+    const head = Buffer.from(headLines.join('\r\n'), 'utf8');
     const tail = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
     const total = head.length + fileSize + tail.length;
 
@@ -112,6 +119,7 @@ class TelegramClient {
         res.on('data', (c) => { body += c; });
         res.on('end', () => {
           try {
+            if (!body) return reject(new Error(`Resposta vazia do Telegram (HTTP ${res.statusCode})`));
             const data = JSON.parse(body);
             if (!data.ok) return reject(new Error(data.description || `Falha ao enviar ${fieldName}`));
             resolve(data.result);
