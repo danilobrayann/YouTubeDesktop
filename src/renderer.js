@@ -3122,6 +3122,14 @@ if (btnTelegramClearIndex) {
 document.querySelectorAll('.tg-side-item').forEach(el => {
   el.addEventListener('click', () => setTgView(el.dataset.tgview));
 });
+document.getElementById('btn-tg-backup-index')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-tg-backup-index');
+  btn.disabled = true; btn.textContent = '⏳';
+  const r = await api.telegramBackupIndex();
+  btn.disabled = false; btn.textContent = '💾';
+  if (r && r.success) alert('Índice da nuvem salvo no Telegram (turbodown-indice.json). Se formatar o PC, baixe esse arquivo e use Importar configurações.');
+  else alert(r && r.message || 'Falha ao salvar índice');
+});
 document.getElementById('btn-tg-settings')?.addEventListener('click', () => {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));

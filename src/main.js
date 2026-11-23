@@ -227,7 +227,14 @@ function recordTelegramFile(entry) {
   const list = getTelegramFiles();
   list.unshift(entry);
   store.set('telegramFiles', list.slice(0, 500));
+  // Backup automático do índice na nuvem a cada 25 arquivos
+  telegramIndexBackupCounter++;
+  if (telegramIndexBackupCounter >= 25) {
+    telegramIndexBackupCounter = 0;
+    backupTelegramIndex().catch(() => {});
+  }
 }
+let telegramIndexBackupCounter = 0;
 
 function detectTelegramMediaType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -266,6 +273,37 @@ ipcMain.handle('telegram-clear-index', () => {
   store.set('telegramFiles', []);
   return true;
 });
+
+// ===== Backup do índice da nuvem (enviado como documento pro próprio Telegram) =====
+async function backupTelegramIndex() {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado' };
+  try {
+    const snapshot = {
+      _app: 'TurboDown',
+      _kind: 'cloud-index',
+      _exportedAt: new Date().toISOString(),
+      telegramFiles: store.get('telegramFiles', []),
+      telegramFolders: store.get('telegramFolders', []),
+      telegramFolderIcons: store.get('telegramFolderIcons', {}),
+      telegramFolderColors: store.get('telegramFolderColors', {}),
+      telegramFavorites: store.get('telegramFavorites', { folders: [], files: [] }),
+      watchFolders: store.get('telegram.watchFolders', [])
+    };
+    const tmp = path.join(os.tmpdir(), `turbodown-indice-${Date.now()}.json`);
+    fs.writeFileSync(tmp, JSON.stringify(snapshot, null, 2), 'utf8');
+    await bot.sendDocument(telegramChatId, tmp, {
+      caption: '📋 Índice da nuvem TurboDown — não apagar (backup de restauração)',
+      filename: 'turbodown-indice.json'
+    });
+    try { fs.unlinkSync(tmp); } catch (e) {}
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+ipcMain.handle('telegram-backup-index', () => backupTelegramIndex());
 
 ipcMain.handle('telegram-download-file', async (_event, id) => {
   const entry = getTelegramFiles().find(f => f.id === id);
@@ -1427,6 +1465,8 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  // Backup do índice da nuvem ao fechar (fire-and-forget)
+  backupTelegramIndex().catch(() => {});
 });
 
 app.on('window-all-closed', () => {
