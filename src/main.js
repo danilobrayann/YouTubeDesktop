@@ -425,6 +425,41 @@ ipcMain.handle('telegram-rename-folder', (_event, { oldName, newName }) => {
   return { success: true };
 });
 
+ipcMain.handle('telegram-move-folder', (_event, { from, to }) => {
+  const src = String(from || '').trim();
+  const dest = String(to || '').trim();
+  if (!src) return { success: false, message: 'Pasta origem inválida' };
+  if (dest === src || dest.startsWith(src + '/')) return { success: false, message: 'Não pode mover pra dentro de si mesma' };
+  const seg = src.split('/').pop();
+  const newPath = dest ? `${dest}/${seg}` : seg;
+  if (newPath === src) return { success: false, message: 'Já está nesse local' };
+  // reusa a lógica de rename com o novo caminho completo
+  return renameTelegramFolderPrefix(src, newPath);
+});
+
+function renameTelegramFolderPrefix(oldName, newName) {
+  const clean = String(newName || '').trim().slice(0, 120);
+  if (!clean || clean === oldName) return { success: false, message: 'Nome inválido' };
+  const list = getTelegramFiles();
+  list.forEach(f => {
+    const fo = f.folder || '';
+    if (fo === oldName) f.folder = clean;
+    else if (fo.startsWith(oldName + '/')) f.folder = clean + fo.slice(oldName.length);
+  });
+  store.set('telegramFiles', list);
+  const folders = store.get('telegramFolders', []);
+  const idx = folders.indexOf(oldName);
+  if (idx !== -1) { folders[idx] = clean; store.set('telegramFolders', folders); }
+  const icons = store.get('telegramFolderIcons', {});
+  if (icons[oldName] !== undefined) { icons[clean] = icons[oldName]; delete icons[oldName]; store.set('telegramFolderIcons', icons); }
+  const colors = store.get('telegramFolderColors', {});
+  if (colors[oldName] !== undefined) { colors[clean] = colors[oldName]; delete colors[oldName]; store.set('telegramFolderColors', colors); }
+  const favs = store.get('telegramFavorites', { folders: [], files: [] });
+  const fi = favs.folders.indexOf(oldName);
+  if (fi !== -1) { favs.folders[fi] = clean; store.set('telegramFavorites', favs); }
+  return { success: true };
+}
+
 ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
   const entries = getTelegramFiles().filter(f => {
     const fo = f.folder || '';
@@ -434,17 +469,60 @@ ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
   const bot = ensureTelegramBot();
   if (!bot) return { success: false, message: 'Bot não conectado' };
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tdcloud-'));
+  const downloadEntry = async (e) => {
+    const info = await bot.getFile(e.fileId);
+    if (!info || !info.file_path) return null;
+    const res = await fetch(bot.fileDownloadUrl(info.file_path));
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  };
+  // caminho relativo dentro do zip: folder "raiz/sub" → "sub/"
+  const relDir = (e) => {
+    const fo = e.folder || '';
+    const rel = fo === folderName ? '' : fo.startsWith(folderName + '/') ? fo.slice(folderName.length + 1) : '';
+    return rel;
+  };
+  const writeSafe = (rel, fileName, buf) => {
+    const safeName = fileName.replace(/[<>:"/\\|?*]/g, '_');
+    const destDir = rel ? path.join(tmpDir, ...rel.split('/').map(s => s.replace(/[<>:"/\\|?*]/g, '_'))) : tmpDir;
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.writeFileSync(path.join(destDir, safeName), buf);
+  };
   try {
-    for (const e of entries) {
+    // Separa partes (.partNNN) das entradas normais
+    const partEntries = [];
+    const normalEntries = [];
+    for (const e of entries) (parsePartName(e.fileName) ? partEntries : normalEntries).push(e);
+    // Baixa arquivos normais preservando subpastas
+    for (const e of normalEntries) {
       try {
-        const info = await bot.getFile(e.fileId);
-        if (!info || !info.file_path) continue;
-        const res = await fetch(bot.fileDownloadUrl(info.file_path));
-        if (!res.ok) continue;
-        const buf = Buffer.from(await res.arrayBuffer());
-        const safe = e.fileName.replace(/[<>:"/\\|?*]/g, '_');
-        fs.writeFileSync(path.join(tmpDir, safe), buf);
+        const buf = await downloadEntry(e);
+        if (buf) writeSafe(relDir(e), e.fileName, buf);
       } catch (err) { /* pula arquivo com falha */ }
+    }
+    // Remonta partes: agrupa por pasta+stem+ext, baixa em ordem e junta
+    const groups = new Map();
+    for (const e of partEntries) {
+      const p = parsePartName(e.fileName);
+      const key = `${e.folder || ''}|${p.stem}|${p.ext}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ e, num: p.num });
+    }
+    for (const [, parts] of groups) {
+      try {
+        parts.sort((a, b) => a.num - b.num);
+        const chunks = [];
+        let okAll = true;
+        for (const pt of parts) {
+          const buf = await downloadEntry(pt.e);
+          if (!buf) { okAll = false; break; }
+          chunks.push(buf);
+        }
+        if (!okAll) continue;
+        const first = parts[0];
+        const p = parsePartName(first.e.fileName);
+        writeSafe(relDir(first.e), `${p.stem}${p.ext}`, Buffer.concat(chunks));
+      } catch (err) { /* pula grupo com falha */ }
     }
     const zipPath = path.join(os.tmpdir(), `tdfolder-${Date.now()}.zip`);
     await new Promise((resolve) => {
@@ -470,7 +548,7 @@ ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
 
 // Drag & drop: recebe paths de arquivos/pastas, zipa pastas e sobe (com split se >48MB)
 // Drag & drop: recebe grupos [{name, files:[{path, rel}]}] — mantém arquivos na pasta de origem
-ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
+ipcMain.handle('telegram-upload-dropped', async (_event, payload, targetFolder) => {
   const bot = ensureTelegramBot();
   if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado' };
   let groups = [];
@@ -489,8 +567,11 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
         const st = fs.statSync(p);
         if (!st.isFile()) continue;
         const sub = (f.rel || '').split('/').filter(Boolean).slice(0, -1).join('/');
-        const folder = g.name ? (sub ? `${g.name}/${sub}` : g.name)
-          : (path.basename(path.dirname(p)) || 'Enviados');
+        const tf = String(targetFolder || '').trim();
+        const folder = tf
+          ? (g.name ? `${tf}/${g.name}${sub ? '/' + sub : ''}` : (sub ? `${tf}/${sub}` : tf))
+          : (g.name ? (sub ? `${g.name}/${sub}` : g.name)
+            : (path.basename(path.dirname(p)) || 'Enviados'));
         const baseName = path.basename(p);
         const emit = (type, size, msg) => mainWindow?.webContents.send('telegram-upload-event', { type, fileName: baseName, size, message: msg || '' });
         let attempts = 0, succeeded = 0;
@@ -505,7 +586,9 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
           const res = await tryUpload(p, baseName, detectTelegramMediaType(p));
           emit(res.success ? 'done' : 'error', st.size, res.reason);
         } else {
-          const zp = await zipFileForUpload(p);
+          // Tipos já compactados (iso, mp4, mp3, zip...) vão direto pro split — sem zip
+          const noZip = NON_COMPRESS_EXT.has(path.extname(p).toLowerCase());
+          const zp = noZip ? null : await zipFileForUpload(p);
           const zsize = zp ? fs.statSync(zp).size : Infinity;
           if (zp && zsize <= MAX) {
             emit('start', zsize);
@@ -513,15 +596,19 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
             emit(res.success ? 'done' : 'error', zsize, res.reason);
             try { fs.unlinkSync(zp); } catch (e) {}
           } else {
-            const parts = await splitFileForUpload(zp || p, MAX);
+            const srcForSplit = zp || p;
+            const parts = await splitFileForUpload(srcForSplit, MAX);
+            // partes de zip → .partNNN.zip (remonta em .zip); partes raw → .partNNN<ext original>
+            const pExt = zp ? '.zip' : path.extname(baseName).toLowerCase();
+            const pStem = zp ? baseName : baseName.slice(0, baseName.length - pExt.length);
             for (let i = 0; i < parts.length; i++) {
               const part = parts[i];
               const psz = fs.statSync(part).size;
-              const pn = `${baseName}.part${String(i + 1).padStart(3, '0')}.zip`;
+              const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
               emit('start', psz);
               const res = await tryUpload(part, pn, 'document');
               emit(res.success ? 'done' : 'error', psz, res.reason);
-              if (part !== (zp || p)) { try { fs.unlinkSync(part); } catch (e) {} }
+              if (part !== srcForSplit) { try { fs.unlinkSync(part); } catch (e) {} }
             }
             if (zp) { try { fs.unlinkSync(zp); } catch (e) {} }
           }
@@ -666,7 +753,7 @@ ipcMain.handle('telegram-upload-path', async (_event, filePath) => {
   return result.success ? { success: true } : { success: false, message: result.reason || 'Falha no envio' };
 });
 
-ipcMain.handle('telegram-pick-upload-file', async () => {
+ipcMain.handle('telegram-pick-upload-file', async (_event, targetFolder) => {
   const bot = ensureTelegramBot();
   if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado', canceled: false };
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -680,8 +767,9 @@ ipcMain.handle('telegram-pick-upload-file', async () => {
   if (size > 2 * 1024 * 1024 * 1024) {
     return { success: false, message: 'Arquivo maior que 2GB (limite do Telegram)' };
   }
+  const destFolder = String(targetFolder || '').trim() || 'Enviados';
   mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(p), size });
-  const res = await uploadToTelegram(p, path.basename(p), detectTelegramMediaType(p), null, { source: 'manual', folder: 'Enviados' });
+  const res = await uploadToTelegram(p, path.basename(p), detectTelegramMediaType(p), null, { source: 'manual', folder: destFolder });
   mainWindow?.webContents.send('telegram-upload-event', {
     type: res.success ? 'done' : 'error',
     fileName: path.basename(p),
@@ -691,7 +779,7 @@ ipcMain.handle('telegram-pick-upload-file', async () => {
   return res.success ? { success: true } : { success: false, message: res.reason || 'Falha no envio' };
 });
 
-ipcMain.handle('telegram-pick-upload-folder', async () => {
+ipcMain.handle('telegram-pick-upload-folder', async (_event, targetFolder) => {
   const bot = ensureTelegramBot();
   if (!bot || !telegramChatId) return { success: false, message: 'Bot não conectado', canceled: false };
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -709,7 +797,7 @@ ipcMain.handle('telegram-pick-upload-folder', async () => {
     }
   };
   walk(dir);
-  const folderName = path.basename(dir) || 'Enviados';
+  const folderName = String(targetFolder || '').trim() || path.basename(dir) || 'Enviados';
   let ok = 0, fail = 0;
   for (const f of files) {
     const st = fs.statSync(f);
@@ -888,21 +976,29 @@ function zipFolderForUpload(dirPath, outZip) {
   });
 }
 
-// Divide arquivo em partes de maxBytes (para caber no limite de 50MB do Telegram)
+// Divide arquivo em partes de maxBytes (streaming — não carrega tudo na RAM)
 async function splitFileForUpload(filePath, maxBytes = 45 * 1024 * 1024) {
   const stat = fs.statSync(filePath);
   if (stat.size <= maxBytes) return [filePath];
-  const buf = fs.readFileSync(filePath);
-  const parts = [];
   const base = path.basename(filePath);
   const ext = path.extname(base);
   const stem = base.slice(0, base.length - ext.length);
-  let i = 0;
-  for (let off = 0; off < buf.length; off += maxBytes) {
-    i++;
-    const partPath = path.join(os.tmpdir(), `${stem}.part${String(i).padStart(3, '0')}${ext}`);
-    fs.writeFileSync(partPath, buf.subarray(off, off + maxBytes));
-    parts.push(partPath);
+  const parts = [];
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    let off = 0, i = 0;
+    while (off < stat.size) {
+      i++;
+      const len = Math.min(maxBytes, stat.size - off);
+      const chunk = Buffer.allocUnsafe(len);
+      fs.readSync(fd, chunk, 0, len, off);
+      const partPath = path.join(os.tmpdir(), `${stem}.part${String(i).padStart(3, '0')}${ext}`);
+      fs.writeFileSync(partPath, chunk);
+      parts.push(partPath);
+      off += len;
+    }
+  } finally {
+    fs.closeSync(fd);
   }
   return parts;
 }
@@ -936,7 +1032,8 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     let uploadPath = filePath;
     let uploadName = path.basename(filePath);
     let tempZip = null;
-    const SKIP_ZIP = new Set(['.zip', '.rar', '.7z', '.tar', '.tgz', '.gz']);
+    // Tipos já compactados não ganham nada com zip — split direto
+    const SKIP_ZIP = NON_COMPRESS_EXT;
     const origStats = fs.statSync(filePath);
     if (origStats.size > 40 * 1024 * 1024 && !SKIP_ZIP.has(path.extname(filePath).toLowerCase())) {
       tempZip = await zipFileForUpload(filePath);
@@ -948,18 +1045,41 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     }
 
     const stats = fs.statSync(uploadPath);
-    if (stats.size > 50 * 1024 * 1024) {
-      const msg = 'Arquivo maior que 50MB (limite padrão do Telegram)';
-      console.warn(msg);
+    const MAXUP = 45 * 1024 * 1024;
+    if (stats.size > MAXUP) {
+      // Arquivo grande: divide em partes e sobe cada uma (remonta no download)
+      const captionBase0 = title || path.basename(filePath);
+      const parts = await splitFileForUpload(uploadPath, MAXUP);
+      const pExt = tempZip ? '.zip' : path.extname(uploadName).toLowerCase();
+      const pStem = tempZip ? uploadName : uploadName.slice(0, uploadName.length - pExt.length);
+      let allOk = true, done = 0;
+      for (let i = 0; i < parts.length; i++) {
+        const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
+        try {
+          const sentP = await bot.sendDocument(telegramChatId, parts[i], {
+            caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${i + 1}/${parts.length})`,
+            filename: pn
+          });
+          recordTelegramFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            fileName: pn, title: captionBase0, folder: opts.folder || '',
+            size: fs.statSync(parts[i]).size, messageId: sentP && sentP.message_id,
+            fileId: extractTelegramFileId(sentP), chatType: store.get('telegram.chatType', ''),
+            source: opts.source || (downloadId ? 'download' : 'manual'), date: Date.now()
+          });
+          done++;
+        } catch (e) { allOk = false; }
+        try { fs.unlinkSync(parts[i]); } catch (e) {}
+      }
       if (tempZip) { try { fs.unlinkSync(tempZip); } catch (e) {} }
       if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
         mainWindow.webContents.send('telegram-upload-status', {
           downloadId,
-          status: 'error',
-          message: `⚠️ Falha no envio: ${msg}`
+          status: allOk ? 'success' : 'error',
+          message: allOk ? `✅ Enviado em ${parts.length} partes!` : `⚠️ ${done}/${parts.length} partes enviadas`
         });
       }
-      return { success: false, reason: msg };
+      return { success: allOk, reason: allOk ? null : 'falha em alguma parte' };
     }
     const captionBase = title || path.basename(filePath);
     const options = {

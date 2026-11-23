@@ -2742,6 +2742,10 @@ async function renderTelegramFiles() {
           tgFolderPath = pathVal;
           setTgView('drive');
         });
+        card.draggable = !!pathVal;
+        card.addEventListener('dragstart', (e) => {
+          if (pathVal) e.dataTransfer.setData('application/x-tg-folder', pathVal);
+        });
         if (droppable && pathVal) {
           card.addEventListener('dragover', (e) => { e.preventDefault(); card.classList.add('tg-drop-target'); });
           card.addEventListener('dragleave', () => card.classList.remove('tg-drop-target'));
@@ -2749,7 +2753,13 @@ async function renderTelegramFiles() {
             e.preventDefault(); e.stopPropagation();
             card.classList.remove('tg-drop-target');
             const fid = e.dataTransfer.getData('application/x-tg-file');
+            const fdrop = e.dataTransfer.getData('application/x-tg-folder');
             if (fid) { await api.telegramMoveFile(fid, pathVal); renderTelegramFiles(); }
+            else if (fdrop && fdrop !== pathVal && !pathVal.startsWith(fdrop + '/')) {
+              const r = await api.telegramMoveFolder(fdrop, pathVal);
+              if (r && r.success) renderTelegramFiles();
+              else if (r && r.message) alert(r.message);
+            }
           });
         }
         if (actions) card.appendChild(actions);
@@ -2950,13 +2960,12 @@ async function renderTelegramFiles() {
       telegramFilesList.appendChild(row);
     });
     telegramCloudLabel.textContent = `${files.length} arquivo(s) • ${formatBytes(totalSize)} ${tgView === 'trash' ? 'na lixeira' : 'na nuvem'}`;
-    // Barra de armazenamento (uso estimado pela nuvem)
+    // Armazenamento real usado na nuvem
     const storageBar = document.getElementById('tg-storage-bar');
     if (storageBar) {
       const usedAll = allFiles.filter(f => !f.trashDate).reduce((a, f) => a + (f.size || 0), 0);
-      const QUOTA = 4 * 1024 * 1024 * 1024;
-      const pct = Math.min(100, (usedAll / QUOTA) * 100);
-      storageBar.innerHTML = `<div class="tg-storage-head"><span>☁️ Armazenamento</span><span>${formatBytes(usedAll)} de ${formatBytes(QUOTA)}</span></div><div class="tg-storage-track"><div class="tg-storage-fill" style="width:${pct.toFixed(1)}%"></div></div><div class="tg-storage-sub">Uso estimado • referência 4 GB</div>`;
+      const cloudCount = allFiles.filter(f => !f.trashDate).length;
+      storageBar.innerHTML = `<div class="tg-storage-head"><span>☁️ Armazenamento</span><span>${formatBytes(usedAll)}</span></div><div class="tg-storage-sub">${cloudCount} arquivo(s) na nuvem • sem limite fixo</div>`;
     }
     updateTgBulkBar();
   } catch (e) {}
@@ -3000,7 +3009,7 @@ if (btnTelegramUploadFile) {
   btnTelegramUploadFile.addEventListener('click', async () => {
     btnTelegramUploadFile.disabled = true;
     try {
-      const res = await api.telegramPickUploadFile();
+      const res = await api.telegramPickUploadFile(tgFolderPath);
       if (res && res.message) alert(res.message);
       else if (res && res.success) renderTelegramFiles();
     } finally {
@@ -3014,7 +3023,7 @@ if (btnTelegramUploadFolder) {
     btnTelegramUploadFolder.disabled = true;
     btnTelegramUploadFolder.textContent = '⏳ Enviando...';
     try {
-      const res = await api.telegramPickUploadFolder();
+      const res = await api.telegramPickUploadFolder(tgFolderPath);
       if (res && res.success && res.total !== undefined) {
         alert(`${res.uploaded} enviado(s), ${res.failed} falha(s) de ${res.total} arquivo(s).`);
         renderTelegramFiles();
@@ -3095,7 +3104,7 @@ if (nuvemWrap && api.telegramUploadDropped) {
       }
     }
     if (!groups.length) { alert('Não foi possível ler os itens soltos.'); return; }
-    const res = await api.telegramUploadDropped(groups);
+    const res = await api.telegramUploadDropped(groups, tgFolderPath);
     if (res && res.message && !res.success) alert(res.message);
     else if (res) alert(`Upload concluído: ${res.ok} enviado(s), ${res.fail} falha(s)`);
     renderTelegramFiles();
