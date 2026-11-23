@@ -235,7 +235,16 @@ function detectTelegramMediaType(filePath) {
   return 'document';
 }
 
-ipcMain.handle('telegram-get-files', () => getTelegramFiles().slice(0, 200));
+const TRASH_TTL = 30 * 24 * 60 * 60 * 1000; // 30 dias na lixeira
+
+ipcMain.handle('telegram-get-files', () => {
+  const list = getTelegramFiles();
+  // Purga automática da lixeira após 30 dias
+  const now = Date.now();
+  const alive = list.filter(f => !f.trashDate || (now - f.trashDate) < TRASH_TTL);
+  if (alive.length !== list.length) store.set('telegramFiles', alive);
+  return alive.slice(0, 500);
+});
 
 ipcMain.handle('telegram-clear-index', () => {
   store.set('telegramFiles', []);
@@ -310,19 +319,29 @@ ipcMain.handle('telegram-delete-folder', async (_event, folderName) => {
 });
 
 ipcMain.handle('telegram-rename-folder', (_event, { oldName, newName }) => {
-  const clean = String(newName || '').trim().slice(0, 60);
+  const clean = String(newName || '').trim().slice(0, 120);
   if (!clean || clean === oldName) return { success: false, message: 'Nome inválido' };
   const list = getTelegramFiles();
-  list.forEach(f => { if ((f.folder || '') === oldName) f.folder = clean; });
+  // Renomeia a pasta e todos os subcaminhos (a/b → novo/b)
+  list.forEach(f => {
+    const fo = f.folder || '';
+    if (fo === oldName) f.folder = clean;
+    else if (fo.startsWith(oldName + '/')) f.folder = clean + fo.slice(oldName.length);
+  });
   store.set('telegramFiles', list);
   const folders = store.get('telegramFolders', []);
   const idx = folders.indexOf(oldName);
   if (idx !== -1) { folders[idx] = clean; store.set('telegramFolders', folders); }
+  const icons = store.get('telegramFolderIcons', {});
+  if (icons[oldName] !== undefined) { icons[clean] = icons[oldName]; delete icons[oldName]; store.set('telegramFolderIcons', icons); }
   return { success: true };
 });
 
 ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
-  const entries = getTelegramFiles().filter(f => (f.folder || '') === folderName && f.fileId);
+  const entries = getTelegramFiles().filter(f => {
+    const fo = f.folder || '';
+    return (fo === folderName || fo.startsWith(folderName + '/')) && f.fileId;
+  });
   if (!entries.length) return { success: false, message: 'Pasta vazia ou sem arquivos com file_id (reenvie arquivos antigos)' };
   const bot = ensureTelegramBot();
   if (!bot) return { success: false, message: 'Bot não conectado' };
@@ -421,7 +440,27 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload) => {
   return { success: true, ok, fail };
 });
 
+// Lixeira: marca como excluído sem apagar do Telegram (restaurável por 30 dias)
 ipcMain.handle('telegram-delete-file', async (_event, id) => {
+  const list = getTelegramFiles();
+  const entry = list.find(f => f.id === id);
+  if (!entry) return { success: false, message: 'Arquivo não encontrado no índice' };
+  entry.trashDate = Date.now();
+  store.set('telegramFiles', list);
+  return { success: true };
+});
+
+ipcMain.handle('telegram-restore-file', async (_event, id) => {
+  const list = getTelegramFiles();
+  const entry = list.find(f => f.id === id);
+  if (!entry) return { success: false, message: 'Arquivo não encontrado' };
+  delete entry.trashDate;
+  store.set('telegramFiles', list);
+  return { success: true };
+});
+
+// Exclui de vez: apaga a mensagem no Telegram e remove do índice
+ipcMain.handle('telegram-delete-forever', async (_event, id) => {
   const list = getTelegramFiles();
   const entry = list.find(f => f.id === id);
   if (!entry) return { success: false, message: 'Arquivo não encontrado no índice' };
@@ -435,6 +474,50 @@ ipcMain.handle('telegram-delete-file', async (_event, id) => {
   }
   store.set('telegramFiles', list.filter(f => f.id !== id));
   return { success: true };
+});
+
+// Move vários arquivos de uma vez
+ipcMain.handle('telegram-move-files', async (_event, { ids, folder }) => {
+  const list = getTelegramFiles();
+  const set = new Set(ids || []);
+  const clean = String(folder || '').slice(0, 120);
+  let moved = 0;
+  list.forEach(f => { if (set.has(f.id)) { f.folder = clean; moved++; } });
+  store.set('telegramFiles', list);
+  return { success: true, moved };
+});
+
+// Ícone emoji customizado por pasta
+ipcMain.handle('telegram-set-folder-icon', (_event, { path: fp, icon }) => {
+  const icons = store.get('telegramFolderIcons', {});
+  const key = String(fp || '').slice(0, 120);
+  if (!key) return { success: false };
+  icons[key] = String(icon || '').slice(0, 8) || '📁';
+  store.set('telegramFolderIcons', icons);
+  return { success: true };
+});
+
+ipcMain.handle('telegram-get-folder-icons', () => store.get('telegramFolderIcons', {}));
+
+// Preview: baixa o arquivo para temp e retorna o caminho local
+ipcMain.handle('telegram-preview-file', async (_event, id) => {
+  const entry = getTelegramFiles().find(f => f.id === id);
+  if (!entry) return { success: false, message: 'Arquivo não encontrado' };
+  if (!entry.fileId) return { success: false, message: 'Sem file_id (arquivo antigo)' };
+  const bot = ensureTelegramBot();
+  if (!bot) return { success: false, message: 'Bot não conectado' };
+  try {
+    const info = await bot.getFile(entry.fileId);
+    if (!info || !info.file_path) return { success: false, message: 'Arquivo indisponível' };
+    const res = await fetch(bot.fileDownloadUrl(info.file_path));
+    if (!res.ok) return { success: false, message: `Falha no download (${res.status})` };
+    const ext = path.extname(entry.fileName) || '';
+    const tmp = path.join(os.tmpdir(), `tdpreview-${Date.now()}${ext}`);
+    fs.writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
+    return { success: true, path: tmp, name: entry.fileName, ext };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
 });
 
 ipcMain.handle('telegram-upload-path', async (_event, filePath) => {
