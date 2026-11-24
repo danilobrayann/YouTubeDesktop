@@ -3149,6 +3149,8 @@ document.getElementById('btn-tg-settings')?.addEventListener('click', () => {
   document.getElementById('telegram-config-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
+api.on?.('telegram-files-changed', () => renderTelegramFiles());
+
 async function refreshTelegramCloud() {
   try {
     const folders = await api.telegramGetWatchFolders();

@@ -1248,6 +1248,33 @@ ipcMain.handle('start-telegram-wait', async () => {
     });
   }
 
+  // Auto-restore: se o usuário enviar o turbodown-indice.json pro bot, restaura tudo
+  if (!telegramBot._tdDocRegistered) {
+    telegramBot._tdDocRegistered = true;
+    telegramBot.on('document', async (msg) => {
+      try {
+        const doc = msg.document;
+        if (!doc || doc.file_name !== 'turbodown-indice.json') return;
+        if (telegramChatId && String(msg.chat.id) !== String(telegramChatId)) return;
+        const info = await bot.getFile(doc.file_id);
+        if (!info || !info.file_path) { bot.sendMessage(msg.chat.id, '❌ Não consegui baixar o índice.'); return; }
+        const res = await fetch(bot.fileDownloadUrl(info.file_path));
+        if (!res.ok) { bot.sendMessage(msg.chat.id, '❌ Falha ao baixar o índice.'); return; }
+        const data = JSON.parse(await res.text());
+        const RESTORE_KEYS = ['telegramFiles', 'telegramFolders', 'telegramFolderIcons', 'telegramFolderColors', 'telegramFavorites', 'telegram.watchFolders'];
+        let count = 0;
+        for (const k of RESTORE_KEYS) {
+          if (data[k] !== undefined) { store.set(k, data[k]); count++; }
+        }
+        startTelegramWatcher();
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('telegram-files-changed');
+        bot.sendMessage(msg.chat.id, `✅ Índice da nuvem restaurado! (${count} seções) Pastas, favoritos e arquivos voltaram.`);
+      } catch (e) {
+        try { bot.sendMessage(msg.chat.id, `❌ Erro ao restaurar: ${e.message}`); } catch (_) {}
+      }
+    });
+  }
+
   // Polling já fica ativo permanentemente (comandos /listar /apagar)
   bot.startPolling();
 
@@ -1583,10 +1610,17 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
+let quitBackupDone = false;
+app.on('before-quit', (e) => {
   isQuitting = true;
-  // Backup do índice da nuvem ao fechar (fire-and-forget)
-  backupTelegramIndex().catch(() => {});
+  // Garante o backup do índice antes de fechar de verdade (timeout de 20s)
+  if (!quitBackupDone) {
+    e.preventDefault();
+    const force = setTimeout(() => { quitBackupDone = true; app.quit(); }, 20000);
+    backupTelegramIndex()
+      .catch(() => {})
+      .finally(() => { clearTimeout(force); quitBackupDone = true; app.quit(); });
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -2864,6 +2898,11 @@ function initializeAutoUpdater() {
     // Verificar novamente a cada 4 horas enquanto o app estiver aberto
     const updateInterval = setInterval(checkUpdates, 4 * 60 * 60 * 1000);
     app.on('will-quit', () => clearInterval(updateInterval));
+    // Backup do índice da nuvem a cada hora
+    const indexBackupInterval = setInterval(() => {
+      if (getTelegramFiles().length) backupTelegramIndex().catch(() => {});
+    }, 60 * 60 * 1000);
+    app.on('will-quit', () => clearInterval(indexBackupInterval));
   } else if (isPortableBuild) {
     sendAppUpdateStatus('portable', {
       message: 'A atualização automática está disponível apenas na versão instalada pelo Setup.'

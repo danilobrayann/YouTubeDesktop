@@ -129,7 +129,8 @@ window.api = {
       'telegram-upload-status',
       'telegram-login-success',
       'telegram-login-timeout',
-      'telegram-upload-event'
+      'telegram-upload-event',
+      'telegram-files-changed'
     ];
     if (allowedChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));
