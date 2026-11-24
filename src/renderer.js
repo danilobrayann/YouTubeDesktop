@@ -1314,14 +1314,28 @@ async function pollMusicMeta() {
       const bar = document.querySelector('ytmusic-player-bar');
       const img = bar ? bar.querySelector('img') : null;
       const titleEl = bar ? bar.querySelector('.title') : null;
+      const subEl = bar ? bar.querySelector('.subtitle') : null;
       const cover = img ? (img.src || img.getAttribute('src')) : '';
-      return { cover: cover || '', title: titleEl ? titleEl.textContent.trim() : '' };
+      const sub = subEl ? subEl.textContent.trim() : '';
+      return {
+        cover: cover || '',
+        title: titleEl ? titleEl.textContent.trim() : '',
+        artist: sub.split('\\u2022')[0].trim() || sub.split(' - ')[0].trim() || ''
+      };
     })()`);
+    if (meta && (meta.title || meta.artist)) {
+      const fpTitle = document.getElementById('fp-title');
+      const fpArtist = document.getElementById('fp-artist');
+      if (fpTitle && meta.title) fpTitle.textContent = meta.title;
+      if (fpArtist) fpArtist.textContent = meta.artist || '';
+      if (meta.title) document.title = `TurboDown — ${meta.title}`;
+    }
     if (meta && meta.cover) {
       const fpCover = document.getElementById('fp-cover');
       if (fpCover && fpCover.dataset.src !== meta.cover) {
         fpCover.dataset.src = meta.cover;
         fpCover.src = meta.cover;
+        applyPlayerColor(meta.cover);
       }
       applyDominantColor(meta.cover);
     }
@@ -1386,6 +1400,115 @@ document.querySelector('.fp-progress')?.addEventListener('click', (e) => {
   fpSeek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
 });
 
+// Volume + mudo
+const fpVol = document.getElementById('fp-vol');
+const fpMute = document.getElementById('fp-mute');
+fpVol?.addEventListener('input', () => {
+  fpExec(`(() => { const v = document.querySelector('video'); if (v) { v.volume = ${fpVol.value / 100}; v.muted = false; } })()`);
+});
+fpMute?.addEventListener('click', function () {
+  fpExec(`(() => { const v = document.querySelector('video'); if (v) v.muted = !v.muted; return v ? v.muted : null; })()`)
+    .then(m => { if (m !== null) syncMuteIcon(!!m); });
+});
+function syncMuteIcon(muted) {
+  document.querySelectorAll('.fp-vol-waves').forEach(el => el.style.display = muted ? 'none' : '');
+  document.querySelectorAll('.fp-vol-x').forEach(el => el.style.display = muted ? '' : 'none');
+}
+
+// Cor customizada do player
+const fpColorBtn = document.getElementById('fp-color');
+const fpColorInput = document.getElementById('fp-color-input');
+fpColorBtn?.addEventListener('click', () => fpColorInput?.click());
+fpColorInput?.addEventListener('input', () => {
+  const hex = fpColorInput.value;
+  const bar = document.getElementById('fp-bar');
+  if (!bar) return;
+  // accent2 = versão mais clara do accent
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((n >> 16) & 255) + 60), g = Math.min(255, ((n >> 8) & 255) + 60), b = Math.min(255, (n & 255) + 60);
+  const c2 = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+  bar.style.setProperty('--fp-accent', hex);
+  bar.style.setProperty('--fp-accent2', c2);
+  try { localStorage.setItem('td-fp-custom', hex); } catch (e) {}
+});
+(function () {
+  try {
+    const c = localStorage.getItem('td-fp-custom');
+    if (c) {
+      const bar = document.getElementById('fp-bar');
+      const n = parseInt(c.slice(1), 16);
+      const r = Math.min(255, ((n >> 16) & 255) + 60), g = Math.min(255, ((n >> 8) & 255) + 60), b = Math.min(255, (n & 255) + 60);
+      if (bar) {
+        bar.style.setProperty('--fp-accent', c);
+        bar.style.setProperty('--fp-accent2', `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`);
+      }
+    }
+  } catch (e) {}
+})();
+// Trocar de tema limpa a cor customizada
+const _fpThemeBtn = document.getElementById('fp-theme');
+_fpThemeBtn?.addEventListener('click', () => {
+  const bar = document.getElementById('fp-bar');
+  bar?.style.removeProperty('--fp-accent');
+  bar?.style.removeProperty('--fp-accent2');
+  try { localStorage.removeItem('td-fp-custom'); } catch (e) {}
+}, true);
+
+// Cor dominante da capa → accent do player (se não houver cor custom)
+let lastFpColorSrc = '';
+function applyPlayerColor(imgUrl) {
+  if (!imgUrl || imgUrl === lastFpColorSrc) return;
+  lastFpColorSrc = imgUrl;
+  try { if (localStorage.getItem('td-fp-custom')) return; } catch (e) {}
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 24;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, 24, 24);
+      const d = ctx.getImageData(0, 0, 24, 24).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        if (lum > 30 && lum < 235) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      }
+      if (!n) return;
+      r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+      const hex = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+      const bar = document.getElementById('fp-bar');
+      if (!bar) return;
+      const r2 = Math.min(255, r + 60), g2 = Math.min(255, g + 60), b2 = Math.min(255, b + 60);
+      bar.style.setProperty('--fp-accent', hex);
+      bar.style.setProperty('--fp-accent2', `#${((r2 << 16) | (g2 << 8) | b2).toString(16).padStart(6, '0')}`);
+    } catch (e) {}
+  };
+  img.src = imgUrl;
+}
+
+// Atalhos de teclado do player (quando o app está com foco)
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag) || e.ctrlKey || e.altKey || e.metaKey) return;
+  const bar = document.getElementById('fp-bar');
+  if (!bar || bar.classList.contains('hidden')) return;
+  if (e.code === 'Space') { e.preventDefault(); fpToggle(); }
+  else if (e.code === 'ArrowRight') { e.preventDefault(); fpSeekBy(5); }
+  else if (e.code === 'ArrowLeft') { e.preventDefault(); fpSeekBy(-5); }
+  else if (e.code === 'ArrowUp') { e.preventDefault(); fpVolBump(0.05); }
+  else if (e.code === 'ArrowDown') { e.preventDefault(); fpVolBump(-0.05); }
+  else if (e.key === 'm' || e.key === 'M') fpMute?.click();
+});
+function fpSeekBy(sec) {
+  fpExec(`(() => { const v = document.querySelector('video'); if (v && v.duration) v.currentTime = Math.min(v.duration, Math.max(0, v.currentTime + ${sec})); })()`);
+}
+function fpVolBump(d) {
+  if (!fpVol) return;
+  fpVol.value = Math.min(100, Math.max(0, parseInt(fpVol.value, 10) + Math.round(d * 100)));
+  fpVol.dispatchEvent(new Event('input'));
+}
+
 // Poll 1s: estado do vídeo → barra + progresso + play/pause
 setInterval(async () => {
   const bar = document.getElementById('fp-bar');
@@ -1410,6 +1533,13 @@ setInterval(async () => {
     icoPause.style.display = st.paused ? 'none' : '';
   }
   document.querySelector('.fp-disc-wrap')?.classList.toggle('playing', !st.paused);
+  bar.classList.toggle('playing', !st.paused);
+  if (fpMute && !fpMute.dataset.synced) {
+    fpExec(`(() => { const v = document.querySelector('video'); return v ? v.muted : null; })()`)
+      .then(m => { if (m !== null) { syncMuteIcon(!!m); fpMute.dataset.synced = '1'; } });
+    if (fpVol) fpExec(`(() => { const v = document.querySelector('video'); return v ? Math.round(v.volume * 100) : null; })()`)
+      .then(v => { if (v !== null && document.activeElement !== fpVol) fpVol.value = v; });
+  }
 }, 1000);
 
 // ── QUICK DOWNLOAD MODAL ───────────────────────────────────────────────────
