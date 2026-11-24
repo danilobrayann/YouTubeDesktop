@@ -117,6 +117,7 @@ window.api = {
   telegramAddWatchFolder: (folderPath) => ipcRenderer.invoke('telegram-add-watch-folder', folderPath),
   telegramRemoveWatchFolder: (folderPath) => ipcRenderer.invoke('telegram-remove-watch-folder', folderPath),
   telegramBackupIndex: () => ipcRenderer.invoke('telegram-backup-index'),
+  openMusicPlayer: () => ipcRenderer.invoke('open-music-player'),
   resolveNavigationTarget,
 
   // IPC event listeners

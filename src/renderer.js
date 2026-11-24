@@ -622,6 +622,12 @@ if (btnMiniPlayer) {
   });
 }
 
+// Player nativo ytm-rs
+document.getElementById('btn-open-ytmrs')?.addEventListener('click', async () => {
+  const r = await api.openMusicPlayer();
+  if (r && !r.success) alert(r.message || 'Falha ao abrir o player');
+});
+
 // ── Downloads agendados ─────────────────────────────────────────────────────
 const btnToggleSchedule = document.getElementById('btn-toggle-schedule');
 const scheduleForm      = document.getElementById('schedule-form');
@@ -1245,13 +1251,74 @@ function updateNowPlaying(title) {
   const npTitle    = document.getElementById('np-title');
   if (title !== 'YouTube') {
     nowPlaying.classList.remove('hidden');
+    document.body.classList.add('np-visible');
     npTitle.textContent = title;
     document.title = `TurboDown — ${title}`;
   } else {
     nowPlaying.classList.add('hidden');
+    document.body.classList.remove('np-visible');
     document.title = 'TurboDown';
   }
 }
+
+// ===== Meta da música: capa + cor dominante pro dashboard =====
+let lastDashColor = '';
+function applyDominantColor(imgUrl) {
+  if (!imgUrl || imgUrl === lastDashColor) return;
+  lastDashColor = imgUrl;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 24;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, 24, 24);
+      const d = ctx.getImageData(0, 0, 24, 24).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        // ignora pixels muito escuros/quase brancos
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        if (lum > 30 && lum < 235) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      }
+      if (!n) return;
+      r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+      // satura um pouco pra ficar vibrante
+      const f = 1.35;
+      const sr = Math.min(255, Math.round(r * f)), sg = Math.min(255, Math.round(g * f)), sb = Math.min(255, Math.round(b * f));
+      const hero = document.querySelector('.dash-hero');
+      if (hero) hero.style.background = `linear-gradient(135deg, rgba(${sr},${sg},${sb},.28), rgba(${sb},${sr},${sg},.18), rgba(${sg},${sb},${sr},.14))`;
+      document.documentElement.style.setProperty('--dash-glow', `rgba(${sr},${sg},${sb},.35)`);
+    } catch (e) { /* imagem sem CORS — mantém cor padrão */ }
+  };
+  img.src = imgUrl;
+}
+
+async function pollMusicMeta() {
+  const wv = document.getElementById('music-player');
+  const tabMusic = document.getElementById('tab-music');
+  if (!wv || !tabMusic || !tabMusic.classList.contains('active')) return;
+  try {
+    const meta = await wv.executeJavaScript(`(() => {
+      const bar = document.querySelector('ytmusic-player-bar');
+      const img = bar ? bar.querySelector('img') : null;
+      const titleEl = bar ? bar.querySelector('.title') : null;
+      const cover = img ? (img.src || img.getAttribute('src')) : '';
+      return { cover: cover || '', title: titleEl ? titleEl.textContent.trim() : '' };
+    })()`);
+    if (meta && meta.cover) {
+      const npCover = document.getElementById('np-cover');
+      if (npCover && npCover.dataset.src !== meta.cover) {
+        npCover.dataset.src = meta.cover;
+        npCover.src = meta.cover;
+        npCover.classList.remove('hidden');
+      }
+      applyDominantColor(meta.cover);
+    }
+  } catch (e) { /* webview ocupado */ }
+}
+setInterval(pollMusicMeta, 5000);
+pollMusicMeta();
 
 // ── QUICK DOWNLOAD MODAL ───────────────────────────────────────────────────
 btnDownloadQ.addEventListener('click', openQuickDownloadModal);

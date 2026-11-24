@@ -305,6 +305,23 @@ async function backupTelegramIndex() {
 
 ipcMain.handle('telegram-backup-index', () => backupTelegramIndex());
 
+// Abre o player de música nativo (ytm-rs)
+ipcMain.handle('open-music-player', () => {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'bin', 'ytm-rs.exe'),
+    path.join(__dirname, '..', 'bin', 'ytm-rs.exe')
+  ];
+  const exe = candidates.find(p => fs.existsSync(p));
+  if (!exe) return { success: false, message: 'ytm-rs.exe não encontrado' };
+  try {
+    const child = spawn(exe, [], { detached: true, stdio: 'ignore' });
+    child.unref();
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
 ipcMain.handle('telegram-download-file', async (_event, id) => {
   const entry = getTelegramFiles().find(f => f.id === id);
   if (!entry) return { success: false, message: 'Arquivo não encontrado' };

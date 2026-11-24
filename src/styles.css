@@ -4120,7 +4120,8 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 .dash-clock { font-size: 72px; font-weight: 800; letter-spacing: -2px; background: linear-gradient(90deg,#7ab8ff,#a78bfa,#34d399); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .dash-date { font-size: 16px; color: var(--text-secondary, #aab); text-transform: capitalize; margin-top: 4px; }
 .dash-greeting { font-size: 20px; font-weight: 600; margin-top: 10px; color: var(--text-primary, #eee); }
-.dash-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.dash-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 900px) { .dash-stats { grid-template-columns: repeat(2, 1fr); } }
 .dash-stat { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; }
 .dash-stat-ico { font-size: 26px; }
 .dash-stat-num { font-size: 20px; font-weight: 700; }
