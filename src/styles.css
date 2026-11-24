@@ -4195,3 +4195,29 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 .fp-time { font-size: 11px; color: var(--text-secondary, #99a); font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 78px; text-align: right; }
 .fp-ico.active { color: var(--fp-accent); }
 body.fp-visible #app { padding-bottom: 66px; }
+
+/* ===== Modo transparente do app ===== */
+body.transparent-mode .glass-card,
+body.transparent-mode .settings-section,
+body.transparent-mode .dash-hero,
+body.transparent-mode .dash-stat {
+  background: rgba(255,255,255,.055) !important;
+  border-color: rgba(255,255,255,.09) !important;
+}
+body.transparent-mode .dash-card { background: rgba(255,255,255,.05) !important; }
+body.transparent-mode #sidebar,
+body.transparent-mode .sidebar,
+body.transparent-mode nav,
+body.transparent-mode .nav {
+  background: rgba(10,12,20,.55) !important;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+
+/* ===== Tema transparente do player ===== */
+#fp-bar.fp-theme-t {
+  --fp-accent: #7ab8ff;
+  --fp-accent2: #a78bfa;
+  background: rgba(12, 15, 24, .16);
+  border-top-color: rgba(255,255,255,.05);
+  backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+}

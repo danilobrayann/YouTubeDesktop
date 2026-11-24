@@ -308,11 +308,42 @@ ipcMain.handle('telegram-backup-index', () => backupTelegramIndex());
 ipcMain.handle('telegram-download-file', async (_event, id) => {
   const entry = getTelegramFiles().find(f => f.id === id);
   if (!entry) return { success: false, message: 'Arquivo não encontrado' };
+  const bot = ensureTelegramBot();
+  if (!bot) return { success: false, message: 'Bot não conectado' };
+
+  // Arquivo fatiado: baixa todas as partes e remonta num arquivo só (streaming)
+  if (entry.isSplit && Array.isArray(entry.parts) && entry.parts.length > 1) {
+    const save = await dialog.showSaveDialog(mainWindow, {
+      title: 'Salvar arquivo da nuvem',
+      defaultPath: path.join(app.getPath('downloads'), entry.fileName)
+    });
+    if (save.canceled || !save.filePath) return { success: false, canceled: true };
+    const { Readable } = require('stream');
+    const ws = fs.createWriteStream(save.filePath);
+    try {
+      for (let i = 0; i < entry.parts.length; i++) {
+        const pt = entry.parts[i];
+        if (!pt.fileId) return { success: false, message: `Parte ${i + 1} sem file_id` };
+        const info = await bot.getFile(pt.fileId);
+        if (!info || !info.file_path) return { success: false, message: `Parte ${i + 1} indisponível` };
+        const res = await fetch(bot.fileDownloadUrl(info.file_path));
+        if (!res.ok || !res.body) return { success: false, message: `Falha ao baixar parte ${i + 1}` };
+        const rs = Readable.fromWeb(res.body);
+        for await (const chunk of rs) {
+          if (!ws.write(chunk)) await new Promise(r => ws.once('drain', r));
+        }
+      }
+      await new Promise((res, rej) => { ws.end(); ws.on('finish', res); ws.on('error', rej); });
+      return { success: true, path: save.filePath, parts: entry.parts.length };
+    } catch (e) {
+      try { ws.destroy(); fs.unlinkSync(save.filePath); } catch (e2) {}
+      return { success: false, message: e.message };
+    }
+  }
+
   if (!entry.fileId) {
     return { success: false, message: 'Este arquivo foi enviado antes do recurso de download — reenvie-o' };
   }
-  const bot = ensureTelegramBot();
-  if (!bot) return { success: false, message: 'Bot não conectado' };
 
   // Se for uma parte (.partNNN), baixa TODAS as partes e remonta o arquivo original
   const partInfo = parsePartName(entry.fileName);
@@ -396,9 +427,14 @@ ipcMain.handle('telegram-delete-folder', async (_event, folderName) => {
   const match = (f) => (f.folder || '') === folderName || (f.folder || '').startsWith(folderName + '/');
   const targets = list.filter(match);
   for (const e of targets) {
-    try {
-      if (bot && e.messageId) await bot.deleteMessage(e.chatId || telegramChatId, e.messageId);
-    } catch (err) {}
+    const msgIds = (e.isSplit && Array.isArray(e.parts))
+      ? e.parts.map(p => p.messageId).filter(Boolean)
+      : (e.messageId ? [e.messageId] : []);
+    for (const mid of msgIds) {
+      try {
+        if (bot) await bot.deleteMessage(e.chatId || telegramChatId, mid);
+      } catch (err) {}
+    }
   }
   store.set('telegramFiles', list.filter(f => !match(f)));
   const folders = store.get('telegramFolders', []).filter(x => x !== folderName);
@@ -488,16 +524,56 @@ ipcMain.handle('telegram-download-folder', async (_event, folderName) => {
     fs.mkdirSync(destDir, { recursive: true });
     fs.writeFileSync(path.join(destDir, safeName), buf);
   };
+  const destPathFor = (rel, fileName) => {
+    const safeName = fileName.replace(/[<>:"/\\|?*]/g, '_');
+    const destDir = rel ? path.join(tmpDir, ...rel.split('/').map(s => s.replace(/[<>:"/\\|?*]/g, '_'))) : tmpDir;
+    fs.mkdirSync(destDir, { recursive: true });
+    return path.join(destDir, safeName);
+  };
+  // Baixa as partes de um arquivo fatiado direto pra um arquivo destino (streaming)
+  const downloadSplitTo = async (e, destPath) => {
+    const { Readable } = require('stream');
+    const ws = fs.createWriteStream(destPath);
+    try {
+      for (const pt of e.parts) {
+        if (!pt.fileId) throw new Error('parte sem file_id');
+        const info = await bot.getFile(pt.fileId);
+        if (!info || !info.file_path) throw new Error('parte indisponível');
+        const res = await fetch(bot.fileDownloadUrl(info.file_path));
+        if (!res.ok || !res.body) throw new Error('falha no download da parte');
+        const rs = Readable.fromWeb(res.body);
+        for await (const chunk of rs) {
+          if (!ws.write(chunk)) await new Promise(r => ws.once('drain', r));
+        }
+      }
+      await new Promise((res, rej) => { ws.end(); ws.on('finish', res); ws.on('error', rej); });
+      return true;
+    } catch (err) {
+      try { ws.destroy(); fs.unlinkSync(destPath); } catch (e2) {}
+      return false;
+    }
+  };
   try {
-    // Separa partes (.partNNN) das entradas normais
+    // Separa partes (.partNNN legadas e arquivos fatiados novos) das entradas normais
     const partEntries = [];
     const normalEntries = [];
-    for (const e of entries) (parsePartName(e.fileName) ? partEntries : normalEntries).push(e);
+    const splitEntries = [];
+    for (const e of entries) {
+      if (e.isSplit && Array.isArray(e.parts) && e.parts.length > 1) splitEntries.push(e);
+      else if (parsePartName(e.fileName)) partEntries.push(e);
+      else normalEntries.push(e);
+    }
     // Baixa arquivos normais preservando subpastas
     for (const e of normalEntries) {
       try {
         const buf = await downloadEntry(e);
         if (buf) writeSafe(relDir(e), e.fileName, buf);
+      } catch (err) { /* pula arquivo com falha */ }
+    }
+    // Arquivos fatiados (entrada única): remonta as partes no destino
+    for (const e of splitEntries) {
+      try {
+        await downloadSplitTo(e, destPathFor(relDir(e), e.fileName));
       } catch (err) { /* pula arquivo com falha */ }
     }
     // Remonta partes: agrupa por pasta+stem+ext, baixa em ordem e junta
@@ -586,32 +662,10 @@ ipcMain.handle('telegram-upload-dropped', async (_event, payload, targetFolder) 
           const res = await tryUpload(p, baseName, detectTelegramMediaType(p));
           emit(res.success ? 'done' : 'error', st.size, res.reason);
         } else {
-          // Tipos já compactados (iso, mp4, mp3, zip...) vão direto pro split — sem zip
-          const noZip = NON_COMPRESS_EXT.has(path.extname(p).toLowerCase());
-          const zp = noZip ? null : await zipFileForUpload(p);
-          const zsize = zp ? fs.statSync(zp).size : Infinity;
-          if (zp && zsize <= MAX) {
-            emit('start', zsize);
-            const res = await tryUpload(zp, `${baseName}.zip`, 'document');
-            emit(res.success ? 'done' : 'error', zsize, res.reason);
-            try { fs.unlinkSync(zp); } catch (e) {}
-          } else {
-            const srcForSplit = zp || p;
-            const parts = await splitFileForUpload(srcForSplit, MAX);
-            // partes de zip → .partNNN.zip (remonta em .zip); partes raw → .partNNN<ext original>
-            const pExt = zp ? '.zip' : path.extname(baseName).toLowerCase();
-            const pStem = zp ? baseName : baseName.slice(0, baseName.length - pExt.length);
-            for (let i = 0; i < parts.length; i++) {
-              const part = parts[i];
-              const psz = fs.statSync(part).size;
-              const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
-              emit('start', psz);
-              const res = await tryUpload(part, pn, 'document');
-              emit(res.success ? 'done' : 'error', psz, res.reason);
-              if (part !== srcForSplit) { try { fs.unlinkSync(part); } catch (e) {} }
-            }
-            if (zp) { try { fs.unlinkSync(zp); } catch (e) {} }
-          }
+          // >45MB: uploadToTelegram resolve zip/split internamente e grava 1 entrada só
+          emit('start', st.size);
+          const res = await tryUpload(p, baseName, detectTelegramMediaType(p));
+          emit(res.success ? 'done' : 'error', st.size, res.reason);
         }
         // Modo nuvem: apaga o arquivo local só se TODAS as partes subiram
         if (succeeded === attempts && attempts > 0) { ok += succeeded; }
@@ -650,11 +704,17 @@ ipcMain.handle('telegram-delete-forever', async (_event, id) => {
   const entry = list.find(f => f.id === id);
   if (!entry) return { success: false, message: 'Arquivo não encontrado no índice' };
   const bot = ensureTelegramBot();
-  if (bot && telegramChatId && entry.messageId) {
-    try {
-      await bot.deleteMessage(telegramChatId, entry.messageId);
-    } catch (e) {
-      console.warn('Falha ao deletar mensagem no Telegram:', e.message);
+  const msgIds = [];
+  if (entry.isSplit && Array.isArray(entry.parts)) {
+    for (const pt of entry.parts) if (pt.messageId) msgIds.push(pt.messageId);
+  } else if (entry.messageId) {
+    msgIds.push(entry.messageId);
+  }
+  if (bot && telegramChatId) {
+    for (const mid of msgIds) {
+      try { await bot.deleteMessage(telegramChatId, mid); } catch (e) {
+        console.warn('Falha ao deletar mensagem no Telegram:', e.message);
+      }
     }
   }
   store.set('telegramFiles', list.filter(f => f.id !== id));
@@ -1059,6 +1119,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
       const partBase = [];
       let acc = 0;
       for (const s of partSizes) { partBase.push(acc); acc += s; }
+      const partRecords = [];
       let allOk = true, done = 0;
       for (let i = 0; i < parts.length; i++) {
         const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
@@ -1083,16 +1144,25 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
               };
             })()
           });
-          recordTelegramFile({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            fileName: pn, title: captionBase0, folder: opts.folder || '',
-            size: fs.statSync(parts[i]).size, messageId: sentP && sentP.message_id,
-            fileId: extractTelegramFileId(sentP), chatType: store.get('telegram.chatType', ''),
-            source: opts.source || (downloadId ? 'download' : 'manual'), date: Date.now()
+          partRecords.push({
+            fileName: pn, size: partSizes[i],
+            messageId: sentP && sentP.message_id,
+            fileId: extractTelegramFileId(sentP)
           });
           done++;
         } catch (e) { allOk = false; }
         try { fs.unlinkSync(parts[i]); } catch (e) {}
+      }
+      // Uma única entrada no índice — o arquivo aparece inteiro na nuvem
+      if (allOk && partRecords.length) {
+        recordTelegramFile({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          fileName: uploadName, title: captionBase0, folder: opts.folder || '',
+          size: stats.size, isSplit: true, parts: partRecords,
+          messageId: partRecords[0].messageId, fileId: partRecords[0].fileId,
+          chatType: store.get('telegram.chatType', ''),
+          source: opts.source || (downloadId ? 'download' : 'manual'), date: Date.now()
+        });
       }
       if (tempZip) { try { fs.unlinkSync(tempZip); } catch (e) {} }
       if (mainWindow && !mainWindow.isDestroyed() && downloadId) {

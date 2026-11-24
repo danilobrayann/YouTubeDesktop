@@ -352,6 +352,10 @@ function applyTheme(theme) {
     root.style.setProperty('--scrollbar-thumb','rgba(255,255,255,0.15)');
   }
 
+  // Modo transparente — janela mostra o desktop atrás dos painéis
+  const transparent = theme.transparencyEnabled !== false;
+  document.body.classList.toggle('transparent-mode', transparent);
+
   // Background gradient or solid
   if (theme.backgroundImage) {
     document.body.style.backgroundImage = `url('${theme.backgroundImage.replace(/\\/g, '/')}')`;
@@ -364,11 +368,15 @@ function applyTheme(theme) {
       const angle = theme.gradientAngle !== undefined ? theme.gradientAngle : 135;
       const c1    = theme.gradientColor1 || theme.bgColor || '#0f0f1a';
       const c2    = theme.gradientColor2 || '#1a1a2e';
-      const grad  = `linear-gradient(${angle}deg, ${c1} 0%, ${c2} 100%)`;
+      const a = transparent ? 0.55 : 1;
+      const g1 = transparent ? hexToRgba(c1, a) : c1;
+      const g2 = transparent ? hexToRgba(c2, a * 0.9) : c2;
+      const grad  = `linear-gradient(${angle}deg, ${g1} 0%, ${g2} 100%)`;
       document.body.style.background  = grad;
       root.style.setProperty('--bg-gradient', grad);
     } else {
-      document.body.style.background = theme.bgColor || '#0f0f1a';
+      const bg = transparent ? hexToRgba(theme.bgColor || '#0f0f1a', 0.55) : (theme.bgColor || '#0f0f1a');
+      document.body.style.background = bg;
       root.style.setProperty('--bg-gradient', theme.bgColor || '#0f0f1a');
     }
   }
@@ -1343,19 +1351,24 @@ document.getElementById('fp-repeat')?.addEventListener('click', function () {
   fpExec(`document.querySelector('ytmusic-player-bar .repeat-button, ytmusic-player-bar [class*="repeat"]')?.click()`);
   this.classList.toggle('active');
 });
-// Temas do player — cicla e persiste
+// Temas do player — cicla e persiste (0-5 = cores, t = transparente)
+const FP_THEMES = ['fp-theme-0','fp-theme-1','fp-theme-2','fp-theme-3','fp-theme-4','fp-theme-5','fp-theme-t'];
+function fpSetTheme(name) {
+  const bar = document.getElementById('fp-bar');
+  if (!bar) return;
+  FP_THEMES.forEach(c => bar.classList.remove(c));
+  bar.classList.add(name);
+  try { localStorage.setItem('td-fp-theme', name); } catch (e) {}
+}
 document.getElementById('fp-theme')?.addEventListener('click', function () {
   const bar = document.getElementById('fp-bar');
-  const cur = parseInt((bar.className.match(/fp-theme-(\d)/) || [0, 0])[1], 10);
-  const next = (cur + 1) % 6;
-  bar.className = bar.className.replace(/fp-theme-\d/g, '').trim() + ` fp-theme-${next}`;
-  try { localStorage.setItem('td-fp-theme', String(next)); } catch (e) {}
+  const cur = FP_THEMES.findIndex(c => bar.classList.contains(c));
+  fpSetTheme(FP_THEMES[(cur + 1) % FP_THEMES.length]);
 });
 (function () {
   try {
     const t = localStorage.getItem('td-fp-theme');
-    const bar = document.getElementById('fp-bar');
-    if (t !== null && bar) bar.className = bar.className.replace(/fp-theme-\d/g, '').trim() + ` fp-theme-${t % 6}`;
+    if (t && FP_THEMES.includes(t)) fpSetTheme(t);
   } catch (e) {}
 })();
 document.querySelector('.fp-progress')?.addEventListener('click', (e) => {
