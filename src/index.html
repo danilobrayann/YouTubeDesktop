@@ -113,12 +113,21 @@
               <button
                 type="button"
                 class="nav-item active"
-                data-tab="home"
+                data-tab="dashboard"
                 title="Início"
                 aria-current="page"
               >
                 <svg class="icon nav-icon-svg" aria-hidden="true"><use href="#i-home"/></svg>
                 <span class="nav-label">Início</span>
+              </button>
+              <button
+                type="button"
+                class="nav-item"
+                data-tab="home"
+                title="YouTube"
+              >
+                <svg class="icon nav-icon-svg" aria-hidden="true"><use href="#i-play"/></svg>
+                <span class="nav-label">YouTube</span>
               </button>
               <button
                 type="button"
@@ -995,7 +1004,32 @@
           </div>
 
           <!-- ════ TAB: HOME ════ -->
-          <div class="tab active" id="tab-home">
+          <!-- ════ TAB: DASHBOARD ════ -->
+          <div class="tab active" id="tab-dashboard">
+            <div class="dash-wrap">
+              <div class="dash-hero glass-card">
+                <div class="dash-clock" id="dash-clock">--:--</div>
+                <div class="dash-date" id="dash-date"></div>
+                <div class="dash-greeting" id="dash-greeting"></div>
+              </div>
+              <div class="dash-stats">
+                <div class="dash-stat glass-card"><div class="dash-stat-ico">⚡</div><div><div class="dash-stat-num" id="dash-dl-count">—</div><div class="dash-stat-label">Downloads ativos</div></div></div>
+                <div class="dash-stat glass-card"><div class="dash-stat-ico">☁️</div><div><div class="dash-stat-num" id="dash-cloud-size">—</div><div class="dash-stat-label">Na nuvem</div></div></div>
+                <div class="dash-stat glass-card"><div class="dash-stat-ico">📁</div><div><div class="dash-stat-num" id="dash-cloud-count">—</div><div class="dash-stat-label">Arquivos na nuvem</div></div></div>
+                <div class="dash-stat glass-card"><div class="dash-stat-ico">🕐</div><div><div class="dash-stat-num" id="dash-uptime">—</div><div class="dash-stat-label">Sessão</div></div></div>
+              </div>
+              <div class="dash-shortcuts">
+                <div class="dash-card glass-card" data-goto="home"><div class="dash-card-ico">▶️</div><div class="dash-card-title">YouTube</div><div class="dash-card-sub">Assistir e baixar</div></div>
+                <div class="dash-card glass-card" data-goto="nuvem"><div class="dash-card-ico">☁️</div><div class="dash-card-title">Nuvem</div><div class="dash-card-sub">Seus arquivos</div></div>
+                <div class="dash-card glass-card" data-goto="downloads"><div class="dash-card-ico">⬇️</div><div class="dash-card-title">Downloads</div><div class="dash-card-sub">Histórico</div></div>
+                <div class="dash-card glass-card" data-goto="music"><div class="dash-card-ico">🎵</div><div class="dash-card-title">Música</div><div class="dash-card-sub">YouTube Music</div></div>
+                <div class="dash-card glass-card" data-goto="wallpapers"><div class="dash-card-ico">🖼️</div><div class="dash-card-title">Wallpapers</div><div class="dash-card-sub">Papéis de parede</div></div>
+                <div class="dash-card glass-card" data-goto="settings"><div class="dash-card-ico">⚙️</div><div class="dash-card-title">Config</div><div class="dash-card-sub">Ajustes</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab" id="tab-home">
             <div id="url-bar">
               <div id="url-bar-nav">
                 <button
@@ -1564,6 +1598,12 @@
                               <option value="date">Recentes</option>
                               <option value="name">Nome</option>
                               <option value="size">Tamanho</option>
+                            </select>
+                            <select id="tg-folders-sort" class="tg-sort" title="Ordenar pastas">
+                              <option value="name">Pastas: Nome</option>
+                              <option value="size">Pastas: Tamanho</option>
+                              <option value="count">Pastas: Itens</option>
+                              <option value="recent">Pastas: Recentes</option>
                             </select>
                             <button id="btn-tg-settings" class="btn-ghost btn-xs" title="Configurações da nuvem">⚙️</button>
                             <button id="btn-tg-backup-index" class="btn-ghost btn-xs" title="Backup do índice na nuvem">💾</button>

@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const api = window.api;
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webUtils } = require('electron');
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2540,10 +2540,19 @@ function formatBytes(bytes) {
 
 function telegramFileIcon(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
-  if (['mp3', 'm4a', 'ogg', 'opus', 'wav', 'flac', 'aac'].includes(ext)) return '🎵';
+  if (['mp3', 'm4a', 'ogg', 'opus', 'wav', 'flac', 'aac', 'wma'].includes(ext)) return '🎵';
   if (['mp4', 'mkv', 'webm', 'mov', 'avi', 'm4v'].includes(ext)) return '🎬';
-  if (['zip', 'rar', '7z'].includes(ext)) return '🗜️';
-  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return '🖼️';
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'tgz'].includes(ext)) return '🗜️';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(ext)) return '🖼️';
+  if (['pdf'].includes(ext)) return '📕';
+  if (['doc', 'docx', 'txt', 'rtf', 'odt'].includes(ext)) return '📝';
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return '📊';
+  if (['ppt', 'pptx', 'odp'].includes(ext)) return '📽️';
+  if (['iso', 'img', 'dmg'].includes(ext)) return '💿';
+  if (['apk', 'exe', 'msi'].includes(ext)) return '🤖';
+  if (['js', 'ts', 'html', 'css', 'json', 'py', 'java', 'cpp', 'c', 'rs', 'go', 'php', 'rb', 'sql'].includes(ext)) return '💻';
+  if (['torrent'].includes(ext)) return '🧲';
+  if (['epub', 'mobi'].includes(ext)) return '📚';
   return '📄';
 }
 
@@ -2622,6 +2631,7 @@ function setTgView(v) {
   renderTelegramFiles();
 }
 let tgTypeFilter = '';
+let tgFolderSort = 'name';
 const tgSelected = new Set();
 const TG_FOLDER_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#64748b'];
 const TG_FOLDER_EMOJIS = ['📁','🎵','🎬','🖼️','📄','🗜️','📚','💼','🎮','❤️','⭐','🗂️'];
@@ -2752,6 +2762,15 @@ async function renderTelegramFiles() {
           card.addEventListener('drop', async (e) => {
             e.preventDefault(); e.stopPropagation();
             card.classList.remove('tg-drop-target');
+            // Arquivos do PC arrastados direto pro card → sobem pra essa pasta
+            if (e.dataTransfer.files && e.dataTransfer.files.length) {
+              const paths = [...e.dataTransfer.files].map(f => { try { return webUtils.getPathForFile(f); } catch (_) { return ''; } }).filter(Boolean);
+              if (paths.length) {
+                await api.telegramUploadDropped([{ name: '', files: paths.map(p => ({ path: p, rel: '' })) }], pathVal);
+                renderTelegramFiles();
+              }
+              return;
+            }
             const fid = e.dataTransfer.getData('application/x-tg-file');
             const fdrop = e.dataTransfer.getData('application/x-tg-folder');
             if (fid) { await api.telegramMoveFile(fid, pathVal); renderTelegramFiles(); }
@@ -2766,7 +2785,22 @@ async function renderTelegramFiles() {
         return card;
       };
       foldersBar.appendChild(mkCard('🏠', 'Início', `${allFiles.filter(f => !f.trashDate).length} itens`, '', 'Raiz da nuvem', null, false));
-      [...children].sort((a, b) => a.localeCompare(b)).forEach(cp => {
+      const folderStats = (fp) => {
+        const fs2 = allFiles.filter(f => { const fo = f.folder || ''; return (fo === fp || fo.startsWith(fp + '/')) && !f.trashDate; });
+        return {
+          count: fs2.length,
+          size: fs2.reduce((a, f) => a + (f.size || 0), 0),
+          recent: fs2.reduce((a, f) => Math.max(a, f.date || 0), 0)
+        };
+      };
+      const fSort = document.getElementById('tg-folders-sort')?.value || tgFolderSort;
+      tgFolderSort = fSort;
+      [...children].sort((a, b) => {
+        if (fSort === 'size') return folderStats(b).size - folderStats(a).size;
+        if (fSort === 'count') return folderStats(b).count - folderStats(a).count;
+        if (fSort === 'recent') return folderStats(b).recent - folderStats(a).recent;
+        return a.localeCompare(b);
+      }).forEach(cp => {
         const seg = cp.split('/').pop();
         const icon = folderIcons[cp] || '📁';
         const acts = document.createElement('div');
@@ -3150,6 +3184,51 @@ document.getElementById('btn-tg-settings')?.addEventListener('click', () => {
 });
 
 api.on?.('telegram-files-changed', () => renderTelegramFiles());
+
+// ===== Dashboard (Início) =====
+(function initDashboard() {
+  const clockEl = document.getElementById('dash-clock');
+  const dateEl = document.getElementById('dash-date');
+  const greetEl = document.getElementById('dash-greeting');
+  const sessStart = Date.now();
+  const tick = () => {
+    const now = new Date();
+    if (clockEl) clockEl.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (greetEl) {
+      const h = now.getHours();
+      greetEl.textContent = h < 6 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    }
+    const up = document.getElementById('dash-uptime');
+    if (up) {
+      const s = Math.floor((Date.now() - sessStart) / 1000);
+      up.textContent = `${Math.floor(s / 60)}m ${s % 60}s`;
+    }
+  };
+  tick();
+  setInterval(tick, 1000);
+  document.querySelectorAll('.dash-card[data-goto]').forEach(c => {
+    c.addEventListener('click', () => {
+      const t = c.dataset.goto;
+      const nav = document.querySelector(`.nav-item[data-tab="${t}"]`);
+      if (nav) nav.click();
+    });
+  });
+  // Stats da nuvem
+  (async () => {
+    try {
+      const files = await api.telegramGetFiles();
+      const cloud = files.filter(f => !f.trashDate);
+      const sizeEl = document.getElementById('dash-cloud-size');
+      const countEl = document.getElementById('dash-cloud-count');
+      if (sizeEl) sizeEl.textContent = formatBytes(cloud.reduce((a, f) => a + (f.size || 0), 0));
+      if (countEl) countEl.textContent = String(cloud.length);
+    } catch (e) {}
+    const dlEl = document.getElementById('dash-dl-count');
+    if (dlEl) dlEl.textContent = String(downloads.size);
+    setInterval(() => { const el = document.getElementById('dash-dl-count'); if (el) el.textContent = String(downloads.size); }, 3000);
+  })();
+})();
 
 async function refreshTelegramCloud() {
   try {
