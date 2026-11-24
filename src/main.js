@@ -305,23 +305,6 @@ async function backupTelegramIndex() {
 
 ipcMain.handle('telegram-backup-index', () => backupTelegramIndex());
 
-// Abre o player de música nativo (ytm-rs)
-ipcMain.handle('open-music-player', () => {
-  const candidates = [
-    path.join(process.resourcesPath || '', 'bin', 'ytm-rs.exe'),
-    path.join(__dirname, '..', 'bin', 'ytm-rs.exe')
-  ];
-  const exe = candidates.find(p => fs.existsSync(p));
-  if (!exe) return { success: false, message: 'ytm-rs.exe não encontrado' };
-  try {
-    const child = spawn(exe, [], { detached: true, stdio: 'ignore' });
-    child.unref();
-    return { success: true };
-  } catch (e) {
-    return { success: false, message: e.message };
-  }
-});
-
 ipcMain.handle('telegram-download-file', async (_event, id) => {
   const entry = getTelegramFiles().find(f => f.id === id);
   if (!entry) return { success: false, message: 'Arquivo não encontrado' };
@@ -2610,36 +2593,6 @@ ipcMain.handle('get-onboarding-done', () => Boolean(store.get('onboardingDone'))
 ipcMain.handle('set-onboarding-done', () => {
   store.set('onboardingDone', true);
   return true;
-});
-
-// ─── Miniplayer flutuante (YouTube Music) ────────────────────────────────────
-let miniPlayerWindow = null;
-
-ipcMain.handle('toggle-miniplayer', () => {
-  if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-    miniPlayerWindow.close();
-    return { open: false };
-  }
-  miniPlayerWindow = new BrowserWindow({
-    width: 420,
-    height: 110,
-    minWidth: 380,
-    minHeight: 100,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: true,
-    skipTaskbar: false,
-    webPreferences: {
-      partition: 'persist:google',
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-  miniPlayerWindow.setAlwaysOnTop(true, 'floating');
-  miniPlayerWindow.loadURL('https://music.youtube.com/');
-  miniPlayerWindow.on('closed', () => { miniPlayerWindow = null; });
-  return { open: true };
 });
 
 // ─── Sugestões de busca do YouTube ───────────────────────────────────────────

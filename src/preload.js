@@ -55,7 +55,6 @@ window.api = {
   getDiscordSettings: () => ipcRenderer.invoke('get-discord-settings'),
   saveDiscordSettings: (options) => ipcRenderer.invoke('save-discord-settings', options),
   setDiscordMusicState: (state) => ipcRenderer.invoke('set-discord-music-state', state),
-  toggleMiniPlayer: () => ipcRenderer.invoke('toggle-miniplayer'),
   getSuggestions: (query) => ipcRenderer.invoke('youtube-suggestions', query),
   getSchedules: () => ipcRenderer.invoke('get-schedules'),
   addSchedule: (data) => ipcRenderer.invoke('add-schedule', data),
@@ -117,7 +116,6 @@ window.api = {
   telegramAddWatchFolder: (folderPath) => ipcRenderer.invoke('telegram-add-watch-folder', folderPath),
   telegramRemoveWatchFolder: (folderPath) => ipcRenderer.invoke('telegram-remove-watch-folder', folderPath),
   telegramBackupIndex: () => ipcRenderer.invoke('telegram-backup-index'),
-  openMusicPlayer: () => ipcRenderer.invoke('open-music-player'),
   resolveNavigationTarget,
 
   // IPC event listeners

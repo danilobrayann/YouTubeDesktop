@@ -614,19 +614,6 @@ window.addEventListener('beforeunload', () => {
   api.setDiscordMusicState({ playing: false }).catch(() => {});
 });
 
-// ── Miniplayer flutuante ────────────────────────────────────────────────────
-const btnMiniPlayer = document.getElementById('btn-miniplayer');
-if (btnMiniPlayer) {
-  btnMiniPlayer.addEventListener('click', async () => {
-    try { await api.toggleMiniPlayer(); } catch (e) { console.warn(e); }
-  });
-}
-
-// Player nativo ytm-rs
-document.getElementById('btn-open-ytmrs')?.addEventListener('click', async () => {
-  const r = await api.openMusicPlayer();
-  if (r && !r.success) alert(r.message || 'Falha ao abrir o player');
-});
 // Fechar barra now-playing
 document.getElementById('fp-close')?.addEventListener('click', () => {
   const fpBar = document.getElementById('fp-bar');
