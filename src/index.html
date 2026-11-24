@@ -2295,13 +2295,25 @@
     </div>
     <!-- /#app -->
 
-    <!-- Now playing: barra de rodapé ponta a ponta -->
-    <div id="now-playing" class="hidden">
-      <div class="np-dot"></div>
-      <img id="np-cover" class="np-cover hidden" alt="" />
-      <span id="np-title">Reproduzindo...</span>
+    <!-- ===== Mini player embutido: rodapé ponta a ponta ===== -->
+    <div id="fp-bar" class="hidden">
+      <img id="fp-cover" class="fp-cover" alt="" />
+      <div class="fp-info">
+        <div id="fp-title">—</div>
+        <div id="fp-artist">—</div>
+      </div>
+      <div class="fp-controls">
+        <button id="fp-prev" class="fp-btn" title="Anterior">⏮</button>
+        <button id="fp-play" class="fp-btn fp-play" title="Play/Pause">▶</button>
+        <button id="fp-next" class="fp-btn" title="Próximo">⏭</button>
+      </div>
+      <div class="fp-progress"><div id="fp-progress-fill"></div></div>
+      <div class="fp-time"><span id="fp-cur">0:00</span>/<span id="fp-dur">0:00</span></div>
+      <button id="fp-close" class="fp-btn" title="Fechar">✕</button>
     </div>
+    <div id="fp-yt-container" style="position:absolute;width:1px;height:1px;overflow:hidden;left:-9999px;"></div>
 
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

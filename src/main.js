@@ -756,8 +756,8 @@ ipcMain.handle('telegram-upload-path', async (_event, filePath) => {
     return { success: false, message: 'Arquivo inválido' };
   }
   const size = fs.statSync(p).size;
-  if (size > 2 * 1024 * 1024 * 1024) {
-    return { success: false, message: 'Arquivo maior que 2GB (limite do Telegram)' };
+  if (size > 20 * 1024 * 1024 * 1024) {
+    return { success: false, message: 'Arquivo maior que 20GB' };
   }
   mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(p), size });
   const result = await uploadToTelegram(p, path.basename(p), detectTelegramMediaType(p), null, { source: 'manual', folder: 'Enviados' });
@@ -781,8 +781,9 @@ ipcMain.handle('telegram-pick-upload-file', async (_event, targetFolder) => {
   if (result.canceled || !result.filePaths.length) return { success: false, canceled: true };
   const p = result.filePaths[0];
   const size = fs.statSync(p).size;
-  if (size > 2 * 1024 * 1024 * 1024) {
-    return { success: false, message: 'Arquivo maior que 2GB (limite do Telegram)' };
+  // Arquivos gigantes (>2GB) são fatiados em partes de 45MB automaticamente
+  if (size > 20 * 1024 * 1024 * 1024) {
+    return { success: false, message: 'Arquivo maior que 20GB' };
   }
   const destFolder = String(targetFolder || '').trim() || 'Enviados';
   mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(p), size });
@@ -818,7 +819,7 @@ ipcMain.handle('telegram-pick-upload-folder', async (_event, targetFolder) => {
   let ok = 0, fail = 0;
   for (const f of files) {
     const st = fs.statSync(f);
-    if (st.size > 2 * 1024 * 1024 * 1024) { fail++; continue; }
+    if (st.size > 20 * 1024 * 1024 * 1024) { fail++; continue; }
     mainWindow?.webContents.send('telegram-upload-event', { type: 'start', fileName: path.basename(f), size: st.size });
     const res = await uploadToTelegram(f, path.basename(f), detectTelegramMediaType(f), null, { source: 'manual', folder: folderName });
     if (res.success) {
@@ -879,7 +880,7 @@ function startTelegramWatcher() {
 async function handleWatchedFile(full, rootFolder) {
   try {
     const st = fs.statSync(full);
-    if (!st.isFile() || st.size === 0 || st.size > 2 * 1024 * 1024 * 1024) return;
+    if (!st.isFile() || st.size === 0 || st.size > 20 * 1024 * 1024 * 1024) return;
     const bot = ensureTelegramBot();
     if (!bot || !telegramChatId) return;
     // pasta virtual = nome da pasta vigiada
@@ -1052,7 +1053,9 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     // Tipos já compactados não ganham nada com zip — split direto
     const SKIP_ZIP = NON_COMPRESS_EXT;
     const origStats = fs.statSync(filePath);
-    if (origStats.size > 40 * 1024 * 1024 && !SKIP_ZIP.has(path.extname(filePath).toLowerCase())) {
+    // Acima de ~1GB nem tenta zip (Compress-Archive travaria) — vai direto pro split
+    const tooBigForZip = origStats.size > 1024 * 1024 * 1024;
+    if (origStats.size > 40 * 1024 * 1024 && !tooBigForZip && !SKIP_ZIP.has(path.extname(filePath).toLowerCase())) {
       tempZip = await zipFileForUpload(filePath);
       if (tempZip) {
         uploadPath = tempZip;

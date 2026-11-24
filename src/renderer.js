@@ -627,6 +627,12 @@ document.getElementById('btn-open-ytmrs')?.addEventListener('click', async () =>
   const r = await api.openMusicPlayer();
   if (r && !r.success) alert(r.message || 'Falha ao abrir o player');
 });
+// Fechar barra now-playing
+document.getElementById('fp-close')?.addEventListener('click', () => {
+  const fpBar = document.getElementById('fp-bar');
+  if (fpBar) fpBar.classList.add('hidden');
+  document.body.classList.remove('fp-visible');
+});
 
 // ── Downloads agendados ─────────────────────────────────────────────────────
 const btnToggleSchedule = document.getElementById('btn-toggle-schedule');
@@ -1247,16 +1253,16 @@ webview.addEventListener('page-title-updated', (e) => {
 
 function updateNowPlaying(title) {
   if (!title) return;
-  const nowPlaying = document.getElementById('now-playing');
-  const npTitle    = document.getElementById('np-title');
-  if (title !== 'YouTube') {
-    nowPlaying.classList.remove('hidden');
-    document.body.classList.add('np-visible');
-    npTitle.textContent = title;
+  const fpBar = document.getElementById('fp-bar');
+  const fpTitle = document.getElementById('fp-title');
+  if (title !== 'YouTube' && fpBar) {
+    fpBar.classList.remove('hidden');
+    document.body.classList.add('fp-visible');
+    if (fpTitle) fpTitle.textContent = title;
     document.title = `TurboDown — ${title}`;
   } else {
-    nowPlaying.classList.add('hidden');
-    document.body.classList.remove('np-visible');
+    if (fpBar) fpBar.classList.add('hidden');
+    document.body.classList.remove('fp-visible');
     document.title = 'TurboDown';
   }
 }
@@ -1307,11 +1313,10 @@ async function pollMusicMeta() {
       return { cover: cover || '', title: titleEl ? titleEl.textContent.trim() : '' };
     })()`);
     if (meta && meta.cover) {
-      const npCover = document.getElementById('np-cover');
-      if (npCover && npCover.dataset.src !== meta.cover) {
-        npCover.dataset.src = meta.cover;
-        npCover.src = meta.cover;
-        npCover.classList.remove('hidden');
+      const fpCover = document.getElementById('fp-cover');
+      if (fpCover && fpCover.dataset.src !== meta.cover) {
+        fpCover.dataset.src = meta.cover;
+        fpCover.src = meta.cover;
       }
       applyDominantColor(meta.cover);
     }
