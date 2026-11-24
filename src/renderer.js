@@ -1348,6 +1348,29 @@ document.getElementById('fp-prev')?.addEventListener('click', () => {
 document.getElementById('fp-next')?.addEventListener('click', () => {
   fpExec(`document.querySelector('ytmusic-player-bar .next-button, ytmusic-player-bar [class*="next"]')?.click()`);
 });
+document.getElementById('fp-shuffle')?.addEventListener('click', function () {
+  fpExec(`document.querySelector('ytmusic-player-bar .shuffle-button, ytmusic-player-bar [class*="shuffle"]')?.click()`);
+  this.classList.toggle('active');
+});
+document.getElementById('fp-repeat')?.addEventListener('click', function () {
+  fpExec(`document.querySelector('ytmusic-player-bar .repeat-button, ytmusic-player-bar [class*="repeat"]')?.click()`);
+  this.classList.toggle('active');
+});
+// Temas do player — cicla e persiste
+document.getElementById('fp-theme')?.addEventListener('click', function () {
+  const bar = document.getElementById('fp-bar');
+  const cur = parseInt((bar.className.match(/fp-theme-(\d)/) || [0, 0])[1], 10);
+  const next = (cur + 1) % 6;
+  bar.className = bar.className.replace(/fp-theme-\d/g, '').trim() + ` fp-theme-${next}`;
+  try { localStorage.setItem('td-fp-theme', String(next)); } catch (e) {}
+});
+(function () {
+  try {
+    const t = localStorage.getItem('td-fp-theme');
+    const bar = document.getElementById('fp-bar');
+    if (t !== null && bar) bar.className = bar.className.replace(/fp-theme-\d/g, '').trim() + ` fp-theme-${t % 6}`;
+  } catch (e) {}
+})();
 document.querySelector('.fp-progress')?.addEventListener('click', (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   fpSeek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
@@ -1369,8 +1392,13 @@ setInterval(async () => {
   const cur = document.getElementById('fp-cur'), dur = document.getElementById('fp-dur');
   if (cur) cur.textContent = fpFmt(st.t);
   if (dur) dur.textContent = fpFmt(st.d);
-  const play = document.getElementById('fp-play');
-  if (play) play.textContent = st.paused ? '▶' : '⏸';
+  const icoPlay = document.getElementById('fp-ico-play');
+  const icoPause = document.getElementById('fp-ico-pause');
+  if (icoPlay && icoPause) {
+    icoPlay.style.display = st.paused ? '' : 'none';
+    icoPause.style.display = st.paused ? 'none' : '';
+  }
+  document.querySelector('.fp-disc-wrap')?.classList.toggle('playing', !st.paused);
 }, 1000);
 
 // ── QUICK DOWNLOAD MODAL ───────────────────────────────────────────────────

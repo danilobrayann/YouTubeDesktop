@@ -964,21 +964,6 @@
 
           <!-- ════ TAB: YOUTUBE MUSIC ════ -->
           <div class="tab" id="tab-music">
-            <button
-              id="btn-open-ytmrs"
-              class="miniplayer-btn"
-              title="Abrir player nativo (ytm-rs)"
-              style="right:64px;"
-            >
-              <span style="font-size:14px;">⚡</span>
-            </button>
-            <button
-              id="btn-miniplayer"
-              class="miniplayer-btn"
-              title="Mini player flutuante"
-            >
-              <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg>
-            </button>
             <webview
               id="music-player"
               class="transparent-bg"
@@ -2296,20 +2281,26 @@
     <!-- /#app -->
 
     <!-- ===== Mini player embutido: rodapé ponta a ponta ===== -->
-    <div id="fp-bar" class="hidden">
-      <img id="fp-cover" class="fp-cover" alt="" />
+    <div id="fp-bar" class="hidden fp-theme-0">
+      <div class="fp-disc-wrap">
+        <img id="fp-cover" class="fp-cover" alt="" />
+        <div class="fp-disc-hole"></div>
+      </div>
       <div class="fp-info">
         <div id="fp-title">—</div>
         <div id="fp-artist">—</div>
       </div>
       <div class="fp-controls">
-        <button id="fp-prev" class="fp-btn" title="Anterior">⏮</button>
-        <button id="fp-play" class="fp-btn fp-play" title="Play/Pause">▶</button>
-        <button id="fp-next" class="fp-btn" title="Próximo">⏭</button>
+        <button id="fp-shuffle" class="fp-btn fp-ico" title="Aleatório"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg></button>
+        <button id="fp-prev" class="fp-btn fp-ico" title="Anterior"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 5h2v14H6z"/><path d="M19 5v14L9.5 12z"/></svg></button>
+        <button id="fp-play" class="fp-btn fp-play" title="Play/Pause"><svg id="fp-ico-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><svg id="fp-ico-pause" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none"><path d="M6 5h4v14H6z"/><path d="M14 5h4v14h-4z"/></svg></button>
+        <button id="fp-next" class="fp-btn fp-ico" title="Próximo"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 5h2v14h-2z"/><path d="M5 5v14l9.5-7z"/></svg></button>
+        <button id="fp-repeat" class="fp-btn fp-ico" title="Repetir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
       </div>
       <div class="fp-progress"><div id="fp-progress-fill"></div></div>
       <div class="fp-time"><span id="fp-cur">0:00</span>/<span id="fp-dur">0:00</span></div>
-      <button id="fp-close" class="fp-btn" title="Fechar">✕</button>
+      <button id="fp-theme" class="fp-btn fp-ico" title="Mudar tema"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none"/></svg></button>
+      <button id="fp-close" class="fp-btn fp-ico" title="Fechar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div id="fp-yt-container" style="position:absolute;width:1px;height:1px;overflow:hidden;left:-9999px;"></div>
 
