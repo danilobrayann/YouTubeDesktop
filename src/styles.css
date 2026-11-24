@@ -4221,3 +4221,15 @@ body.transparent-mode .nav {
   border-top-color: rgba(255,255,255,.05);
   backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
 }
+
+/* ===== Botão reabrir player minimizado ===== */
+#fp-reopen {
+  position: fixed; right: 18px; bottom: 18px; z-index: 9001;
+  width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 20px; color: #fff;
+  background: linear-gradient(135deg, #7ab8ff, #a78bfa);
+  box-shadow: 0 6px 20px rgba(122,184,255,.45), 0 2px 8px rgba(0,0,0,.4);
+  transition: transform .15s, box-shadow .15s;
+}
+#fp-reopen:hover { transform: scale(1.1); box-shadow: 0 8px 26px rgba(122,184,255,.6), 0 2px 8px rgba(0,0,0,.4); }
+#fp-reopen.hidden { display: none; }

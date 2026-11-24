@@ -622,11 +622,21 @@ window.addEventListener('beforeunload', () => {
   api.setDiscordMusicState({ playing: false }).catch(() => {});
 });
 
-// Fechar barra now-playing
+// Minimizar player → vira botãozinho ♪ no canto; reabre com 1 clique
+let fpDismissed = false;
 document.getElementById('fp-close')?.addEventListener('click', () => {
   const fpBar = document.getElementById('fp-bar');
   if (fpBar) fpBar.classList.add('hidden');
   document.body.classList.remove('fp-visible');
+  fpDismissed = true;
+  document.getElementById('fp-reopen')?.classList.remove('hidden');
+});
+document.getElementById('fp-reopen')?.addEventListener('click', () => {
+  const fpBar = document.getElementById('fp-bar');
+  if (fpBar) fpBar.classList.remove('hidden');
+  document.body.classList.add('fp-visible');
+  fpDismissed = false;
+  document.getElementById('fp-reopen')?.classList.add('hidden');
 });
 
 // ── Downloads agendados ─────────────────────────────────────────────────────
@@ -1381,11 +1391,12 @@ setInterval(async () => {
   const bar = document.getElementById('fp-bar');
   if (!bar) return;
   const st = await fpExec(`(() => { const v = document.querySelector('video'); if (!v || !v.duration) return null; return { paused: v.paused, t: v.currentTime, d: v.duration }; })()`);
-  if (!st) return;
-  // vídeo do YouTube Music tocando → garante a barra visível
-  if (bar.classList.contains('hidden')) {
+  if (!st) { fpDismissed = false; return; }
+  // vídeo do YouTube Music tocando → garante a barra visível (se não minimizada)
+  if (bar.classList.contains('hidden') && !fpDismissed) {
     bar.classList.remove('hidden');
     document.body.classList.add('fp-visible');
+    document.getElementById('fp-reopen')?.classList.add('hidden');
   }
   const fill = document.getElementById('fp-progress-fill');
   if (fill) fill.style.width = `${Math.min(100, (st.t / st.d) * 100)}%`;
