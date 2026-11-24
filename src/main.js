@@ -1072,13 +1072,33 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
       const parts = await splitFileForUpload(uploadPath, MAXUP);
       const pExt = tempZip ? '.zip' : path.extname(uploadName).toLowerCase();
       const pStem = tempZip ? uploadName : uploadName.slice(0, uploadName.length - pExt.length);
+      const partSizes = parts.map(p => { try { return fs.statSync(p).size; } catch (e) { return 0; } });
+      const partBase = [];
+      let acc = 0;
+      for (const s of partSizes) { partBase.push(acc); acc += s; }
       let allOk = true, done = 0;
       for (let i = 0; i < parts.length; i++) {
         const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
         try {
           const sentP = await bot.sendDocument(telegramChatId, parts[i], {
             caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${i + 1}/${parts.length})`,
-            filename: pn
+            filename: pn,
+            onProgress: (() => {
+              let lastSent = 0;
+              return (loaded) => {
+                const now = Date.now();
+                if (now - lastSent < 250) return;
+                lastSent = now;
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('telegram-upload-event', {
+                    type: 'progress',
+                    fileName: uploadName,
+                    loaded: partBase[i] + loaded,
+                    size: stats.size
+                  });
+                }
+              };
+            })()
           });
           recordTelegramFile({
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1105,25 +1125,33 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     const options = {
       caption: (opts.folder ? `[${opts.folder}] ` : '') + captionBase,
       filename: uploadName,
-      onProgress: (loaded, totalBytes) => {
-        if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
-          mainWindow.webContents.send('telegram-upload-status', {
-            downloadId,
-            status: 'uploading',
-            progress: totalBytes ? Math.round((loaded / totalBytes) * 100) : 0,
-            loaded,
-            total: totalBytes
-          });
-        }
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('telegram-upload-event', {
-            type: 'progress',
-            fileName: uploadName,
-            loaded,
-            size: totalBytes
-          });
-        }
-      }
+      onProgress: (() => {
+        let lastSent = 0, lastPct = -1;
+        return (loaded, totalBytes) => {
+          const now = Date.now();
+          const pct = totalBytes ? Math.floor((loaded / totalBytes) * 100) : 0;
+          // no máx. ~4 eventos/seg ou quando o % inteiro muda — evita flood de IPC
+          if (now - lastSent < 250 && pct === lastPct) return;
+          lastSent = now; lastPct = pct;
+          if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
+            mainWindow.webContents.send('telegram-upload-status', {
+              downloadId,
+              status: 'uploading',
+              progress: pct,
+              loaded,
+              total: totalBytes
+            });
+          }
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('telegram-upload-event', {
+              type: 'progress',
+              fileName: uploadName,
+              loaded,
+              size: totalBytes
+            });
+          }
+        };
+      })()
     };
     const sendByType = () => {
       if (mediaType === 'video') return bot.sendVideo(telegramChatId, uploadPath, options);

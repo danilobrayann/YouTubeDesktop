@@ -1325,6 +1325,54 @@ async function pollMusicMeta() {
 setInterval(pollMusicMeta, 5000);
 pollMusicMeta();
 
+// ── Player funcional: controla o <video> do YouTube Music ──
+function fpExec(js) {
+  const wv = document.getElementById('music-player');
+  if (!wv) return Promise.resolve(null);
+  return wv.executeJavaScript(js, true).catch(() => null);
+}
+function fpFmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+async function fpToggle() {
+  await fpExec(`(() => { const v = document.querySelector('video'); if (v) v.paused ? v.play() : v.pause(); })()`);
+}
+async function fpSeek(frac) {
+  await fpExec(`(() => { const v = document.querySelector('video'); if (v && v.duration) v.currentTime = v.duration * ${frac}; })()`);
+}
+document.getElementById('fp-play')?.addEventListener('click', fpToggle);
+document.getElementById('fp-prev')?.addEventListener('click', () => {
+  fpExec(`document.querySelector('ytmusic-player-bar .previous-button, ytmusic-player-bar [class*="previous"]')?.click()`);
+});
+document.getElementById('fp-next')?.addEventListener('click', () => {
+  fpExec(`document.querySelector('ytmusic-player-bar .next-button, ytmusic-player-bar [class*="next"]')?.click()`);
+});
+document.querySelector('.fp-progress')?.addEventListener('click', (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  fpSeek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+});
+
+// Poll 1s: estado do vídeo → barra + progresso + play/pause
+setInterval(async () => {
+  const bar = document.getElementById('fp-bar');
+  if (!bar) return;
+  const st = await fpExec(`(() => { const v = document.querySelector('video'); if (!v || !v.duration) return null; return { paused: v.paused, t: v.currentTime, d: v.duration }; })()`);
+  if (!st) return;
+  // vídeo do YouTube Music tocando → garante a barra visível
+  if (bar.classList.contains('hidden')) {
+    bar.classList.remove('hidden');
+    document.body.classList.add('fp-visible');
+  }
+  const fill = document.getElementById('fp-progress-fill');
+  if (fill) fill.style.width = `${Math.min(100, (st.t / st.d) * 100)}%`;
+  const cur = document.getElementById('fp-cur'), dur = document.getElementById('fp-dur');
+  if (cur) cur.textContent = fpFmt(st.t);
+  if (dur) dur.textContent = fpFmt(st.d);
+  const play = document.getElementById('fp-play');
+  if (play) play.textContent = st.paused ? '▶' : '⏸';
+}, 1000);
+
 // ── QUICK DOWNLOAD MODAL ───────────────────────────────────────────────────
 btnDownloadQ.addEventListener('click', openQuickDownloadModal);
 
@@ -2600,7 +2648,9 @@ const tgCloud = {
   bytesDone: 0,
   filesTotal: 0,
   filesDone: 0,
-  idleTimer: null
+  idleTimer: null,
+  inflight: {},
+  currentName: ''
 };
 
 function formatBytes(bytes) {
@@ -2630,8 +2680,10 @@ function telegramFileIcon(name) {
 
 function updateTelegramCloudUI() {
   if (!telegramCloud || !telegramCloudFill) return;
+  const inflightBytes = Object.values(tgCloud.inflight).reduce((s, e) => s + (e.loaded || 0), 0);
+  const effDone = tgCloud.bytesDone + inflightBytes;
   const pct = tgCloud.bytesTotal > 0
-    ? Math.min(100, Math.round((tgCloud.bytesDone / tgCloud.bytesTotal) * 100))
+    ? Math.min(100, Math.round((effDone / tgCloud.bytesTotal) * 100))
     : (tgCloud.filesTotal > 0 ? Math.round((tgCloud.filesDone / tgCloud.filesTotal) * 100) : 0);
   telegramCloudFill.style.width = `${pct}%`;
   // Gradiente muda de cor conforme o progresso (azul → roxo → verde → dourado)
@@ -2640,9 +2692,10 @@ function updateTelegramCloudUI() {
   telegramCloud.style.setProperty('--cloud-hue', hue);
   telegramCloudPct.textContent = `${pct}%`;
   if (tgCloud.filesTotal > 0) {
+    const namePart = tgCloud.currentName ? ` — ${tgCloud.currentName}` : '';
     telegramCloudLabel.textContent = tgCloud.filesDone >= tgCloud.filesTotal
       ? `Concluído — ${tgCloud.filesDone} arquivo(s)`
-      : `Enviando ${tgCloud.filesDone + 1}/${tgCloud.filesTotal} — ${formatBytes(tgCloud.bytesDone)} de ${formatBytes(tgCloud.bytesTotal)}`;
+      : `Enviando ${tgCloud.filesDone + 1}/${tgCloud.filesTotal}${namePart} — ${formatBytes(effDone)} de ${formatBytes(tgCloud.bytesTotal)}`;
   } else {
     telegramCloudLabel.textContent = 'Nuvem Telegram';
   }
@@ -2652,6 +2705,8 @@ function resetTelegramCloud() {
   if (tgCloud.idleTimer) clearTimeout(tgCloud.idleTimer);
   tgCloud.idleTimer = setTimeout(() => {
     tgCloud.bytesTotal = tgCloud.bytesDone = tgCloud.filesTotal = tgCloud.filesDone = 0;
+    tgCloud.inflight = {};
+    tgCloud.currentName = '';
     telegramCloudFill.style.width = '0%';
     telegramCloudPct.textContent = '0%';
     telegramCloudLabel.textContent = 'Nuvem Telegram';
@@ -2664,10 +2719,20 @@ api.on('telegram-upload-event', (data) => {
   if (data.type === 'start') {
     tgCloud.filesTotal++;
     tgCloud.bytesTotal += data.size || 0;
+    tgCloud.currentName = data.fileName || '';
+  } else if (data.type === 'progress') {
+    // uploads são serializados — uma entrada por vez basta, mas guardo por nome p/ segurança
+    const key = data.fileName || '_';
+    tgCloud.inflight[key] = { loaded: data.loaded || 0, size: data.size || 0 };
+    if (data.fileName) tgCloud.currentName = data.fileName;
   } else if (data.type === 'done' || data.type === 'error') {
     tgCloud.filesDone++;
     tgCloud.bytesDone += data.size || 0;
-    if (tgCloud.filesDone >= tgCloud.filesTotal) resetTelegramCloud();
+    tgCloud.inflight = {};
+    if (tgCloud.filesDone >= tgCloud.filesTotal) {
+      tgCloud.currentName = '';
+      resetTelegramCloud();
+    }
   }
   updateTelegramCloudUI();
 });
@@ -3284,6 +3349,7 @@ api.on?.('telegram-files-changed', () => renderTelegramFiles());
       const t = c.dataset.goto;
       const nav = document.querySelector(`.nav-item[data-tab="${t}"]`);
       if (nav) nav.click();
+      else if (document.getElementById(`tab-${t}`)) switchTab(t);
     });
   });
   // Stats da nuvem
