@@ -23,8 +23,10 @@
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {
+    "@types/node": "^26.6.10",
     "electron": "^33.3.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "typescript": "^7.0.2"
   },
   "build": {
     "appId": "com.youtubedesktop.app",

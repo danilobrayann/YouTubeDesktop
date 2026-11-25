@@ -1038,30 +1038,16 @@ function zipFolderForUpload(dirPath, outZip) {
 }
 
 // Divide arquivo em partes de maxBytes (streaming — não carrega tudo na RAM)
-async function splitFileForUpload(filePath, maxBytes = 45 * 1024 * 1024) {
-  const stat = fs.statSync(filePath);
-  if (stat.size <= maxBytes) return [filePath];
-  const base = path.basename(filePath);
-  const ext = path.extname(base);
-  const stem = base.slice(0, base.length - ext.length);
-  const parts = [];
-  const fd = fs.openSync(filePath, 'r');
-  try {
-    let off = 0, i = 0;
-    while (off < stat.size) {
-      i++;
-      const len = Math.min(maxBytes, stat.size - off);
-      const chunk = Buffer.allocUnsafe(len);
-      fs.readSync(fd, chunk, 0, len, off);
-      const partPath = path.join(os.tmpdir(), `${stem}.part${String(i).padStart(3, '0')}${ext}`);
-      fs.writeFileSync(partPath, chunk);
-      parts.push(partPath);
-      off += len;
-    }
-  } finally {
-    fs.closeSync(fd);
-  }
-  return parts;
+// Extrai UM pedaço do arquivo para um arquivo temporário (streaming, não bloqueia)
+function extractPartAsync(srcPath, partIndex, offset, length, destPath) {
+  return new Promise((resolve, reject) => {
+    const rs = fs.createReadStream(srcPath, { start: offset, end: offset + length - 1 });
+    const ws = fs.createWriteStream(destPath);
+    rs.on('error', reject);
+    ws.on('error', reject);
+    ws.on('finish', resolve);
+    rs.pipe(ws);
+  });
 }
 
 // Compacta arquivo grande em .zip temporário (ajuda a caber no limite do Telegram)
@@ -1110,22 +1096,28 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     const stats = fs.statSync(uploadPath);
     const MAXUP = 45 * 1024 * 1024;
     if (stats.size > MAXUP) {
-      // Arquivo grande: divide em partes e sobe cada uma (remonta no download)
+      // Arquivo grande: fatia e sobe parte por parte — extrai cada parte com
+      // stream async (não bloqueia o app) e apaga depois de enviar
       const captionBase0 = title || path.basename(filePath);
-      const parts = await splitFileForUpload(uploadPath, MAXUP);
       const pExt = tempZip ? '.zip' : path.extname(uploadName).toLowerCase();
       const pStem = tempZip ? uploadName : uploadName.slice(0, uploadName.length - pExt.length);
-      const partSizes = parts.map(p => { try { return fs.statSync(p).size; } catch (e) { return 0; } });
+      const totalSize = stats.size;
+      const partCount = Math.ceil(totalSize / MAXUP);
+      const partSizes = [];
+      for (let i = 0; i < partCount; i++) partSizes.push(Math.min(MAXUP, totalSize - i * MAXUP));
       const partBase = [];
       let acc = 0;
       for (const s of partSizes) { partBase.push(acc); acc += s; }
       const partRecords = [];
       let allOk = true, done = 0;
-      for (let i = 0; i < parts.length; i++) {
+      const srcForParts = uploadPath;
+      for (let i = 0; i < partCount; i++) {
         const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
+        const partPath = path.join(os.tmpdir(), `tdpart-${Date.now()}-${i}${pExt}`);
         try {
-          const sentP = await bot.sendDocument(telegramChatId, parts[i], {
-            caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${i + 1}/${parts.length})`,
+          await extractPartAsync(srcForParts, i, i * MAXUP, partSizes[i], partPath);
+          const sentP = await bot.sendDocument(telegramChatId, partPath, {
+            caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${i + 1}/${partCount})`,
             filename: pn,
             onProgress: (() => {
               let lastSent = 0;
@@ -1138,7 +1130,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
                     type: 'progress',
                     fileName: uploadName,
                     loaded: partBase[i] + loaded,
-                    size: stats.size
+                    size: totalSize
                   });
                 }
               };
@@ -1151,7 +1143,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
           });
           done++;
         } catch (e) { allOk = false; }
-        try { fs.unlinkSync(parts[i]); } catch (e) {}
+        try { fs.unlinkSync(partPath); } catch (e) {}
       }
       // Uma única entrada no índice — o arquivo aparece inteiro na nuvem
       if (allOk && partRecords.length) {
@@ -1169,7 +1161,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
         mainWindow.webContents.send('telegram-upload-status', {
           downloadId,
           status: allOk ? 'success' : 'error',
-          message: allOk ? `✅ Enviado em ${parts.length} partes!` : `⚠️ ${done}/${parts.length} partes enviadas`
+          message: allOk ? `✅ Enviado em ${partCount} partes!` : `⚠️ ${done}/${partCount} partes enviadas`
         });
       }
       return { success: allOk, reason: allOk ? null : 'falha em alguma parte' };
