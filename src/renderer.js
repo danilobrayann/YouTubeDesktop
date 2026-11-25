@@ -561,7 +561,7 @@ const DISCORD_YOUTUBE_EXTRACT = `(() => {
 })()`;
 
 const DISCORD_MUSIC_EXTRACT = `(() => {
-  const v = document.querySelector('video');
+  const v = document.querySelector('video.html5-main-video') || document.querySelector('video');
   const bar = document.querySelector('ytmusic-player-bar');
   const titleEl = bar && bar.querySelector('.title');
   const subEl = bar && bar.querySelector('.subtitle');
@@ -875,7 +875,7 @@ if (sleepTimerSelect) {
     sleepTimerEndAt = Date.now() + mins * 60000;
     sleepTimerTimeout = setTimeout(() => {
       musicPlayer.executeJavaScript(
-        `(() => { const v = document.querySelector('video'); if (v) v.pause(); })()`
+        `(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) v.pause(); })()`
       ).catch(() => {});
       sleepTimerEndAt = 0;
       sleepTimerSelect.value = '0';
@@ -1403,10 +1403,10 @@ function fpFmt(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 async function fpToggle() {
-  await fpExec(`(() => { const v = document.querySelector('video'); if (v) v.paused ? v.play() : v.pause(); })()`);
+  await fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) v.paused ? v.play() : v.pause(); })()`);
 }
 async function fpSeek(frac) {
-  await fpExec(`(() => { const v = document.querySelector('video'); if (v && v.duration) v.currentTime = v.duration * ${frac}; })()`);
+  await fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v && v.duration) v.currentTime = v.duration * ${frac}; })()`);
 }
 document.querySelector('.fp-disc-wrap')?.addEventListener('click', () => switchTab(fpSrc === 'yt' ? 'home' : 'music'));
 document.getElementById('fp-play')?.addEventListener('click', fpToggle);
@@ -1464,10 +1464,10 @@ document.querySelector('.fp-progress')?.addEventListener('click', (e) => {
 const fpVol = document.getElementById('fp-vol');
 const fpMute = document.getElementById('fp-mute');
 fpVol?.addEventListener('input', () => {
-  fpExec(`(() => { const v = document.querySelector('video'); if (v) { v.volume = ${fpVol.value / 100}; v.muted = false; } })()`);
+  fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) { v.volume = ${fpVol.value / 100}; v.muted = false; } })()`);
 });
 fpMute?.addEventListener('click', function () {
-  fpExec(`(() => { const v = document.querySelector('video'); if (v) v.muted = !v.muted; return v ? v.muted : null; })()`)
+  fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) v.muted = !v.muted; return v ? v.muted : null; })()`)
     .then(m => { if (m !== null) syncMuteIcon(!!m); });
 });
 function syncMuteIcon(muted) {
@@ -1565,7 +1565,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'm' || e.key === 'M') fpMute?.click();
 });
 function fpSeekBy(sec) {
-  fpExec(`(() => { const v = document.querySelector('video'); if (v && v.duration) v.currentTime = Math.min(v.duration, Math.max(0, v.currentTime + ${sec})); })()`);
+  fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v && v.duration) v.currentTime = Math.min(v.duration, Math.max(0, v.currentTime + ${sec})); })()`);
 }
 function fpVolBump(d) {
   if (!fpVol) return;
@@ -1575,7 +1575,7 @@ function fpVolBump(d) {
 
 // Poll 1s: estado do vídeo → barra + progresso + play/pause
 // Verifica YouTube Music e YouTube — prefere o que está tocando
-const FP_STATE_JS = `(() => { const v = document.querySelector('video'); if (!v || !v.duration) return null; return { paused: v.paused, t: v.currentTime, d: v.duration }; })()`;
+const FP_STATE_JS = `(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (!v || !v.duration) return null; return { paused: v.paused, t: v.currentTime, d: v.duration }; })()`;
 let fpPlayingNow = false;
 let lastFpCover = '';
 function syncDashHero() {
@@ -1626,7 +1626,7 @@ setInterval(async () => {
   document.querySelector('.fp-disc-wrap')?.classList.toggle('playing', !st.paused);
   bar.classList.toggle('playing', !st.paused);
   // Sincroniza volume/mudo do YouTube Music ↔ player em tempo real
-  fpExec(`(() => { const v = document.querySelector('video'); if (!v) return null; return { muted: v.muted, vol: Math.round(v.volume * 100) }; })()`)
+  fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (!v) return null; return { muted: v.muted, vol: Math.round(v.volume * 100) }; })()`)
     .then(s => {
       if (s === null) return;
       syncMuteIcon(!!s.muted);
