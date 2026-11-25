@@ -556,8 +556,11 @@ const DISCORD_MUSIC_EXTRACT = `(() => {
   const bar = document.querySelector('ytmusic-player-bar');
   const titleEl = bar && bar.querySelector('.title');
   const subEl = bar && bar.querySelector('.subtitle');
+  const imgEl = bar && bar.querySelector('img');
   const title = titleEl ? titleEl.innerText.trim() : '';
-  const artist = subEl ? subEl.innerText.trim() : '';
+  const sub = subEl ? subEl.innerText.trim() : '';
+  const artist = sub.split('\\u2022')[0].split(' - ')[0].trim() || 'YouTube Music';
+  const cover = imgEl ? (imgEl.src || imgEl.getAttribute('src') || '') : '';
   if (!v || !title) return { playing: false };
   const videoId = new URLSearchParams(location.search).get('v') || '';
   return {
@@ -1377,11 +1380,22 @@ document.getElementById('fp-repeat')?.addEventListener('click', function () {
 });
 // Temas do player — cicla e persiste (0-5 = cores, t = transparente)
 const FP_THEMES = ['fp-theme-0','fp-theme-1','fp-theme-2','fp-theme-3','fp-theme-4','fp-theme-5','fp-theme-t'];
+function syncFpReopenColor() {
+  const reopen = document.getElementById('fp-reopen');
+  const bar = document.getElementById('fp-bar');
+  if (!reopen || !bar) return;
+  const cs = getComputedStyle(bar);
+  const a = cs.getPropertyValue('--fp-accent').trim() || '#7ab8ff';
+  const a2 = cs.getPropertyValue('--fp-accent2').trim() || '#a78bfa';
+  reopen.style.background = `linear-gradient(135deg, ${a}, ${a2})`;
+  reopen.style.boxShadow = `0 6px 20px ${a}66, 0 2px 8px rgba(0,0,0,.4)`;
+}
 function fpSetTheme(name) {
   const bar = document.getElementById('fp-bar');
   if (!bar) return;
   FP_THEMES.forEach(c => bar.classList.remove(c));
   bar.classList.add(name);
+  syncFpReopenColor();
   try { localStorage.setItem('td-fp-theme', name); } catch (e) {}
 }
 document.getElementById('fp-theme')?.addEventListener('click', function () {
@@ -1429,6 +1443,7 @@ fpColorInput?.addEventListener('input', () => {
   const c2 = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
   bar.style.setProperty('--fp-accent', hex);
   bar.style.setProperty('--fp-accent2', c2);
+  syncFpReopenColor();
   try { localStorage.setItem('td-fp-custom', hex); } catch (e) {}
 });
 (function () {
@@ -1441,6 +1456,7 @@ fpColorInput?.addEventListener('input', () => {
       if (bar) {
         bar.style.setProperty('--fp-accent', c);
         bar.style.setProperty('--fp-accent2', `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`);
+        syncFpReopenColor();
       }
     }
   } catch (e) {}
@@ -1451,6 +1467,7 @@ _fpThemeBtn?.addEventListener('click', () => {
   const bar = document.getElementById('fp-bar');
   bar?.style.removeProperty('--fp-accent');
   bar?.style.removeProperty('--fp-accent2');
+  syncFpReopenColor();
   try { localStorage.removeItem('td-fp-custom'); } catch (e) {}
 }, true);
 
@@ -1482,6 +1499,7 @@ function applyPlayerColor(imgUrl) {
       const r2 = Math.min(255, r + 60), g2 = Math.min(255, g + 60), b2 = Math.min(255, b + 60);
       bar.style.setProperty('--fp-accent', hex);
       bar.style.setProperty('--fp-accent2', `#${((r2 << 16) | (g2 << 8) | b2).toString(16).padStart(6, '0')}`);
+      syncFpReopenColor();
     } catch (e) {}
   };
   img.src = imgUrl;
@@ -1534,12 +1552,13 @@ setInterval(async () => {
   }
   document.querySelector('.fp-disc-wrap')?.classList.toggle('playing', !st.paused);
   bar.classList.toggle('playing', !st.paused);
-  if (fpMute && !fpMute.dataset.synced) {
-    fpExec(`(() => { const v = document.querySelector('video'); return v ? v.muted : null; })()`)
-      .then(m => { if (m !== null) { syncMuteIcon(!!m); fpMute.dataset.synced = '1'; } });
-    if (fpVol) fpExec(`(() => { const v = document.querySelector('video'); return v ? Math.round(v.volume * 100) : null; })()`)
-      .then(v => { if (v !== null && document.activeElement !== fpVol) fpVol.value = v; });
-  }
+  // Sincroniza volume/mudo do YouTube Music ↔ player em tempo real
+  fpExec(`(() => { const v = document.querySelector('video'); if (!v) return null; return { muted: v.muted, vol: Math.round(v.volume * 100) }; })()`)
+    .then(s => {
+      if (s === null) return;
+      syncMuteIcon(!!s.muted);
+      if (fpVol && document.activeElement !== fpVol && String(fpVol.value) !== String(s.vol)) fpVol.value = s.vol;
+    });
 }, 1000);
 
 // ── QUICK DOWNLOAD MODAL ───────────────────────────────────────────────────

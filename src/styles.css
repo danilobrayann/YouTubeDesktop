@@ -4156,6 +4156,15 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 
 /* Capa estilo CD — fica à esquerda do play */
 .fp-disc-wrap { position: relative; width: 46px; height: 46px; flex-shrink: 0; }
+.fp-disc-wrap::before {
+  content: '';
+  position: absolute; inset: -4px; border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--fp-accent, #7ab8ff), var(--fp-accent2, #a78bfa), var(--fp-accent, #7ab8ff));
+  animation: fp-ring-spin 4s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+}
+@keyframes fp-ring-spin { to { transform: rotate(360deg); } }
 .fp-cover {
   width: 46px; height: 46px; border-radius: 50%; object-fit: cover;
   border: 2px solid rgba(255,255,255,.18);
