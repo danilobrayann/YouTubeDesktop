@@ -1341,6 +1341,7 @@ const FP_META_YT_JS = `(() => {
   const videoId = new URLSearchParams(location.search).get('v') || '';
   return {
     cover: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : '',
+    coverHQ: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/maxresdefault.jpg' : '',
     title: titleEl ? titleEl.textContent.trim() : '',
     artist: chEl ? chEl.textContent.trim() : ''
   };
@@ -1365,7 +1366,7 @@ async function pollMusicMeta() {
       if (meta.title) document.title = `TurboDown — ${meta.title}`;
     }
     if (meta && meta.cover) {
-      lastFpCover = meta.cover;
+      lastFpCover = meta.coverHQ || meta.cover;
       const fpCover = document.getElementById('fp-cover');
       if (fpCover && fpCover.dataset.src !== meta.cover) {
         fpCover.dataset.src = meta.cover;
@@ -1373,11 +1374,27 @@ async function pollMusicMeta() {
         applyPlayerColor(meta.cover);
       }
       const reopenCover = document.getElementById('fp-reopen-cover');
-      if (reopenCover && reopenCover.dataset.src !== meta.cover) {
-        reopenCover.dataset.src = meta.cover;
-        reopenCover.src = meta.cover;
+      if (reopenCover && reopenCover.dataset.src !== lastFpCover) {
+        reopenCover.dataset.src = lastFpCover;
+        reopenCover.src = lastFpCover;
         reopenCover.classList.remove('hidden');
         document.getElementById('fp-reopen')?.classList.add('has-cover');
+      }
+      // Card "Agora tocando" no dashboard — capa em alta qualidade
+      const dnp = document.getElementById('dash-nowplaying');
+      if (dnp) {
+        dnp.classList.remove('hidden');
+        const dnpCover = document.getElementById('dnp-cover');
+        const hq = meta.coverHQ || meta.cover;
+        if (dnpCover && dnpCover.dataset.src !== hq) {
+          dnpCover.dataset.src = hq;
+          dnpCover.onerror = () => { if (meta.cover && dnpCover.src !== meta.cover) dnpCover.src = meta.cover; };
+          dnpCover.src = hq;
+        }
+        const dnpT = document.getElementById('dnp-title');
+        const dnpA = document.getElementById('dnp-artist');
+        if (dnpT && meta.title) dnpT.textContent = meta.title;
+        if (dnpA) dnpA.textContent = meta.artist || '';
       }
       applyDominantColor(meta.cover);
       syncDashHero();
@@ -1409,6 +1426,38 @@ async function fpSeek(frac) {
   await fpExec(`(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v && v.duration) v.currentTime = v.duration * ${frac}; })()`);
 }
 document.querySelector('.fp-disc-wrap')?.addEventListener('click', () => switchTab(fpSrc === 'yt' ? 'home' : 'music'));
+document.getElementById('dash-nowplaying')?.addEventListener('click', () => switchTab(fpSrc === 'yt' ? 'home' : 'music'));
+
+// ── Letra da música (LRCLIB) ──
+const fpLyricsBtn = document.getElementById('fp-lyrics');
+const fpLyricsModal = document.getElementById('fp-lyrics-modal');
+const fpLyricsBody = document.getElementById('fp-lyrics-body');
+const fpLyricsTitle = document.getElementById('fp-lyrics-title');
+function stripLrc(s) {
+  return s.split('\n').map(l => l.replace(/^\[\d+:[\d.]+\]\s?/, '')).join('\n').trim();
+}
+fpLyricsBtn?.addEventListener('click', async () => {
+  if (!fpLyricsModal) return;
+  fpLyricsModal.classList.remove('hidden');
+  const title = (document.getElementById('fp-title')?.textContent || '').trim();
+  const artistRaw = (document.getElementById('fp-artist')?.textContent || '').trim();
+  const artist = artistRaw.split('•')[0].split('-')[0].trim();
+  fpLyricsTitle.textContent = title || 'Letra';
+  fpLyricsBody.textContent = 'Buscando letra...';
+  if (!title) { fpLyricsBody.textContent = 'Nenhuma música tocando.'; return; }
+  try {
+    const url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('not found');
+    const data = await res.json();
+    const lyrics = data.plainLyrics || (data.syncedLyrics ? stripLrc(data.syncedLyrics) : '');
+    fpLyricsBody.textContent = lyrics || 'Letra não encontrada.';
+  } catch (e) {
+    fpLyricsBody.textContent = 'Letra não encontrada para esta música.';
+  }
+});
+document.getElementById('fp-lyrics-close')?.addEventListener('click', () => fpLyricsModal?.classList.add('hidden'));
+fpLyricsModal?.addEventListener('click', (e) => { if (e.target === fpLyricsModal) fpLyricsModal.classList.add('hidden'); });
 document.getElementById('fp-play')?.addEventListener('click', fpToggle);
 document.getElementById('fp-prev')?.addEventListener('click', () => {
   fpExec(`document.querySelector('ytmusic-player-bar .previous-button, ytmusic-player-bar [class*="previous"], .ytp-prev-button')?.click()`);
@@ -1588,6 +1637,7 @@ function syncDashHero() {
   }
   hc.classList.toggle('on', on);
   document.body.classList.toggle('dash-cover-on', on);
+  document.getElementById('dash-nowplaying')?.classList.toggle('playing', on);
   const hero = document.querySelector('.dash-hero');
   if (hero) hero.style.background = on ? 'transparent' : '';
 }
@@ -1605,7 +1655,11 @@ setInterval(async () => {
   fpPlayingNow = !!(st && !st.paused);
   document.getElementById('fp-reopen')?.classList.toggle('playing', fpPlayingNow);
   syncDashHero();
-  if (!st) { fpDismissed = false; return; }
+  if (!st) {
+    fpDismissed = false;
+    document.getElementById('dash-nowplaying')?.classList.add('hidden');
+    return;
+  }
   // vídeo do YouTube Music tocando → garante a barra visível (se não minimizada)
   if (bar.classList.contains('hidden') && !fpDismissed) {
     bar.classList.remove('hidden');
@@ -2921,6 +2975,25 @@ function formatBytes(bytes) {
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+function telegramFileIconSvg(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const MAP = [
+    [['mp3','m4a','ogg','opus','wav','flac','aac','wma'], 'i-music', 'aud'],
+    [['mp4','mkv','webm','mov','avi','m4v'], 'i-listvideo', 'vid'],
+    [['jpg','jpeg','png','webp','gif','bmp','svg'], 'i-image', 'img'],
+    [['zip','rar','7z','tar','gz','tgz'], 'i-package', 'zip'],
+    [['iso','img','dmg'], 'i-harddrive', 'iso'],
+    [['apk','exe','msi'], 'i-cpu', 'app'],
+    [['js','ts','html','css','json','py','java','cpp','c','rs','go','php','rb','sql'], 'i-filetext', 'code'],
+    [['xls','xlsx','csv','ods'], 'i-list', 'doc'],
+    [['ppt','pptx','odp'], 'i-monitor', 'doc'],
+    [['epub','mobi','pdf','doc','docx','txt','rtf','odt'], 'i-filetext', 'doc'],
+    [['torrent'], 'i-link', 'def'],
+  ];
+  for (const [exts, icon, cls] of MAP) if (exts.includes(ext)) return { icon, cls };
+  return { icon: 'i-filetext', cls: 'def' };
+}
+
 function telegramFileIcon(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
   if (['mp3', 'm4a', 'ogg', 'opus', 'wav', 'flac', 'aac', 'wma'].includes(ext)) return '🎵';
@@ -3182,7 +3255,8 @@ async function renderTelegramFiles() {
         if (actions) card.appendChild(actions);
         return card;
       };
-      foldersBar.appendChild(mkCard('🏠', 'Início', `${allFiles.filter(f => !f.trashDate).length} itens`, '', 'Raiz da nuvem', null, false));
+      const svgIcon = (id) => `<svg class="icon" aria-hidden="true"><use href="#${id}"/></svg>`;
+      foldersBar.appendChild(mkCard(svgIcon('i-homeicon'), 'Início', `${allFiles.filter(f => !f.trashDate).length} itens`, '', 'Raiz da nuvem', null, false));
       const folderStats = (fp) => {
         const fs2 = allFiles.filter(f => { const fo = f.folder || ''; return (fo === fp || fo.startsWith(fp + '/')) && !f.trashDate; });
         return {
@@ -3200,7 +3274,7 @@ async function renderTelegramFiles() {
         return a.localeCompare(b);
       }).forEach(cp => {
         const seg = cp.split('/').pop();
-        const icon = folderIcons[cp] || '📁';
+        const icon = folderIcons[cp] || svgIcon('i-folder');
         const acts = document.createElement('div');
         acts.className = 'tg-fc-actions';
         const mkAct = (txt, ttl, fn) => { const s = document.createElement('span'); s.className = 'tg-folder-zip'; s.textContent = txt; s.title = ttl; s.addEventListener('click', (e) => { e.stopPropagation(); fn(); }); return s; };
@@ -3340,7 +3414,8 @@ async function renderTelegramFiles() {
       }
       const icon = document.createElement('span');
       icon.className = 'telegram-file-icon';
-      icon.textContent = telegramFileIcon(f.fileName);
+      const fi = telegramFileIconSvg(f.fileName);
+      icon.innerHTML = `<svg class="icon tg-ico-${fi.cls}" aria-hidden="true"><use href="#${fi.icon}"/></svg>`;
       const info = document.createElement('div');
       info.className = 'telegram-file-info';
       const name = document.createElement('div');

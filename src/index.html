@@ -1008,6 +1008,14 @@
                 <div class="dash-stat glass-card"><div class="dash-stat-ico">📁</div><div><div class="dash-stat-num" id="dash-cloud-count">—</div><div class="dash-stat-label">Arquivos na nuvem</div></div></div>
                 <div class="dash-stat glass-card"><div class="dash-stat-ico">🕐</div><div><div class="dash-stat-num" id="dash-uptime">—</div><div class="dash-stat-label">Sessão</div></div></div>
               </div>
+              <div class="dash-nowplaying glass-card hidden" id="dash-nowplaying">
+                <div class="dnp-disc"><img id="dnp-cover" alt="" /><div class="dnp-hole"></div><div class="dnp-eq"><span></span><span></span><span></span><span></span></div></div>
+                <div class="dnp-info">
+                  <div class="dnp-title" id="dnp-title">—</div>
+                  <div class="dnp-artist" id="dnp-artist">—</div>
+                </div>
+                <div class="dnp-hint">Tocando agora — clique para abrir</div>
+              </div>
               <div class="dash-shortcuts">
                 <div class="dash-card glass-card" data-goto="home"><div class="dash-card-ico">▶️</div><div class="dash-card-title">YouTube</div><div class="dash-card-sub">Assistir e baixar</div></div>
                 <div class="dash-card glass-card" data-goto="nuvem"><div class="dash-card-ico">☁️</div><div class="dash-card-title">Nuvem</div><div class="dash-card-sub">Seus arquivos</div></div>
@@ -2305,12 +2313,22 @@
         <button id="fp-mute" class="fp-btn fp-ico" title="Mudo"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path class="fp-vol-waves" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="fp-vol-waves" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><line class="fp-vol-x" x1="15" y1="9" x2="21" y2="15" style="display:none"/><line class="fp-vol-x" x1="21" y1="9" x2="15" y2="15" style="display:none"/></button>
         <input type="range" id="fp-vol" class="fp-vol-slider" min="0" max="100" value="100" title="Volume" />
       </div>
+      <button id="fp-lyrics" class="fp-btn fp-ico" title="Letra da música"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>
       <button id="fp-color" class="fp-btn fp-ico" title="Cor personalizada do player"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 0 20c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14 16 15.5 16H18a4 4 0 0 0 4-4c0-5.5-4.5-10-10-10z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor"/></svg></button>
       <input type="color" id="fp-color-input" class="hidden" value="#7ab8ff" />
       <button id="fp-theme" class="fp-btn fp-ico" title="Mudar tema do player (inclui transparente)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none"/></svg></button>
       <button id="fp-close" class="fp-btn fp-ico" title="Minimizar player"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></button>
     </div>
     <button id="fp-reopen" class="hidden" title="Abrir player"><span class="fp-reopen-note">♪</span><img id="fp-reopen-cover" class="hidden" alt=""></button>
+    <div id="fp-lyrics-modal" class="hidden">
+      <div class="fp-lyrics-box glass-card">
+        <div class="fp-lyrics-head">
+          <span id="fp-lyrics-title">Letra</span>
+          <button id="fp-lyrics-close" class="fp-btn fp-ico" title="Fechar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div id="fp-lyrics-body" class="fp-lyrics-body"></div>
+      </div>
+    </div>
     <div id="fp-yt-container" style="position:absolute;width:1px;height:1px;overflow:hidden;left:-9999px;"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
