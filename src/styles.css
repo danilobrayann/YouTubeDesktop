@@ -4116,7 +4116,7 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb,
 .dash-hero-cover {
   position: absolute; inset: 0;
   background-size: cover; background-position: center;
-  filter: blur(45px) brightness(.38) saturate(1.1);
+  filter: blur(30px) brightness(.6) saturate(1.05);
   opacity: 0; transform: scale(1.15);
   transition: opacity .8s ease;
   z-index: 0; pointer-events: none;
