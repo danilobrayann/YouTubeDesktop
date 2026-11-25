@@ -1587,6 +1587,9 @@ function syncDashHero() {
     hc.style.backgroundImage = `url(${lastFpCover})`;
   }
   hc.classList.toggle('on', on);
+  document.body.classList.toggle('dash-cover-on', on);
+  const hero = document.querySelector('.dash-hero');
+  if (hero) hero.style.background = on ? 'transparent' : '';
 }
 setInterval(async () => {
   const bar = document.getElementById('fp-bar');
