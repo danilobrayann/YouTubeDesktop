@@ -997,6 +997,7 @@
           <div class="tab active" id="tab-dashboard">
             <div class="dash-wrap">
               <div class="dash-hero glass-card">
+                <div class="dash-hero-cover" id="dash-hero-cover"></div>
                 <div class="dash-clock" id="dash-clock">--:--</div>
                 <div class="dash-date" id="dash-date"></div>
                 <div class="dash-greeting" id="dash-greeting"></div>
@@ -2309,7 +2310,7 @@
       <button id="fp-theme" class="fp-btn fp-ico" title="Mudar tema do player (inclui transparente)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none"/></svg></button>
       <button id="fp-close" class="fp-btn fp-ico" title="Minimizar player"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></button>
     </div>
-    <button id="fp-reopen" class="hidden" title="Abrir player">♪</button>
+    <button id="fp-reopen" class="hidden" title="Abrir player"><span class="fp-reopen-note">♪</span><img id="fp-reopen-cover" class="hidden" alt=""></button>
     <div id="fp-yt-container" style="position:absolute;width:1px;height:1px;overflow:hidden;left:-9999px;"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
