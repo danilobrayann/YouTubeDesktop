@@ -1142,6 +1142,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
             fileId: extractTelegramFileId(sentP)
           });
           done++;
+          store.set('tgUploadState', { i, partCount, uploadName, srcForParts, MAXUP, partSizes, partBase, captionBase0, opts, pExt, pStem, tempZip });
         } catch (e) { allOk = false; }
         try { fs.unlinkSync(partPath); } catch (e) {}
       }
@@ -1156,6 +1157,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
           source: opts.source || (downloadId ? 'download' : 'manual'), date: Date.now()
         });
       }
+      store.delete('tgUploadState');
       if (tempZip) { try { fs.unlinkSync(tempZip); } catch (e) {} }
       if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
         mainWindow.webContents.send('telegram-upload-status', {
@@ -1647,6 +1649,28 @@ app.whenReady().then(() => {
 
   // Inicializa o bot do Telegram se configurado (comandos /listar /apagar)
   try { ensureTelegramBot(); } catch (e) {}
+
+  // Retoma upload interrompido ao fechar o app
+  const st = store.get('tgUploadState');
+  if (st && st.i < st.partCount) {
+    const { i, partCount, uploadName, srcForParts, MAXUP, partSizes, partBase, captionBase0, opts, pExt, pStem, tempZip } = st;
+    (async () => {
+      const bot = ensureTelegramBot();
+      if (!bot) return;
+      for (let j = i; j < partCount; j++) {
+        const pn = `${pStem}.part${String(j + 1).padStart(3, '0')}${pExt}`;
+        const partPath = path.join(os.tmpdir(), `tdpart-${Date.now()}-${j}${pExt}`);
+        await extractPartAsync(srcForParts, j, j * MAXUP, partSizes[j], partPath);
+        const sentP = await bot.sendDocument(telegramChatId, partPath, {
+          caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${j + 1}/${partCount})`,
+          filename: pn
+        });
+        store.set('tgUploadState', { ...st, i: j + 1 });
+        try { fs.unlinkSync(partPath); } catch (e) {}
+      }
+      store.delete('tgUploadState');
+    })();
+  }
 
   // Modo anônimo: limpa cookies/dados do YouTube a cada abertura para
   // evitar que o Google acumule flags de "bot" na sessão persistente.
