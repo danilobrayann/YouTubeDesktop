@@ -1518,9 +1518,16 @@
           <!-- ════ TAB: SETTINGS ════ -->
           <div class="tab" id="tab-nuvem">
             <div class="nuvem-wrap">
-              <h2 class="nuvem-title">☁️ Nuvem Telegram — seus arquivos na nuvem</h2>
-                <!-- Telegram Auto-Upload -->
-                <div class="settings-section glass-card" id="telegram-config-section">
+              <div class="nuvem-header">
+                <h2 class="nuvem-title">☁️ Nuvem Telegram</h2>
+                <button id="btn-tg-config-open" class="btn-ghost btn-sm">⚙️ Configurações</button>
+              </div>
+              <div class="tg-config-modal hidden glass-card" id="tg-config-modal">
+                <div class="tg-config-head">
+                  <span>Configurações da nuvem</span>
+                  <button id="btn-tg-config-close" class="btn-ghost btn-xs">✕</button>
+                </div>
+                <div class="settings-section" id="telegram-config-section">
                   <h3 class="section-title">📤 Telegram Auto-Upload</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -1630,14 +1637,9 @@
                         <div id="tg-storage-bar" class="tg-storage-bar"></div>
                       </div>
                     </div>
-
-                    <p class="maintenance-message" style="grid-column: 1 / -1;">
-                      Para conectar: 1) Crie um bot no @BotFather (/newbot) e copie o token. 2) Cole o token acima e clique em "Conectar".
-                      3) Envie /start para o bot: na conversa privada OU em um grupo onde o bot foi adicionado.
-                      Arquivos serão salvos onde o /start foi enviado.
-                    </p>
                   </div>
                 </div>
+              </div>
             </div>
           </div>
           <div class="tab" id="tab-settings">
