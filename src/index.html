@@ -1522,7 +1522,8 @@
                 <h2 class="nuvem-title">☁️ Nuvem Telegram</h2>
                 <button id="btn-tg-config-open" class="btn-ghost btn-sm">⚙️ Configurações</button>
               </div>
-              <div class="tg-config-modal hidden glass-card" id="tg-config-modal">
+              <div class="tg-config-modal hidden" id="tg-config-modal">
+                <div class="tg-config-box glass-card">
                 <div class="tg-config-head">
                   <span>Configurações da nuvem</span>
                   <button id="btn-tg-config-close" class="btn-ghost btn-xs">✕</button>
@@ -1565,9 +1566,16 @@
                         Deletar arquivo local após upload (modo nuvem)
                       </label>
                     </div>
+                  </div>
+                </div>
+                <button id="btn-tg-config-close2" class="btn-primary btn-sm" style="margin-top:16px;">Fechar</button>
+                </div>
+              </div>
 
-                    <!-- Painel da nuvem -->
-                    <div class="telegram-cloud" id="telegram-cloud">
+              <!-- Painel da nuvem (sempre visível) -->
+              <div class="settings-section glass-card" style="margin-top:16px;">
+                <div class="settings-grid">
+                  <div class="telegram-cloud" id="telegram-cloud">
                       <div class="telegram-cloud-fill" id="telegram-cloud-fill"></div>
                       <div class="telegram-cloud-content">
                         <div class="telegram-cloud-pct" id="telegram-cloud-pct">0%</div>
@@ -1639,7 +1647,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
             </div>
           </div>
           <div class="tab" id="tab-settings">

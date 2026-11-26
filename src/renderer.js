@@ -3198,5 +3198,6 @@ const tgConfigModal = document.getElementById('tg-config-modal');
 if (tgConfigModal) {
   document.getElementById('btn-tg-config-open')?.addEventListener('click', () => tgConfigModal.classList.remove('hidden'));
   document.getElementById('btn-tg-config-close')?.addEventListener('click', () => tgConfigModal.classList.add('hidden'));
+  document.getElementById('btn-tg-config-close2')?.addEventListener('click', () => tgConfigModal.classList.add('hidden'));
   tgConfigModal.addEventListener('click', (e) => { if (e.target === tgConfigModal) tgConfigModal.classList.add('hidden'); });
 }

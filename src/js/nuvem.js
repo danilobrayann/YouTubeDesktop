@@ -767,13 +767,7 @@ document.getElementById('btn-tg-backup-index')?.addEventListener('click', async 
   else alert(r && r.message || 'Falha ao salvar índice');
 });
 document.getElementById('btn-tg-settings')?.addEventListener('click', () => {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  const nav = document.querySelector('.nav-item[data-tab="settings"]') || document.querySelector('.nav-item[data-tab="nuvem"]');
-  const tab = document.getElementById('tab-nuvem');
-  if (nav) nav.classList.add('active');
-  if (tab) tab.classList.add('active');
-  document.getElementById('telegram-config-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('tg-config-modal')?.classList.remove('hidden');
 });
 
 api.on?.('telegram-files-changed', () => renderTelegramFiles());
