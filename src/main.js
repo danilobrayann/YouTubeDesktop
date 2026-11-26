@@ -1238,7 +1238,8 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     if (Notification.isSupported()) {
       new Notification({
         title: 'Telegram',
-        body: `"${title || path.basename(filePath)}" enviado com sucesso!`
+        body: `"${title || path.basename(filePath)}" enviado com sucesso!`,
+        appName: 'TurboDown'
       }).show();
     }
 
@@ -2224,7 +2225,8 @@ async function runDownloadJob(job) {
       if (Notification.isSupported()) {
         new Notification({
           title: 'Download Falhou',
-          body: job.detectedTitle ? `${job.detectedTitle}: ${job.errorMessage}` : job.errorMessage
+          body: job.detectedTitle ? `${job.detectedTitle}: ${job.errorMessage}` : job.errorMessage,
+          appName: 'TurboDown'
         }).show();
       }
 
@@ -2350,7 +2352,8 @@ async function runDownloadJob(job) {
         if (Notification.isSupported()) {
           const notification = new Notification({
             title: 'Download Concluído',
-            body: job.detectedTitle || 'Download finalizado com sucesso!'
+            body: job.detectedTitle || 'Download finalizado com sucesso!',
+            appName: 'TurboDown'
           });
           notification.on('click', () => {
             if (job.lastSavedFilePath && fs.existsSync(job.lastSavedFilePath)) {
@@ -2840,7 +2843,8 @@ setInterval(() => {
       if (Notification.isSupported()) {
         new Notification({
           title: 'Download agendado em breve',
-          body: `${s.label} — começa em ~5 minutos`
+          body: `${s.label} — começa em ~5 minutos`,
+          appName: 'TurboDown'
         }).show();
       }
     }
@@ -2852,7 +2856,8 @@ setInterval(() => {
       if (Notification.isSupported()) {
         new Notification({
           title: ok ? 'Download agendado iniciado' : 'Falha no download agendado',
-          body: s.label
+          body: s.label,
+          appName: 'TurboDown'
         }).show();
       }
       const nextRun = computeNextRun(s.runAt, s.repeat, s.intervalHours);
@@ -2911,7 +2916,8 @@ function initializeAutoUpdater() {
     if (Notification.isSupported()) {
       new Notification({
         title: 'Atualização do TurboDown disponível',
-        body: `A versão ${info.version} está sendo baixada.`
+        body: `A versão ${info.version} está sendo baixada.`,
+        appName: 'TurboDown'
       }).show();
     }
   });
