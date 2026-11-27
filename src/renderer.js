@@ -3201,3 +3201,20 @@ if (tgConfigModal) {
   document.getElementById('btn-tg-config-close2')?.addEventListener('click', () => tgConfigModal.classList.add('hidden'));
   tgConfigModal.addEventListener('click', (e) => { if (e.target === tgConfigModal) tgConfigModal.classList.add('hidden'); });
 }
+
+// Seletor de categoria das configurações
+(function initSettingsGroups() {
+  const sel = document.getElementById('settings-group-select');
+  if (!sel) return;
+  const sections = document.querySelectorAll('#settings-content .settings-section[data-group]');
+  const apply = (g) => {
+    sections.forEach(s => { s.style.display = s.dataset.group === g ? '' : 'none'; });
+    try { localStorage.setItem('td-settings-group', g); } catch (e) {}
+  };
+  let saved = 'aparencia';
+  try { saved = localStorage.getItem('td-settings-group') || 'aparencia'; } catch (e) {}
+  if (![...sel.options].some(o => o.value === saved)) saved = 'aparencia';
+  sel.value = saved;
+  apply(saved);
+  sel.addEventListener('change', () => apply(sel.value));
+})();

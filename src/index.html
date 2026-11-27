@@ -1656,8 +1656,19 @@
               </div>
 
               <div id="settings-content">
+                <!-- Seletor de categoria -->
+                <div class="settings-group-bar glass-card">
+                  <label for="settings-group-select">Categoria:</label>
+                  <select id="settings-group-select" class="glass-select">
+                    <option value="aparencia" selected>🎨 Aparência</option>
+                    <option value="downloads">📥 Downloads</option>
+                    <option value="conta">👤 Conta e integrações</option>
+                    <option value="diagnostico">🛠️ Diagnóstico</option>
+                  </select>
+                </div>
+
                 <!-- Theme Presets -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="aparencia">
                   <h3 class="section-title">🎨 Temas</h3>
                   <div id="theme-presets">
                     <button class="preset-btn" data-preset="dark" title="Dark">
@@ -1749,7 +1760,7 @@
                 </div>
 
                 <!-- Colors -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="aparencia">
                   <h3 class="section-title">🖌️ Cores</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -1774,7 +1785,7 @@
                 </div>
 
                 <!-- Gradient -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="aparencia">
                   <h3 class="section-title">🌈 Gradiente</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -1823,7 +1834,7 @@
                 </div>
 
                 <!-- Glass Effect -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="aparencia">
                   <h3 class="section-title">💎 Efeito Glass</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -1856,7 +1867,7 @@
                 </div>
 
                 <!-- Background Image -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="aparencia">
                   <h3 class="section-title">🖼️ Imagem de Fundo</h3>
                   <div class="bg-image-section">
                     <div id="bg-preview-wrap">
@@ -1881,7 +1892,7 @@
                 </div>
 
                 <!-- Transparency -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="aparencia">
                   <h3 class="section-title">🔮 Transparência</h3>
                   <div class="setting-row">
                     <label>Fundo transparente (mostra a área de trabalho atrás do app)</label>
@@ -1893,7 +1904,7 @@
                 </div>
 
                 <!-- Download Settings -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="downloads">
                   <h3 class="section-title">📥 Configurações de Download</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -1975,7 +1986,7 @@
                 </div>
 
                 <!-- Conta Google unificada -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="conta">
                   <h3 class="section-title">👤 Conta Google</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -1994,7 +2005,7 @@
                 </div>
 
                 <!-- YouTube anonymous mode -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="conta">
                   <h3 class="section-title">🕶️ YouTube anônimo</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -2012,7 +2023,7 @@
                 </div>
 
                 <!-- Ad blocker -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="conta">
                   <h3 class="section-title">🛡️ Bloqueador de anúncios</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -2030,7 +2041,7 @@
                 </div>
 
                 <!-- Discord Rich Presence -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="conta">
                   <h3 class="section-title">💬 Discord Rich Presence</h3>
                   <div class="settings-grid">
                     <div class="setting-row">
@@ -2059,7 +2070,7 @@
 
 
                 <!-- Tool status and application updates -->
-                <div class="settings-section glass-card">
+                <div class="settings-section glass-card" data-group="diagnostico">
                   <h3 class="section-title">🛠️ Diagnóstico e atualizações</h3>
                   <div class="maintenance-grid">
                     <div class="maintenance-row">
