@@ -4453,3 +4453,18 @@ body.transparent-mode .nav {
 .settings-group-bar .glass-select {
   min-width: 220px;
 }
+
+/* Dashboard — card de upload em andamento */
+.dash-upload {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; margin-bottom: 16px; cursor: pointer;
+  border: 1px solid rgba(120,180,255,.25);
+}
+.dash-upload.hidden { display: none; }
+.du-ico { font-size: 26px; flex-shrink: 0; }
+.du-info { flex: 1; min-width: 0; }
+.du-title { font-weight: 700; font-size: 14px; }
+.du-file { font-size: 12px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.du-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); margin-top: 8px; overflow: hidden; }
+.du-bar-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg,#4da3ff,#8b5cf6); transition: width .3s ease; }
+.du-pct { font-weight: 800; font-size: 18px; color: #7db8ff; flex-shrink: 0; }

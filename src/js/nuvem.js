@@ -176,6 +176,30 @@ function resetTelegramCloud() {
   }, 4000);
 }
 
+// Card visual no dashboard — mostra upload em andamento (inclusive retomado)
+function updateDashUpload() {
+  const card = document.getElementById('dash-upload');
+  if (!card) return;
+  const inflightEntries = Object.values(tgCloud.inflight);
+  const inflightBytes = inflightEntries.reduce((s, e) => s + (e.loaded || 0), 0);
+  const inflightSize = inflightEntries.reduce((s, e) => s + (e.size || 0), 0);
+  const active = tgCloud.filesTotal > tgCloud.filesDone || inflightEntries.length > 0;
+  if (!active) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const pct = tgCloud.bytesTotal > 0
+    ? Math.min(100, Math.round(((tgCloud.bytesDone + inflightBytes) / tgCloud.bytesTotal) * 100))
+    : (inflightSize > 0 ? Math.min(100, Math.round((inflightBytes / inflightSize) * 100)) : 0);
+  const fill = document.getElementById('du-bar-fill');
+  const pctEl = document.getElementById('du-pct');
+  const fileEl = document.getElementById('du-file');
+  const titleEl = document.getElementById('du-title');
+  if (fill) fill.style.width = `${pct}%`;
+  if (pctEl) pctEl.textContent = `${pct}%`;
+  if (fileEl) fileEl.textContent = tgCloud.currentName || 'Arquivo(s) na fila';
+  if (titleEl) titleEl.textContent = tgCloud.filesTotal > 1 ? `Enviando ${tgCloud.filesDone + 1}/${tgCloud.filesTotal} arquivos` : 'Enviando para a nuvem';
+}
+document.getElementById('dash-upload')?.addEventListener('click', () => switchTab('nuvem'));
+
 api.on('telegram-upload-event', (data) => {
   if (!data) return;
   if (data.type === 'start') {
@@ -197,6 +221,7 @@ api.on('telegram-upload-event', (data) => {
     }
   }
   updateTelegramCloudUI();
+  updateDashUpload();
 });
 
 let tgFolderFilter = '';
