@@ -1683,18 +1683,21 @@ function resumePendingTelegramUpload() {
   const bot = ensureTelegramBot();
   if (!bot || !telegramChatId) return;
 
+  // Espera a janela e a UI inicializarem antes de começar/avisar
+  setTimeout(() => resumePendingTelegramUploadInner(st), 4000);
+}
+
+function tgNotify(title, body) {
+  if (Notification.isSupported()) {
+    new Notification({ title, body, appName: 'TurboDown' }).show();
+  }
+}
+
+function resumePendingTelegramUploadInner(st) {
   // Estado legado (2.7.3–2.7.9): sem partRecords → não dá pra montar o índice
   if (!st.type || !Array.isArray(st.partRecords)) {
     store.delete('tgUploadState');
-    setTimeout(() => {
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'TurboDown',
-          body: 'Um upload antigo foi interrompido e não pôde ser retomado. Reenvie o arquivo se necessário.',
-          appName: 'TurboDown'
-        }).show();
-      }
-    }, 3000);
+    tgNotify('TurboDown', 'Um upload antigo foi interrompido e não pôde ser retomado. Reenvie o arquivo se necessário.');
     return;
   }
 
@@ -1702,27 +1705,15 @@ function resumePendingTelegramUpload() {
     if (st.nextIndex >= st.partCount) { store.delete('tgUploadState'); return; }
     if (!fs.existsSync(st.srcForParts)) {
       store.delete('tgUploadState');
-      setTimeout(() => {
-        if (Notification.isSupported()) {
-          new Notification({
-            title: 'TurboDown',
-            body: `Não foi possível retomar "${st.uploadName}": o arquivo original não existe mais.`,
-            appName: 'TurboDown'
-          }).show();
-        }
-      }, 3000);
+      tgNotify('TurboDown', `Não foi possível retomar "${st.uploadName}": o arquivo original não existe mais.`);
       return;
     }
+    const pct = Math.round((st.nextIndex / st.partCount) * 100);
+    tgNotify('TurboDown', `Retomando upload de "${st.uploadName}" — parte ${st.nextIndex + 1} de ${st.partCount} (${pct}% concluído). Acompanhe na aba Nuvem.`);
     runSplitUpload(st).then(res => {
       if (res.success) {
         if (st.tempZip) { try { fs.unlinkSync(st.tempZip); } catch (e) {} }
-        if (Notification.isSupported()) {
-          new Notification({
-            title: 'Telegram',
-            body: `"${st.uploadName}" upload concluído!`,
-            appName: 'TurboDown'
-          }).show();
-        }
+        tgNotify('Telegram', `"${st.uploadName}" upload concluído!`);
       }
     }).catch(() => {});
   } else if (st.type === 'single') {
@@ -1730,15 +1721,12 @@ function resumePendingTelegramUpload() {
       store.delete('tgUploadState');
       return;
     }
+    tgNotify('TurboDown', `Reenviando "${st.title || path.basename(st.filePath)}" para a nuvem...`);
     // Reenvia o arquivo inteiro (o estado é re-salvo e limpo dentro do doTelegramUpload)
     uploadToTelegram(st.filePath, st.title, st.mediaType, null, st.opts || {})
       .then(res => {
-        if (res && res.success && Notification.isSupported()) {
-          new Notification({
-            title: 'Telegram',
-            body: `"${st.title || path.basename(st.filePath)}" enviado com sucesso!`,
-            appName: 'TurboDown'
-          }).show();
+        if (res && res.success) {
+          tgNotify('Telegram', `"${st.title || path.basename(st.filePath)}" enviado com sucesso!`);
         }
       })
       .catch(() => {});

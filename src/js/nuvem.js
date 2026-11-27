@@ -134,11 +134,16 @@ function telegramFileIcon(name) {
 
 function updateTelegramCloudUI() {
   if (!telegramCloud || !telegramCloudFill) return;
-  const inflightBytes = Object.values(tgCloud.inflight).reduce((s, e) => s + (e.loaded || 0), 0);
+  const inflightEntries = Object.values(tgCloud.inflight);
+  const inflightBytes = inflightEntries.reduce((s, e) => s + (e.loaded || 0), 0);
+  const inflightSize = inflightEntries.reduce((s, e) => s + (e.size || 0), 0);
   const effDone = tgCloud.bytesDone + inflightBytes;
+  // Se o 'start' passou antes da UI abrir (ex.: upload retomado), calcula o %
+  // direto do que está voando agora — a barra reflete o envio em andamento.
   const pct = tgCloud.bytesTotal > 0
     ? Math.min(100, Math.round((effDone / tgCloud.bytesTotal) * 100))
-    : (tgCloud.filesTotal > 0 ? Math.round((tgCloud.filesDone / tgCloud.filesTotal) * 100) : 0);
+    : (inflightSize > 0 ? Math.min(100, Math.round((inflightBytes / inflightSize) * 100))
+    : (tgCloud.filesTotal > 0 ? Math.round((tgCloud.filesDone / tgCloud.filesTotal) * 100) : 0));
   telegramCloudFill.style.width = `${pct}%`;
   // Gradiente muda de cor conforme o progresso (azul → roxo → verde → dourado)
   const hue = 210 - (pct / 100) * 190;
@@ -150,6 +155,9 @@ function updateTelegramCloudUI() {
     telegramCloudLabel.textContent = tgCloud.filesDone >= tgCloud.filesTotal
       ? `Concluído — ${tgCloud.filesDone} arquivo(s)`
       : `Enviando ${tgCloud.filesDone + 1}/${tgCloud.filesTotal}${namePart} — ${formatBytes(effDone)} de ${formatBytes(tgCloud.bytesTotal)}`;
+  } else if (inflightEntries.length) {
+    const namePart = tgCloud.currentName ? ` — ${tgCloud.currentName}` : '';
+    telegramCloudLabel.textContent = `Enviando${namePart} — ${pct}%`;
   } else {
     telegramCloudLabel.textContent = 'Nuvem Telegram';
   }
