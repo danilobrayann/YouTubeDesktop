@@ -49,9 +49,7 @@ async function pollMusicMeta() {
     let meta = null;
     for (const w of order) {
       if (!w) continue;
-      const m = w === musicWv
-        ? await w.executeJavaScript(FP_META_MUSIC_JS, true).catch(() => null)
-        : await w.executeJavaScript(FP_META_YT_JS, true).catch(() => null);
+      const m = await fpExec(w === musicWv ? FP_META_MUSIC_JS : FP_META_YT_JS, w);
       if (m && (m.title || m.artist || m.cover)) { meta = m; break; }
     }
     if (meta && (meta.title || meta.artist)) {
@@ -109,7 +107,12 @@ function fpWv() {
 function fpExec(js, wvOverride) {
   const wv = wvOverride || fpWv();
   if (!wv) return Promise.resolve(null);
-  return wv.executeJavaScript(js, true).catch(() => null);
+  // Timeout: webview sem src (ex.: music-player antes de abrir a aba Música)
+  // pode deixar executeJavaScript pendurado e travar o poll inteiro.
+  return Promise.race([
+    wv.executeJavaScript(js, true).catch(() => null),
+    new Promise(r => setTimeout(() => r(null), 2500))
+  ]);
 }
 function fpFmt(s) {
   s = Math.max(0, Math.floor(s || 0));
@@ -342,8 +345,11 @@ setInterval(async () => {
   if (!bar) return;
   const musicWv = document.getElementById('music-player');
   const ytWv = document.getElementById('youtube-player');
-  const stM = await fpExec(FP_STATE_JS, musicWv);
-  const stY = await fpExec(FP_STATE_JS, ytWv);
+  // Paralelo + timeout: uma fonte travada não impede a outra de responder
+  const [stM, stY] = await Promise.all([
+    fpExec(FP_STATE_JS, musicWv),
+    fpExec(FP_STATE_JS, ytWv)
+  ]);
   // prefere o webview com vídeo tocando; empate → YouTube Music
   const useYt = !!(stY && (!stM || (stM.paused && !stY.paused)));
   const st = useYt ? stY : stM;
@@ -355,6 +361,11 @@ setInterval(async () => {
     console.log('[fp] music:', stM ? (stM.paused ? 'paused' : 'playing') : 'null',
                 '| yt:', stY ? (stY.paused ? 'paused' : 'playing') : 'null',
                 '| src:', fpSrc);
+    ytWv?.executeJavaScript(
+      `({url: location.href.slice(0,80), vids: document.querySelectorAll('video').length, title: (document.title||'').slice(0,50)})`,
+      true
+    ).then(r => console.log('[fp:yt-raw]', JSON.stringify(r)))
+     .catch(e => console.log('[fp:yt-err]', String(e).slice(0,120)));
   }
   document.getElementById('fp-reopen')?.classList.toggle('playing', fpPlayingNow);
   syncDashHero();
