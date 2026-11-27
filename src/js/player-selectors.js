@@ -2,8 +2,18 @@
 // Se o YouTube mudar o DOM, conserte AQUI — não precisa caçar no app inteiro.
 // Cada valor é um fragmento de JS executado DENTRO do webview (string).
 window.FP_SELS = {
-  // Vídeo principal (YTM usa <video> puro; YouTube usa .html5-main-video)
-  video: `document.querySelector('video.html5-main-video') || document.querySelector('video')`,
+  // Vídeo principal — varre TODOS os <video> da página (YouTube tem vários:
+  // player principal, ambient mode, previews). Prefere o que está tocando;
+  // em empate, o de maior duração. Funciona no YTM e no YouTube.
+  video: `(() => {
+    const vids = Array.from(document.querySelectorAll('video'));
+    let pick = null;
+    for (const v of vids) {
+      if (!v.duration) continue;
+      if (!pick || (pick.paused && !v.paused) || (pick.paused === v.paused && v.duration > pick.duration)) pick = v;
+    }
+    return pick || document.querySelector('video.html5-main-video') || document.querySelector('video');
+  })()`,
 
   // Player bar do YouTube Music
   ytmBar: `document.querySelector('ytmusic-player-bar')`,
@@ -29,19 +39,25 @@ window.FP_SELS = {
     };
   })()`,
 
-  // Meta do YouTube (só em /watch)
+  // Meta do YouTube — /watch usa seletores da página; outras rotas
+  // (/shorts, links do YTM abertos aqui) caem no título da aba.
   ytMeta: `(() => {
-    if (!location.pathname.startsWith('/watch')) return null;
     const v = document.querySelector('video.html5-main-video') || document.querySelector('video');
-    if (!v) return null;
-    const titleEl = document.querySelector('h1 yt-formatted-string, #title h1 yt-formatted-string, h1');
-    const chEl = document.querySelector('#channel-name a, ytd-channel-name a, .ytd-channel-name a, #owner ytd-channel-name a');
+    if (!v || v.paused) return null;
     const videoId = new URLSearchParams(location.search).get('v') || '';
+    let title = '', artist = '';
+    if (location.pathname.startsWith('/watch')) {
+      const titleEl = document.querySelector('h1 yt-formatted-string, #title h1 yt-formatted-string, h1');
+      const chEl = document.querySelector('#channel-name a, ytd-channel-name a, .ytd-channel-name a, #owner ytd-channel-name a');
+      title = titleEl ? titleEl.textContent.trim() : '';
+      artist = chEl ? chEl.textContent.trim() : '';
+    }
+    if (!title) title = (document.title || '').replace(/ - YouTube$/, '').replace(/ \\| YouTube$/, '').trim();
+    const poster = v.poster || '';
     return {
-      cover: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : '',
-      coverHQ: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/maxresdefault.jpg' : '',
-      title: titleEl ? titleEl.textContent.trim() : '',
-      artist: chEl ? chEl.textContent.trim() : ''
+      cover: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : poster,
+      coverHQ: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/maxresdefault.jpg' : poster,
+      title, artist
     };
   })()`,
 };
