@@ -35,23 +35,13 @@ function applyDominantColor(imgUrl) {
   img.src = imgUrl;
 }
 
-const FP_META_MUSIC_JS = FP_SELS.ytmMeta;
 const FP_META_YT_JS = FP_SELS.ytMeta;
 
 async function pollMusicMeta() {
-  const musicWv = document.getElementById('music-player');
   const ytWv = document.getElementById('youtube-player');
-  if (!musicWv) return;
+  if (!ytWv) return;
   try {
-    // Consulta primeiro a fonte ativa (fpSrc); a outra é fallback.
-    // Antes sempre ia no YTM primeiro — música pausada lá escondia o YouTube.
-    const order = fpSrc === 'yt' ? [ytWv, musicWv] : [musicWv, ytWv];
-    let meta = null;
-    for (const w of order) {
-      if (!w) continue;
-      const m = await fpExec(w === musicWv ? FP_META_MUSIC_JS : FP_META_YT_JS, w);
-      if (m && (m.title || m.artist || m.cover)) { meta = m; break; }
-    }
+    const meta = await fpExec(FP_META_YT_JS, ytWv);
     if (meta && (meta.title || meta.artist)) {
       const fpTitle = document.getElementById('fp-title');
       const fpArtist = document.getElementById('fp-artist');
@@ -98,17 +88,15 @@ async function pollMusicMeta() {
 setInterval(pollMusicMeta, 5000);
 pollMusicMeta();
 
-// ── Player funcional: controla o <video> do YouTube Music ou do YouTube ──
-let fpSrc = null; // 'music' | 'yt' | null — qual webview tem o vídeo ativo
+// ── Player funcional: controla o <video> do YouTube ──
+let fpSrc = null; // 'yt' | null — fonte ativa (só YouTube agora)
 function fpWv() {
-  if (fpSrc === 'yt') return document.getElementById('youtube-player');
-  return document.getElementById('music-player');
+  return document.getElementById('youtube-player');
 }
 function fpExec(js, wvOverride) {
   const wv = wvOverride || fpWv();
   if (!wv) return Promise.resolve(null);
-  // Timeout: webview sem src (ex.: music-player antes de abrir a aba Música)
-  // pode deixar executeJavaScript pendurado e travar o poll inteiro.
+  // Timeout: executeJavaScript pendurado não pode travar o poll.
   return Promise.race([
     wv.executeJavaScript(js, true).catch(() => null),
     new Promise(r => setTimeout(() => r(null), 2500))
@@ -124,8 +112,8 @@ async function fpToggle() {
 async function fpSeek(frac) {
   await fpExec(`(() => { const v = ${FP_SELS.video}; if (v && v.duration) v.currentTime = v.duration * ${frac}; })()`);
 }
-document.querySelector('.fp-disc-wrap')?.addEventListener('click', () => switchTab(fpSrc === 'yt' ? 'home' : 'music'));
-document.getElementById('dash-nowplaying')?.addEventListener('click', () => switchTab(fpSrc === 'yt' ? 'home' : 'music'));
+document.querySelector('.fp-disc-wrap')?.addEventListener('click', () => switchTab('home'));
+document.getElementById('dash-nowplaying')?.addEventListener('click', () => switchTab('home'));
 
 // ── Letra da música (LRCLIB) ──
 const fpLyricsBtn = document.getElementById('fp-lyrics');
@@ -343,24 +331,14 @@ function syncDashHero() {
 setInterval(async () => {
   const bar = document.getElementById('fp-bar');
   if (!bar) return;
-  const musicWv = document.getElementById('music-player');
   const ytWv = document.getElementById('youtube-player');
-  // Paralelo + timeout: uma fonte travada não impede a outra de responder
-  const [stM, stY] = await Promise.all([
-    fpExec(FP_STATE_JS, musicWv),
-    fpExec(FP_STATE_JS, ytWv)
-  ]);
-  // prefere o webview com vídeo tocando; empate → YouTube Music
-  const useYt = !!(stY && (!stM || (stM.paused && !stY.paused)));
-  const st = useYt ? stY : stM;
-  fpSrc = st ? (useYt ? 'yt' : 'music') : null;
+  const st = await fpExec(FP_STATE_JS, ytWv);
+  fpSrc = st ? 'yt' : null;
   fpPlayingNow = !!(st && !st.paused);
-  // Diagnóstico temporário: estado das duas fontes (visível no DevTools)
+  // Diagnóstico temporário (visível no DevTools)
   if (!window.__fpDbg || Date.now() - window.__fpDbg > 15000) {
     window.__fpDbg = Date.now();
-    console.log('[fp] music:', stM ? (stM.paused ? 'paused' : 'playing') : 'null',
-                '| yt:', stY ? (stY.paused ? 'paused' : 'playing') : 'null',
-                '| src:', fpSrc);
+    console.log('[fp] yt:', st ? (st.paused ? 'paused' : 'playing') : 'null', '| src:', fpSrc);
     ytWv?.executeJavaScript(
       `({url: location.href.slice(0,80), vids: document.querySelectorAll('video').length, title: (document.title||'').slice(0,50)})`,
       true

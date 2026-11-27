@@ -157,11 +157,6 @@ const gradc2Label        = document.getElementById('gradc2-label');
 const angleVal           = document.getElementById('angle-val');
 const blurVal            = document.getElementById('blur-val');
 const opacityVal         = document.getElementById('opacity-val');
-const musicPlayer        = document.getElementById('music-player');
-const musicLoading       = document.getElementById('music-loading');
-const musicLoadingText   = document.getElementById('music-loading-text');
-const musicRetry         = document.getElementById('music-retry');
-
 // Google Web DOM refs
 const googleWebviews        = document.getElementById('google-webviews');
 const googleTabsContainer   = document.getElementById('google-tabs');
@@ -499,10 +494,6 @@ function switchTab(tabId) {
     navItem.setAttribute('aria-current', 'page');
   }
 
-  if (tabId === 'music' && !musicPlayer.getAttribute('src')) {
-    musicPlayer.setAttribute('src', 'https://music.youtube.com/');
-  }
-
   if (tabId === 'settings') {
     refreshGoogleAccountStatus();
     refreshTelegramCloud();
@@ -515,26 +506,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
   });
 });
 
-let musicLoadTimer = null;
-musicPlayer.addEventListener('did-start-loading', () => {
-  musicLoading.classList.remove('hidden');
-  musicLoadingText.textContent = 'Carregando YouTube Music...';
-  musicRetry.classList.add('hidden');
-  clearTimeout(musicLoadTimer);
-  // Watchdog: se demorar demais, oferece retry em vez de ficar girando pra sempre
-  musicLoadTimer = setTimeout(() => {
-    musicLoadingText.textContent = 'Demorando mais que o normal. Verifique a conexão.';
-    musicRetry.classList.remove('hidden');
-  }, 25000);
-});
-
-musicPlayer.addEventListener('dom-ready', () => {
-  clearTimeout(musicLoadTimer);
-  musicLoading.classList.add('hidden');
-});
-musicPlayer.addEventListener('did-finish-load', () => clearTimeout(musicLoadTimer));
-
-// ── Discord Rich Presence: poll media players (Music + navegador) ───────────
+// ── Discord Rich Presence: poll media players (navegador) ───────────────────
 let discordPresenceEnabled = false;
 
 const DISCORD_YOUTUBE_EXTRACT = `(() => {
@@ -554,27 +526,6 @@ const DISCORD_YOUTUBE_EXTRACT = `(() => {
     title,
     artist: channelEl ? channelEl.innerText.trim() : 'YouTube',
     label: 'Vendo',
-    image: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : null,
-    position: v.currentTime || 0,
-    duration: isFinite(v.duration) ? v.duration : 0
-  };
-})()`;
-
-const DISCORD_MUSIC_EXTRACT = `(() => {
-  const v = ${FP_SELS.video};
-  const bar = ${FP_SELS.ytmBar};
-  const titleEl = bar && bar.querySelector('.title');
-  const subEl = bar && bar.querySelector('.subtitle');
-  const imgEl = bar && bar.querySelector('img');
-  const title = titleEl ? titleEl.innerText.trim() : '';
-  const sub = subEl ? subEl.innerText.trim() : '';
-  const artist = sub.split('\\u2022')[0].split(' - ')[0].trim() || 'YouTube Music';
-  const cover = imgEl ? (imgEl.src || imgEl.getAttribute('src') || '') : '';
-  if (!v || !title) return { playing: false };
-  const videoId = new URLSearchParams(location.search).get('v') || '';
-  return {
-    playing: !v.paused && !v.ended && v.readyState > 1,
-    title, artist, label: 'Ouvindo',
     image: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : null,
     position: v.currentTime || 0,
     duration: isFinite(v.duration) ? v.duration : 0
@@ -607,15 +558,7 @@ async function pollDiscordMusicState() {
     return;
   }
 
-  // 1) YouTube Music tem prioridade
-  try {
-    if (musicPlayer && musicPlayer.getAttribute('src')) {
-      const state = await musicPlayer.executeJavaScript(DISCORD_MUSIC_EXTRACT, true);
-      if (state && state.playing) { sendDiscordState(state); return; }
-    }
-  } catch (e) { /* webview ainda não carregou */ }
-
-  // 2) YouTube normal (aba navegador) — vídeos e lives
+  // YouTube (aba navegador) — vídeos e lives
   try {
     if (webview && webview.getAttribute('src')) {
       const state = await webview.executeJavaScript(DISCORD_YOUTUBE_EXTRACT, true);
@@ -849,52 +792,6 @@ if (btnOnboardingClose) {
     await api.setOnboardingDone().catch(() => {});
   });
 }
-
-// ── Sleep timer (YouTube Music) ─────────────────────────────────────────────
-const sleepTimerSelect = document.getElementById('sleep-timer-select');
-const sleepTimerStatus = document.getElementById('sleep-timer-status');
-let sleepTimerTimeout = null;
-let sleepTimerEndAt = 0;
-
-function updateSleepTimerStatus() {
-  if (!sleepTimerEndAt) {
-    sleepTimerStatus.classList.add('hidden');
-    return;
-  }
-  const remaining = Math.max(0, Math.round((sleepTimerEndAt - Date.now()) / 60000));
-  sleepTimerStatus.textContent = `Para em ~${remaining} min`;
-  sleepTimerStatus.classList.remove('hidden');
-}
-
-if (sleepTimerSelect) {
-  sleepTimerSelect.addEventListener('change', () => {
-    clearTimeout(sleepTimerTimeout);
-    sleepTimerEndAt = 0;
-    const mins = parseInt(sleepTimerSelect.value, 10);
-    if (!mins) { updateSleepTimerStatus(); return; }
-    sleepTimerEndAt = Date.now() + mins * 60000;
-    sleepTimerTimeout = setTimeout(() => {
-      musicPlayer.executeJavaScript(
-        `(() => { const v = ${FP_SELS.video}; if (v) v.pause(); })()`
-      ).catch(() => {});
-      sleepTimerEndAt = 0;
-      sleepTimerSelect.value = '0';
-      updateSleepTimerStatus();
-    }, mins * 60000);
-    updateSleepTimerStatus();
-  });
-}
-setInterval(updateSleepTimerStatus, 30000);
-
-musicPlayer.addEventListener('did-fail-load', (event) => {
-  clearTimeout(musicLoadTimer);
-  if (event.errorCode === -3 || !event.isMainFrame) return;
-  musicLoading.classList.remove('hidden');
-  musicLoadingText.textContent = 'Não foi possível carregar o YouTube Music. Verifique a conexão e tente novamente.';
-  musicRetry.classList.remove('hidden');
-});
-
-musicRetry.addEventListener('click', () => musicPlayer.reload());
 
 function setSidebarCollapsed(collapsed) {
   appShell.classList.toggle('sidebar-collapsed', collapsed);
@@ -1164,7 +1061,6 @@ function injectWebviewEnhancements(wv) {
 }
 
 injectWebviewEnhancements(webview);
-injectWebviewEnhancements(musicPlayer);
 
 // ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
