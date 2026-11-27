@@ -1062,6 +1062,77 @@ function zipFileForUpload(filePath) {
   });
 }
 
+// Envia as partes restantes de um upload dividido, persistindo o estado após
+// cada parte. Usada tanto no upload normal quanto na retomada após reabrir o app.
+async function runSplitUpload(st) {
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return { success: false, reason: 'not_configured' };
+  const { partCount, partSizes, partBase, MAXUP, totalSize, srcForParts, uploadName, captionBase0, opts, pExt, pStem } = st;
+  st.partRecords = st.partRecords || [];
+  let allOk = true;
+  // A UI da nuvem mostra o upload retomado como um upload novo em andamento
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('telegram-upload-event', { type: 'start', fileName: uploadName, size: totalSize });
+  }
+  for (let i = st.nextIndex || 0; i < partCount; i++) {
+    if (!fs.existsSync(srcForParts)) { allOk = false; break; }
+    const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
+    const partPath = path.join(os.tmpdir(), `tdpart-${Date.now()}-${i}${pExt}`);
+    try {
+      await extractPartAsync(srcForParts, i, i * MAXUP, partSizes[i], partPath);
+      const sentP = await bot.sendDocument(telegramChatId, partPath, {
+        caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${i + 1}/${partCount})`,
+        filename: pn,
+        onProgress: (() => {
+          let lastSent = 0;
+          return (loaded) => {
+            const now = Date.now();
+            if (now - lastSent < 250) return;
+            lastSent = now;
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('telegram-upload-event', {
+                type: 'progress',
+                fileName: uploadName,
+                loaded: partBase[i] + loaded,
+                size: totalSize
+              });
+            }
+          };
+        })()
+      });
+      st.partRecords.push({
+        fileName: pn, size: partSizes[i],
+        messageId: sentP && sentP.message_id,
+        fileId: extractTelegramFileId(sentP)
+      });
+      st.nextIndex = i + 1;
+      store.set('tgUploadState', st);
+    } catch (e) { allOk = false; break; }
+    try { fs.unlinkSync(partPath); } catch (e) {}
+  }
+  const complete = allOk && st.partRecords.length === partCount;
+  if (complete) {
+    // Uma única entrada no índice — o arquivo aparece inteiro na nuvem
+    recordTelegramFile({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fileName: uploadName, title: captionBase0, folder: opts.folder || '',
+      size: totalSize, isSplit: true, parts: st.partRecords,
+      messageId: st.partRecords[0].messageId, fileId: st.partRecords[0].fileId,
+      chatType: store.get('telegram.chatType', ''),
+      source: opts.source || (st.downloadId ? 'download' : 'manual'), date: st.date || Date.now()
+    });
+    store.delete('tgUploadState');
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('telegram-upload-event', {
+      type: complete ? 'done' : 'error',
+      fileName: uploadName,
+      size: totalSize
+    });
+  }
+  return { success: complete };
+}
+
 async function doTelegramUpload(filePath, title, mediaType = 'document', downloadId = null, opts = {}) {
   const bot = ensureTelegramBot();
   if (!bot || !telegramChatId) return { success: false, reason: 'not_configured' };
@@ -1097,7 +1168,8 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
     const MAXUP = 45 * 1024 * 1024;
     if (stats.size > MAXUP) {
       // Arquivo grande: fatia e sobe parte por parte — extrai cada parte com
-      // stream async (não bloqueia o app) e apaga depois de enviar
+      // stream async (não bloqueia o app) e apaga depois de enviar.
+      // O estado é persistido a cada parte → se o app fechar, retoma de onde parou.
       const captionBase0 = title || path.basename(filePath);
       const pExt = tempZip ? '.zip' : path.extname(uploadName).toLowerCase();
       const pStem = tempZip ? uploadName : uploadName.slice(0, uploadName.length - pExt.length);
@@ -1108,65 +1180,23 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
       const partBase = [];
       let acc = 0;
       for (const s of partSizes) { partBase.push(acc); acc += s; }
-      const partRecords = [];
-      let allOk = true, done = 0;
-      const srcForParts = uploadPath;
-      for (let i = 0; i < partCount; i++) {
-        const pn = `${pStem}.part${String(i + 1).padStart(3, '0')}${pExt}`;
-        const partPath = path.join(os.tmpdir(), `tdpart-${Date.now()}-${i}${pExt}`);
-        try {
-          await extractPartAsync(srcForParts, i, i * MAXUP, partSizes[i], partPath);
-          const sentP = await bot.sendDocument(telegramChatId, partPath, {
-            caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${i + 1}/${partCount})`,
-            filename: pn,
-            onProgress: (() => {
-              let lastSent = 0;
-              return (loaded) => {
-                const now = Date.now();
-                if (now - lastSent < 250) return;
-                lastSent = now;
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                  mainWindow.webContents.send('telegram-upload-event', {
-                    type: 'progress',
-                    fileName: uploadName,
-                    loaded: partBase[i] + loaded,
-                    size: totalSize
-                  });
-                }
-              };
-            })()
-          });
-          partRecords.push({
-            fileName: pn, size: partSizes[i],
-            messageId: sentP && sentP.message_id,
-            fileId: extractTelegramFileId(sentP)
-          });
-          done++;
-          store.set('tgUploadState', { i, partCount, uploadName, srcForParts, MAXUP, partSizes, partBase, captionBase0, opts, pExt, pStem, tempZip });
-        } catch (e) { allOk = false; }
-        try { fs.unlinkSync(partPath); } catch (e) {}
-      }
-      // Uma única entrada no índice — o arquivo aparece inteiro na nuvem
-      if (allOk && partRecords.length) {
-        recordTelegramFile({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          fileName: uploadName, title: captionBase0, folder: opts.folder || '',
-          size: stats.size, isSplit: true, parts: partRecords,
-          messageId: partRecords[0].messageId, fileId: partRecords[0].fileId,
-          chatType: store.get('telegram.chatType', ''),
-          source: opts.source || (downloadId ? 'download' : 'manual'), date: Date.now()
-        });
-      }
-      store.delete('tgUploadState');
+      const st = {
+        type: 'split', nextIndex: 0, partRecords: [],
+        partCount, partSizes, partBase, MAXUP, totalSize,
+        srcForParts: uploadPath, uploadName, captionBase0,
+        opts, downloadId, pExt, pStem, tempZip, date: Date.now()
+      };
+      store.set('tgUploadState', st);
+      const res = await runSplitUpload(st);
       if (tempZip) { try { fs.unlinkSync(tempZip); } catch (e) {} }
       if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
         mainWindow.webContents.send('telegram-upload-status', {
           downloadId,
-          status: allOk ? 'success' : 'error',
-          message: allOk ? `✅ Enviado em ${partCount} partes!` : `⚠️ ${done}/${partCount} partes enviadas`
+          status: res.success ? 'success' : 'error',
+          message: res.success ? `✅ Enviado em ${partCount} partes!` : `⚠️ ${st.partRecords.length}/${partCount} partes enviadas`
         });
       }
-      return { success: allOk, reason: allOk ? null : 'falha em alguma parte' };
+      return { success: res.success, reason: res.success ? null : 'falha em alguma parte' };
     }
     const captionBase = title || path.basename(filePath);
     const options = {
@@ -1205,6 +1235,8 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
       if (mediaType === 'audio') return bot.sendAudio(telegramChatId, uploadPath, options);
       return bot.sendDocument(telegramChatId, uploadPath, options);
     };
+    // Persiste estado: se o app fechar durante o envio, reenvia na próxima abertura
+    store.set('tgUploadState', { type: 'single', filePath, title, mediaType, downloadId, opts, date: Date.now() });
     let sent;
     try {
       sent = await sendByType();
@@ -1228,6 +1260,7 @@ async function doTelegramUpload(filePath, title, mediaType = 'document', downloa
       source: opts.source || (downloadId ? 'download' : 'manual'),
       date: Date.now()
     });
+    store.delete('tgUploadState');
 
     if (mainWindow && !mainWindow.isDestroyed() && downloadId) {
       mainWindow.webContents.send('telegram-upload-status', {
@@ -1640,6 +1673,78 @@ function createWindow() {
   });
 }
 
+// Retoma uploads interrompidos quando o app fecha no meio do envio.
+// - split: continua da próxima parte não enviada (partRecords persistidos)
+// - single: reenvia o arquivo inteiro (uploads pequenos são rápidos)
+// Estados antigos (sem type/partRecords) são descartados — não dá pra reconstruir.
+function resumePendingTelegramUpload() {
+  const st = store.get('tgUploadState');
+  if (!st) return;
+  const bot = ensureTelegramBot();
+  if (!bot || !telegramChatId) return;
+
+  // Estado legado (2.7.3–2.7.9): sem partRecords → não dá pra montar o índice
+  if (!st.type || !Array.isArray(st.partRecords)) {
+    store.delete('tgUploadState');
+    setTimeout(() => {
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'TurboDown',
+          body: 'Um upload antigo foi interrompido e não pôde ser retomado. Reenvie o arquivo se necessário.',
+          appName: 'TurboDown'
+        }).show();
+      }
+    }, 3000);
+    return;
+  }
+
+  if (st.type === 'split') {
+    if (st.nextIndex >= st.partCount) { store.delete('tgUploadState'); return; }
+    if (!fs.existsSync(st.srcForParts)) {
+      store.delete('tgUploadState');
+      setTimeout(() => {
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'TurboDown',
+            body: `Não foi possível retomar "${st.uploadName}": o arquivo original não existe mais.`,
+            appName: 'TurboDown'
+          }).show();
+        }
+      }, 3000);
+      return;
+    }
+    runSplitUpload(st).then(res => {
+      if (res.success) {
+        if (st.tempZip) { try { fs.unlinkSync(st.tempZip); } catch (e) {} }
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Telegram',
+            body: `"${st.uploadName}" upload concluído!`,
+            appName: 'TurboDown'
+          }).show();
+        }
+      }
+    }).catch(() => {});
+  } else if (st.type === 'single') {
+    if (!fs.existsSync(st.filePath)) {
+      store.delete('tgUploadState');
+      return;
+    }
+    // Reenvia o arquivo inteiro (o estado é re-salvo e limpo dentro do doTelegramUpload)
+    uploadToTelegram(st.filePath, st.title, st.mediaType, null, st.opts || {})
+      .then(res => {
+        if (res && res.success && Notification.isSupported()) {
+          new Notification({
+            title: 'Telegram',
+            body: `"${st.title || path.basename(st.filePath)}" enviado com sucesso!`,
+            appName: 'TurboDown'
+          }).show();
+        }
+      })
+      .catch(() => {});
+  }
+}
+
 app.whenReady().then(() => {
   initializeAutoUpdater();
   [
@@ -1658,27 +1763,8 @@ app.whenReady().then(() => {
   // Inicializa o bot do Telegram se configurado (comandos /listar /apagar)
   try { ensureTelegramBot(); } catch (e) {}
 
-  // Retoma upload interrompido ao fechar o app
-  const st = store.get('tgUploadState');
-  if (st && st.i < st.partCount) {
-    const { i, partCount, uploadName, srcForParts, MAXUP, partSizes, partBase, captionBase0, opts, pExt, pStem, tempZip } = st;
-    (async () => {
-      const bot = ensureTelegramBot();
-      if (!bot) return;
-      for (let j = i; j < partCount; j++) {
-        const pn = `${pStem}.part${String(j + 1).padStart(3, '0')}${pExt}`;
-        const partPath = path.join(os.tmpdir(), `tdpart-${Date.now()}-${j}${pExt}`);
-        await extractPartAsync(srcForParts, j, j * MAXUP, partSizes[j], partPath);
-        const sentP = await bot.sendDocument(telegramChatId, partPath, {
-          caption: (opts.folder ? `[${opts.folder}] ` : '') + `${captionBase0} (parte ${j + 1}/${partCount})`,
-          filename: pn
-        });
-        store.set('tgUploadState', { ...st, i: j + 1 });
-        try { fs.unlinkSync(partPath); } catch (e) {}
-      }
-      store.delete('tgUploadState');
-    })();
-  }
+  // Retoma upload interrompido ao fechar o app (continuidade)
+  resumePendingTelegramUpload();
 
   // Modo anônimo: limpa cookies/dados do YouTube a cada abertura para
   // evitar que o Google acumule flags de "bot" na sessão persistente.
