@@ -1245,10 +1245,7 @@ webview.addEventListener('did-stop-loading', () => {
     if (wvUrl && wvUrl !== urlInput.value) {
       urlInput.value = wvUrl;
     }
-    // Update "Now Playing" if it's a watch URL
-    if (wvUrl && wvUrl.includes('watch?v=')) {
-      webview.getTitle().then && webview.getTitle && updateNowPlaying(webview.getTitle());
-    }
+    // Player do rodapé assume título/capa via js/player.js
   } catch (err) {}
 });
 
@@ -1264,26 +1261,10 @@ webview.addEventListener('did-navigate-in-page', (e) => {
   }
 });
 
-webview.addEventListener('page-title-updated', (e) => {
-  if (e.title) updateNowPlaying(e.title);
-});
-
-
-function updateNowPlaying(title) {
-  if (!title) return;
-  const fpBar = document.getElementById('fp-bar');
-  const fpTitle = document.getElementById('fp-title');
-  if (title !== 'YouTube' && fpBar) {
-    fpBar.classList.remove('hidden');
-    document.body.classList.add('fp-visible');
-    if (fpTitle) fpTitle.textContent = title;
-    document.title = `TurboDown — ${title}`;
-  } else {
-    if (fpBar) fpBar.classList.add('hidden');
-    document.body.classList.remove('fp-visible');
-    document.title = 'TurboDown';
-  }
-}
+// NOTA: updateNowPlaying legado removido — o player (js/player.js) agora
+// controla fp-bar/título/capa via polling de estado real dos webviews.
+// O page-title-updated antigo brigava com o player (mostrava/escondia a
+// barra e sobrescrevia o título a cada navegação do YouTube).
 
 
 // ── QUICK DOWNLOAD MODAL ───────────────────────────────────────────────────

@@ -39,15 +39,20 @@ const FP_META_MUSIC_JS = FP_SELS.ytmMeta;
 const FP_META_YT_JS = FP_SELS.ytMeta;
 
 async function pollMusicMeta() {
-  const wv = document.getElementById('music-player');
+  const musicWv = document.getElementById('music-player');
   const ytWv = document.getElementById('youtube-player');
-  if (!wv) return;
+  if (!musicWv) return;
   try {
-    let meta = await wv.executeJavaScript(FP_META_MUSIC_JS, true).catch(() => null);
-    // sem música no YTM → tenta metadados do YouTube (aba de vídeo)
-    if (!meta || (!meta.title && !meta.artist && !meta.cover)) {
-      const ytMeta = ytWv ? await ytWv.executeJavaScript(FP_META_YT_JS, true).catch(() => null) : null;
-      if (ytMeta && (ytMeta.title || ytMeta.artist)) meta = ytMeta;
+    // Consulta primeiro a fonte ativa (fpSrc); a outra é fallback.
+    // Antes sempre ia no YTM primeiro — música pausada lá escondia o YouTube.
+    const order = fpSrc === 'yt' ? [ytWv, musicWv] : [musicWv, ytWv];
+    let meta = null;
+    for (const w of order) {
+      if (!w) continue;
+      const m = w === musicWv
+        ? await w.executeJavaScript(FP_META_MUSIC_JS, true).catch(() => null)
+        : await w.executeJavaScript(FP_META_YT_JS, true).catch(() => null);
+      if (m && (m.title || m.artist || m.cover)) { meta = m; break; }
     }
     if (meta && (meta.title || meta.artist)) {
       const fpTitle = document.getElementById('fp-title');
@@ -344,6 +349,13 @@ setInterval(async () => {
   const st = useYt ? stY : stM;
   fpSrc = st ? (useYt ? 'yt' : 'music') : null;
   fpPlayingNow = !!(st && !st.paused);
+  // Diagnóstico temporário: estado das duas fontes (visível no DevTools)
+  if (!window.__fpDbg || Date.now() - window.__fpDbg > 15000) {
+    window.__fpDbg = Date.now();
+    console.log('[fp] music:', stM ? (stM.paused ? 'paused' : 'playing') : 'null',
+                '| yt:', stY ? (stY.paused ? 'paused' : 'playing') : 'null',
+                '| src:', fpSrc);
+  }
   document.getElementById('fp-reopen')?.classList.toggle('playing', fpPlayingNow);
   syncDashHero();
   if (!st) {

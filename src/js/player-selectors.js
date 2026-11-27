@@ -43,7 +43,7 @@ window.FP_SELS = {
   // (/shorts, links do YTM abertos aqui) caem no título da aba.
   ytMeta: `(() => {
     const v = document.querySelector('video.html5-main-video') || document.querySelector('video');
-    if (!v || v.paused) return null;
+    if (!v) return null;
     const videoId = new URLSearchParams(location.search).get('v') || '';
     let title = '', artist = '';
     if (location.pathname.startsWith('/watch')) {
