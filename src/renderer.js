@@ -2363,9 +2363,37 @@ if (setYoutubeAnon) {
   const dateEl = document.getElementById('dash-date');
   const greetEl = document.getElementById('dash-greeting');
   const sessStart = Date.now();
+
+  // Paleta do relógio: gradiente muda suavemente conforme a hora do dia
+  const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clockStops = [
+    [0,  ['#4a6cf7', '#8b5cf6', '#c084fc']],  // madrugada
+    [5,  ['#3730a3', '#7c3aed', '#e879f9']],  // amanhecer profundo
+    [7,  ['#f59e0b', '#fb923c', '#fda4af']],  // nascer do sol
+    [10, ['#38bdf8', '#818cf8', '#c084fc']],  // manhã
+    [14, ['#22d3ee', '#34d399', '#a3e635']],  // tarde
+    [17, ['#fbbf24', '#f97316', '#ec4899']],  // entardecer
+    [19, ['#fb7185', '#a78bfa', '#6366f1']],  // anoitecer
+    [22, ['#818cf8', '#c084fc', '#f0abfc']],  // noite
+    [24, ['#4a6cf7', '#8b5cf6', '#c084fc']],
+  ].map(([h, cols]) => [h, cols.map(hexRgb)]);
+  const clockGradient = (hour) => {
+    let i = 0;
+    while (i < clockStops.length - 2 && clockStops[i + 1][0] <= hour) i++;
+    const [h0, c0] = clockStops[i];
+    const [h1, c1] = clockStops[i + 1];
+    const t = Math.min(1, Math.max(0, (hour - h0) / (h1 - h0)));
+    const cols = c0.map((stop, j) => stop.map((v, k) => lerp(v, c1[j][k], t)));
+    return `linear-gradient(90deg,${cols.map(c => `rgb(${c.map(Math.round).join(',')})`).join(',')})`;
+  };
+
   const tick = () => {
     const now = new Date();
-    if (clockEl) clockEl.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      clockEl.style.backgroundImage = clockGradient(now.getHours() + now.getMinutes() / 60);
+    }
     if (dateEl) dateEl.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
     if (greetEl) {
       const h = now.getHours();
